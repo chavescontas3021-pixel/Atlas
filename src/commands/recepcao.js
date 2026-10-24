@@ -254,7 +254,6 @@ module.exports = {
     if (grupo === 'emoji') return emojis(interaction, sub);
 
     if (sub === 'testarvaga') {
-        if (sub === 'testarvaga') {
       await interaction.deferReply({ flags: EPH });
       const nome = interaction.options.getString('nome');
       const r = await U.procurarVaga(interaction.guild, nome, interaction.user.id);
