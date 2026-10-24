@@ -67,13 +67,14 @@ function preencher(texto, vars) {
 }
 
 // Minúsculas, sem acentos, sem fonte estilizada (𝐀𝐊𝐀𝐙𝐀, ＡＫＡＺＡ),
-// sem caracteres invisíveis e sem espaços repetidos
+// sem caracteres invisíveis, sem formatação do Discord (_ * ~ ` |) e sem espaços repetidos
 function normalizar(texto) {
   return String(texto || '')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[\u200b-\u200f\u2060\ufeff\u00ad]/g, '')
     .replace(/[\u3164\u115f\u1160\u2800]/g, ' ')
+    .replace(/[_*~`|]/g, '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
@@ -129,8 +130,19 @@ function textoDaMensagem(msg) {
   return texto + textoComponentes(msg.components);
 }
 
+// Pega só o que vem depois de "Nome do personagem ;" no formulário de vaga.
+// Retorna null se a mensagem não tiver essa linha.
+function campoPersonagem(texto) {
+  for (const linha of String(texto).split(/\r?\n/)) {
+    const m = normalizar(linha).match(/nome d[oae]s? personagem\s*[;:|>=–—-]*\s*(.*)$/);
+    if (m) return m[1].trim();
+  }
+  return null;
+}
+
 // Procura o personagem no canal "fechar vaga".
-// ocupada = alguém (que não é o membro) já fechou; fechada = o próprio membro fechou.
+// ocupada = qualquer vaga com esse nome (de quem for);
+// fechada = a vaga com esse nome que foi fechada pelo próprio membro (autor ou mencionado).
 async function procurarVaga(guild, personagem, userId) {
   const id = cfg('canais.fechar_vaga');
   if (!id) return { erro: 'O canal de fechar vaga ainda não foi configurado.' };
@@ -149,15 +161,34 @@ async function procurarVaga(guild, personagem, userId) {
     return { erro: 'Não tenho permissão para ler o canal de fechar vaga.' };
   }
 
+  const textos = mensagens.map(textoDaMensagem);
+  const campos = textos.map(campoPersonagem);
+  // Se o canal usa o formulário "Nome do personagem ; ...", olhamos só esse campo
+  const usaFormulario = campos.some((c) => c !== null);
+
   let ocupada = null;
   let fechada = null;
-  for (const m of mensagens) {
-    if (!regex.test(normalizar(textoDaMensagem(m)))) continue;
-    const doMembro = m.author.id === userId || m.mentions.users.has(userId);
+  for (let i = 0; i < mensagens.length; i++) {
+    const m = mensagens[i];
+    const alvoBusca = usaFormulario ? campos[i] : normalizar(textos[i]);
+    if (alvoBusca === null || !regex.test(alvoBusca)) continue;
+
+    ocupada = ocupada || m;
+    const doMembro =
+      m.author.id === userId ||
+      m.mentions.users.has(userId) ||
+      textos[i].includes(`<@${userId}>`) ||
+      textos[i].includes(`<@!${userId}>`);
     if (doMembro) fechada = fechada || m;
-    else ocupada = ocupada || m;
   }
-  return { ocupada, fechada, lidas: mensagens.length };
+
+  return {
+    ocupada,
+    fechada,
+    lidas: mensagens.length,
+    formulario: usaFormulario,
+    amostra: mensagens.length ? normalizar(textos[0]).slice(0, 200) : '',
+  };
 }
 
 module.exports = {
