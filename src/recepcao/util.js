@@ -40,6 +40,7 @@ const PADROES = {
   },
 };
 
+// Quantas mensagens do canal "fechar vaga" o Atlas lê
 const LIMITE_MENSAGENS = 3000;
 
 function cfg(chave, padrao) {
@@ -65,7 +66,8 @@ function preencher(texto, vars) {
   return String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
 }
 
-// minúsculas, sem acentos e sem espaços repetidos
+// Minúsculas, sem acentos, sem fonte estilizada (𝐀𝐊𝐀𝐙𝐀, ＡＫＡＺＡ),
+// sem caracteres invisíveis e sem espaços repetidos
 function normalizar(texto) {
   return String(texto || '')
     .normalize('NFKD')
@@ -106,7 +108,7 @@ async function buscarMensagens(canal, limite) {
   return todas;
 }
 
-// Junta o texto da mensagem com o texto dos embeds
+// Lê o texto que estiver dentro dos componentes (mensagens de outros bots)
 function textoComponentes(lista) {
   let t = '';
   for (const c of lista || []) {
@@ -116,6 +118,7 @@ function textoComponentes(lista) {
   return t;
 }
 
+// Junta o texto da mensagem com o texto dos embeds e dos componentes
 function textoDaMensagem(msg) {
   let texto = msg.content || '';
   for (const e of msg.embeds) {
@@ -154,7 +157,7 @@ async function procurarVaga(guild, personagem, userId) {
     if (doMembro) fechada = fechada || m;
     else ocupada = ocupada || m;
   }
-    return { ocupada, fechada, lidas: mensagens.length };
+  return { ocupada, fechada, lidas: mensagens.length };
 }
 
 module.exports = {
