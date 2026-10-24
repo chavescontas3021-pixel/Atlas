@@ -154,7 +154,7 @@ async function procurarVaga(guild, personagem, userId) {
     if (doMembro) fechada = fechada || m;
     else ocupada = ocupada || m;
   }
-  return { ocupada, fechada };
+    return { ocupada, fechada, lidas: mensagens.length };
 }
 
 module.exports = {
