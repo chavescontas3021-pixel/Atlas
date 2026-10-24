@@ -40,7 +40,7 @@ const PADROES = {
   },
 };
 
-const LIMITE_MENSAGENS = 1000;
+const LIMITE_MENSAGENS = 3000;
 
 function cfg(chave, padrao) {
   return db.get(`config.recepcao.${chave}`, padrao);
