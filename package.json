@@ -1,0 +1,17 @@
+{
+  "name": "atlas-bot",
+  "version": "1.0.0",
+  "description": "Atlas - bot da house",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.0",
+    "dotenv": "^16.4.5"
+  }
+}
