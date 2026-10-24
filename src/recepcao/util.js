@@ -107,6 +107,15 @@ async function buscarMensagens(canal, limite) {
 }
 
 // Junta o texto da mensagem com o texto dos embeds
+function textoComponentes(lista) {
+  let t = '';
+  for (const c of lista || []) {
+    if (c.content) t += ' ' + c.content;
+    if (c.components) t += textoComponentes(c.components);
+  }
+  return t;
+}
+
 function textoDaMensagem(msg) {
   let texto = msg.content || '';
   for (const e of msg.embeds) {
@@ -114,7 +123,7 @@ function textoDaMensagem(msg) {
     for (const f of e.fields || []) partes.push(f.name, f.value);
     texto += ' ' + partes.filter(Boolean).join(' ');
   }
-  return texto;
+  return texto + textoComponentes(msg.components);
 }
 
 // Procura o personagem no canal "fechar vaga".
