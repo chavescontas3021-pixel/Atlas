@@ -160,4 +160,3 @@ module.exports = {
   ehPdf,
   extensaoImagem,
 };
-};
