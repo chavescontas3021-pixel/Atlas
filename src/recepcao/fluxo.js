@@ -138,7 +138,7 @@ async function receberPersonagem(message) {
       await message.reply(`⚠️ ${r.erro} Chame a staff, por favor.`);
       return;
     }
-    if (r.ocupada && !r.fechada) {
+    if (r.ocupada) {
       await message.reply(`😕 **${nome}** já está ocupado: ${r.ocupada.url}\nEscolha outro personagem e me envie o nome.`);
       return;
     }
