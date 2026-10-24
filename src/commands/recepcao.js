@@ -254,14 +254,15 @@ module.exports = {
     if (grupo === 'emoji') return emojis(interaction, sub);
 
     if (sub === 'testarvaga') {
+        if (sub === 'testarvaga') {
       await interaction.deferReply({ flags: EPH });
       const nome = interaction.options.getString('nome');
       const r = await U.procurarVaga(interaction.guild, nome, interaction.user.id);
       if (r.erro) return interaction.editReply(`⚠️ ${r.erro}`);
-      const achou = r.ocupada || r.fechada;
       return interaction.editReply(
-        `Li **${r.lidas}** mensagens do canal.\n` +
-          (achou ? `🔒 Encontrei: ${achou.url}` : '🔓 Não encontrei esse nome (vaga livre).')
+        `Li **${r.lidas}** mensagens. Formulário detectado: **${r.formulario ? 'sim' : 'não'}**.\n` +
+          (r.ocupada ? `🔒 Ocupado: ${r.ocupada.url}` : '🔓 Não encontrei esse nome (vaga livre).') +
+          `\n\nÚltima mensagem, do jeito que o Atlas leu:\n\`\`\`${r.amostra || '(vazio)'}\`\`\``
       );
     }
 
