@@ -2,11 +2,11 @@ const db = require('../db');
 
 // Passos mostrados ao membro (o "id" é usado no comando /recepcao canal)
 const PASSOS = [
-  { id: 'pings', nome: 'Pings', desc: 'Escolha os pings que você quer receber.' },
+  { id: 'pings', nome: 'Pings', desc: 'Escolha os cargos de ping que você quer receber.' },
   { id: 'apresentacao', nome: 'Apresentação', desc: 'Faça a sua apresentação.' },
-  { id: 'fechar_vaga', nome: 'Fechar vaga', desc: 'Feche a vaga do seu personagem.' },
-  { id: 'aniversario', nome: 'Aniversário', desc: 'Registre a data do seu aniversário.' },
-  { id: 'registro', nome: 'Registro', desc: 'Faça o seu registro.' },
+  { id: 'fechar_vaga', nome: 'Fechar vaga (obrigatório)', desc: 'Feche a vaga do seu personagem. É o único passo exigido para a verificação.' },
+  { id: 'aniversario', nome: 'Aniversário', desc: 'Escolha o seu cargo de aniversário.' },
+  { id: 'registro', nome: 'Registro', desc: 'Escolha os seus cargos de registro.' },
   { id: 'cor', nome: 'Cor', desc: 'Escolha a cor do seu nome.' },
   { id: 'avaliar', nome: 'Avaliar house e staff', desc: 'Conte o que achou da house e da staff.' },
 ];
