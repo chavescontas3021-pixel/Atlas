@@ -122,13 +122,12 @@ module.exports = {
     .setDescription('Configura a recepção automática do Atlas')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((s) => s.setName('status').setDescription('Mostra a configuração atual'))
-    .addSubcommand((s) =>
+        .addSubcommand((s) =>
       s
-        .setName('ativar')
-        .setDescription('Liga ou desliga a recepção automática')
-        .addBooleanOption((o) =>
-          o.setName('ligado').setDescription('Ligar (true) ou desligar (false)').setRequired(true)
-        )
+        .setName('testarvaga')
+        .setDescription('Testa se um personagem está ocupado no fechar vaga')
+        .addStringOption((o) => o.setName('nome').setDescription('Nome do personagem').setRequired(true))
+       )
     )
     .addSubcommand((s) => s.setName('testar').setDescription('Cria uma recepção de teste para você'))
     .addSubcommand((s) =>
@@ -246,7 +245,19 @@ module.exports = {
 
     if (grupo === 'molde') return moldes(interaction, sub);
     if (grupo === 'emoji') return emojis(interaction, sub);
-
+        
+    if (sub === 'testarvaga') {
+      await interaction.deferReply({ flags: EPH });
+      const nome = interaction.options.getString('nome');
+      const r = await U.procurarVaga(interaction.guild, nome, interaction.user.id);
+      if (r.erro) return interaction.editReply(`⚠️ ${r.erro}`);
+      const achou = r.ocupada || r.fechada;
+      return interaction.editReply(
+        `Li **${r.lidas}** mensagens do canal.\n` +
+          (achou ? `🔒 Encontrei: ${achou.url}` : '🔓 Não encontrei esse nome (vaga livre).')
+      );
+     }
+    
     if (sub === 'status') return status(interaction);
 
     if (sub === 'ativar') {
