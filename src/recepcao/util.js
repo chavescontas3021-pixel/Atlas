@@ -68,8 +68,10 @@ function preencher(texto, vars) {
 // minúsculas, sem acentos e sem espaços repetidos
 function normalizar(texto) {
   return String(texto || '')
-    .normalize('NFD')
+    .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u200b-\u200f\u2060\ufeff\u00ad]/g, '')
+    .replace(/[\u3164\u115f\u1160\u2800]/g, ' ')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
