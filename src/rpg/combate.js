@@ -151,12 +151,12 @@ function embedFim(e, j, fim, res) {
   const m = e.monstro;
   const emb = new EmbedBuilder().setColor(N.COR).setTitle(`${m.emoji} ${m.nome} (Nv ${m.nivel})`);
   if (fim === 'vitoria') {
-    let d = `🏆 **Vitória!**\n${e.log.join('\n')}\n\n⭐ +${res.xp} XP · 💰 +${res.moedas} moedas`;
+    let d = `🏆 **Vitória!**\n${e.log.join('\n')}\n\n✨ +${res.xp} XP · ⭐ +${res.moedas} stars`;
     if (res.drop) d += `\n🎁 Drop: ${N.nomeItem(res.drop)}`;
     if (res.subiu) d += `\n\n🎉 **Subiu para o nível ${j.nivel}!** Vida restaurada e +3 pontos de atributo.`;
     emb.setDescription(d);
   } else if (fim === 'derrota') {
-    emb.setDescription(`💀 **Derrota...**\n${e.log.join('\n')}\n\nVocê perdeu 💰 ${res.perda} moedas e acordou com ${j.hp} HP.`);
+    emb.setDescription(`💀 **Derrota...**\n${e.log.join('\n')}\n\nVocê perdeu ⭐ ${res.perda} stars e acordou com ${j.hp} HP.`);
   } else {
     emb.setDescription('🏃 Você fugiu do combate!');
   }
