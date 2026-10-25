@@ -10,7 +10,7 @@ module.exports = {
     .setName('rpgadmin')
     .setDescription('Administração do RPG (staff)')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .addSubcommand((s) => s.setName('moedas').setDescription('Dá ou tira moedas')
+    .addSubcommand((s) => s.setName('stars').setDescription('Dá ou tira stars')
       .addUserOption((o) => o.setName('membro').setDescription('Membro').setRequired(true))
       .addIntegerOption((o) => o.setName('quantidade').setDescription('Use negativo para tirar').setRequired(true)))
     .addSubcommand((s) => s.setName('xp').setDescription('Dá XP')
@@ -51,18 +51,18 @@ module.exports = {
       return interaction.reply({ content: `🗑️ Personagem de <@${alvo.id}> apagado.`, flags: EPH });
     }
 
-    if (sub === 'moedas') {
+    if (sub === 'stars') {
       const q = interaction.options.getInteger('quantidade');
       j.moedas = Math.max(0, j.moedas + q);
       N.salvar(alvo.id, j);
-      return interaction.reply({ content: `💰 <@${alvo.id}> agora tem **${j.moedas}** moedas.`, flags: EPH });
+      return interaction.reply({ content: `⭐ <@${alvo.id}> agora tem **${j.moedas}** stars.`, flags: EPH });
     }
 
     if (sub === 'xp') {
       const q = interaction.options.getInteger('quantidade');
       const subiu = N.ganharXp(j, q);
       N.salvar(alvo.id, j);
-      return interaction.reply({ content: `⭐ <@${alvo.id}> ganhou ${q} XP${subiu ? ` e subiu para o nível ${j.nivel}` : ''}.`, flags: EPH });
+      return interaction.reply({ content: `✨ <@${alvo.id}> ganhou ${q} XP${subiu ? ` e subiu para o nível ${j.nivel}` : ''}.`, flags: EPH });
     }
 
     if (sub === 'item') {
