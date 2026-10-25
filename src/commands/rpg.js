@@ -48,7 +48,7 @@ module.exports = {
     .addSubcommand((s) => s.setName('ranking').setDescription('Top 10 da house'))
     .addSubcommand((s) => s.setName('duelo').setDescription('Desafia um membro para um duelo')
       .addUserOption((o) => o.setName('membro').setDescription('Oponente').setRequired(true))
-      .addIntegerOption((o) => o.setName('aposta').setDescription('Moedas apostadas (padrão 0)').setMinValue(0).setMaxValue(100000))),
+      .addIntegerOption((o) => o.setName('aposta').setDescription('Stars apostadas (padrão 0)').setMinValue(0).setMaxValue(100000))),
 
   async execute(interaction) {
     const canal = db.get('config.rpg.canal', null);
@@ -66,7 +66,7 @@ module.exports = {
       const j = N.criar(id, classe, nome);
       const c = CLASSES[classe];
       return interaction.reply({
-        content: `${c.emoji} Personagem criado! Você é um(a) **${c.nome}** e ganhou 💰 100 moedas e 3 poções pequenas.\nHabilidade: **${c.hab.nome}** — ${c.hab.desc}\nComece com \`/rpg explorar\`.`,
+        content: `${c.emoji} Personagem criado! Você é um(a) **${c.nome}** e ganhou ⭐ 100 stars e 3 poções pequenas.\nHabilidade: **${c.hab.nome}** — ${c.hab.desc}\nComece com \`/rpg explorar\`.`,
         embeds: [N.embedPerfil(j, interaction.user)],
       });
     }
@@ -92,7 +92,7 @@ module.exports = {
       const txt = LOJA.map((k) => {
         const i = ITENS[k];
         const info = i.tipo === 'consumo' ? `cura ${i.cura} HP` : `+${i.bonus} ${i.tipo === 'arma' ? 'ataque' : 'defesa'} · Nv ${i.nivelMin}+`;
-        return `${i.emoji} **${i.nome}** — 💰 ${i.preco} (${info})`;
+        return `${i.emoji} **${i.nome}** — ⭐ ${i.preco} (${info})`;
       }).join('\n');
       return interaction.reply({ embeds: [new EmbedBuilder().setColor(N.COR).setTitle('🏪 Loja').setDescription(txt).setFooter({ text: 'Use /rpg comprar' })] });
     }
@@ -133,7 +133,7 @@ module.exports = {
       const subiu = N.ganharXp(j, xp);
       N.definirCd(j, 'treinar', 5 * 60 * 1000);
       N.salvar(id, j);
-      return interaction.reply(`🏋️ Você treinou: ⭐ +${xp} XP · 💰 +${moedas}${extra}${subiu ? `\n🎉 **Subiu para o nível ${j.nivel}!**` : ''}`);
+      return interaction.reply(`🏋️ Você treinou: ✨ +${xp} XP · ⭐ +${moedas} stars${extra}${subiu ? `\n🎉 **Subiu para o nível ${j.nivel}!**` : ''}`);
     }
 
     if (sub === 'diario') {
@@ -148,14 +148,14 @@ module.exports = {
       N.addItem(j, 'pocao_p', 1);
       N.definirCd(j, 'diario', 22 * 3600 * 1000);
       N.salvar(id, j);
-      return interaction.reply(`🎁 Recompensa diária: 💰 **${moedas}** moedas e 1 🧪 Poção Pequena!\n🔥 Sequência: **${j.streak}** dia(s) (bônus de ${Math.round(bonus * 100)}%).`);
+      return interaction.reply(`🎁 Recompensa diária: ⭐ **${moedas}** stars e 1 🧪 Poção Pequena!\n🔥 Sequência: **${j.streak}** dia(s) (bônus de ${Math.round(bonus * 100)}%).`);
     }
 
     if (sub === 'inventario') {
       const itens = Object.entries(j.inv);
       const txt = itens.length ? itens.map(([k, q]) => `${N.nomeItem(k)} × **${q}**`).join('\n') : 'Vazio.';
       return interaction.reply({
-        embeds: [new EmbedBuilder().setColor(N.COR).setTitle('🎒 Inventário').setDescription(txt).addFields({ name: '💰 Moedas', value: `${j.moedas}` })],
+        embeds: [new EmbedBuilder().setColor(N.COR).setTitle('🎒 Inventário').setDescription(txt).addFields({ name: '⭐ Stars', value: `${j.moedas}` })],
         flags: EPH,
       });
     }
@@ -168,11 +168,11 @@ module.exports = {
       if (i.nivelMin && j.nivel < i.nivelMin) return interaction.reply({ content: `Você precisa ser nível ${i.nivelMin} para comprar isso.`, flags: EPH });
       if (i.tipo !== 'consumo' && q > 1) return interaction.reply({ content: 'Equipamentos você compra um por vez.', flags: EPH });
       const total = i.preco * q;
-      if (j.moedas < total) return interaction.reply({ content: `Faltam 💰 ${total - j.moedas} moedas.`, flags: EPH });
+      if (j.moedas < total) return interaction.reply({ content: `Faltam ⭐ ${total - j.moedas} stars.`, flags: EPH });
       j.moedas -= total;
       N.addItem(j, item, q);
       N.salvar(id, j);
-      return interaction.reply({ content: `🛒 Você comprou ${q}× ${N.nomeItem(item)} por 💰 ${total}.`, flags: EPH });
+      return interaction.reply({ content: `🛒 Você comprou ${q}× ${N.nomeItem(item)} por ⭐ ${total}.`, flags: EPH });
     }
 
     if (sub === 'vender') {
@@ -184,7 +184,7 @@ module.exports = {
       N.removerItem(j, item, q);
       j.moedas += total;
       N.salvar(id, j);
-      return interaction.reply({ content: `💰 Você vendeu ${q}× ${N.nomeItem(item)} por ${total} moedas.`, flags: EPH });
+      return interaction.reply({ content: `⭐ Você vendeu ${q}× ${N.nomeItem(item)} por ${total} stars.`, flags: EPH });
     }
 
     if (sub === 'usar') {
@@ -232,13 +232,13 @@ module.exports = {
       if (alvo.bot || alvo.id === id) return interaction.reply({ content: 'Escolha outro membro.', flags: EPH });
       const outro = N.obter(alvo.id);
       if (!outro) return interaction.reply({ content: 'Esse membro não tem personagem.', flags: EPH });
-      if (j.moedas < aposta) return interaction.reply({ content: 'Você não tem moedas suficientes para essa aposta.', flags: EPH });
+      if (j.moedas < aposta) return interaction.reply({ content: 'Você não tem stars suficientes para essa aposta.', flags: EPH });
       const linha = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`rpg:d:ok:${id}:${alvo.id}:${aposta}`).setLabel('Aceitar').setEmoji('⚔️').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId(`rpg:d:no:${id}:${alvo.id}:${aposta}`).setLabel('Recusar').setStyle(ButtonStyle.Secondary),
       );
       return interaction.reply({
-        content: `⚔️ <@${alvo.id}>, **${interaction.user.username}** te desafiou para um duelo${aposta ? ` valendo 💰 **${aposta}**` : ''}!`,
+        content: `⚔️ <@${alvo.id}>, **${interaction.user.username}** te desafiou para um duelo${aposta ? ` valendo ⭐ **${aposta}**` : ''}!`,
         components: [linha],
       });
     }
