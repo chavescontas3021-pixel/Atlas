@@ -124,14 +124,14 @@ function embedPerfil(j, usuario) {
     .setThumbnail(usuario.displayAvatarURL())
     .addFields(
       { name: '❤️ Vida', value: `${barra(j.hp, j.hpMax)} ${j.hp}/${j.hpMax}`, inline: false },
-      { name: '⭐ XP', value: `${barra(j.xp, nec)} ${j.xp}/${nec}`, inline: false },
+      { name: '✨ XP', value: `${barra(j.xp, nec)} ${j.xp}/${nec}`, inline: false },
       { name: '📊 Atributos', value: attrs, inline: true },
       {
         name: '🎒 Equipamento',
         value: `Arma: ${j.equip.arma ? nomeItem(j.equip.arma) : '—'}\nArmadura: ${j.equip.armadura ? nomeItem(j.equip.armadura) : '—'}\n⚔️ Ataque: **${ataque(j)}** · 🛡️ Defesa: **${defesa(j)}**`,
         inline: true,
       },
-      { name: '💰 Moedas', value: `${j.moedas}`, inline: true },
+      { name: '⭐ Stars', value: `${j.moedas}`, inline: true },
       { name: '🏆 Combates', value: `${j.vitorias} vitórias · ${j.derrotas} derrotas${total ? ` (${Math.round((j.vitorias / total) * 100)}%)` : ''}`, inline: true },
     );
 }
