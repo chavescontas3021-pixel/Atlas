@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel do Atlas</title>
+<style>
+  :root {
+    --bg: #fff7fb; --card: #ffffff; --texto: #2a1f27; --suave: #7a6572; --borda: #f0d5e3;
+    --rosa: #f5a3c7; --rosa-forte: #d9578f; --ok: #2e9e5b; --erro: #d64545; --campo: #fffafd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1a1318; --card: #251b22; --texto: #f6e9f0; --suave: #b79ead; --borda: #3b2a35; --campo: #1f161c; --rosa-forte: #f5a3c7; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--texto); font: 16px/1.45 system-ui, sans-serif; padding-bottom: 96px; }
+  header { padding: 20px 16px 8px; max-width: 760px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 1.5rem; }
+  .sub { color: var(--suave); font-size: .9rem; }
+  main { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--borda); border-radius: 14px; padding: 14px; margin: 12px 0; }
+  label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .dica { color: var(--suave); font-size: .82rem; margin-top: 4px; }
+  input[type=text], input[type=password], input[type=number], input[type=time], select, textarea {
+    width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--borda);
+    background: var(--campo); color: var(--texto); font: inherit;
+  }
+  textarea { resize: vertical; min-height: 90px; }
+  button { font: inherit; border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; background: var(--rosa); color: #3a1428; font-weight: 600; }
+  button.sec { background: transparent; border: 1px solid var(--borda); color: var(--texto); }
+  button.mini { padding: 4px 10px; font-size: .8rem; }
+  .abas { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0; }
+  .abas button { white-space: nowrap; background: transparent; border: 1px solid var(--borda); color: var(--texto); }
+  .abas button.ativa { background: var(--rosa); color: #3a1428; border-color: var(--rosa); }
+  .campo.alterado { border-color: var(--rosa-forte); }
+  .campo .topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .tag { font-size: .72rem; color: var(--suave); }
+  .tag.pers { color: var(--rosa-forte); }
+  .checks { display: grid; gap: 6px; max-height: 220px; overflow: auto; }
+  .checks label { font-weight: 400; display: flex; gap: 8px; align-items: center; margin: 0; }
+  .linha-tipo { display: grid; grid-template-columns: 64px 1fr; gap: 6px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed var(--borda); }
+  .linha-tipo .desc { grid-column: 1 / -1; }
+  .linha-tipo .acoes { grid-column: 1 / -1; display: flex; gap: 6px; }
+  .barra { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--borda); padding: 10px 16px; display: flex; gap: 10px; align-items: center; justify-content: center; }
+  .barra .msg { flex: 1; max-width: 480px; font-size: .88rem; }
+  .ok { color: var(--ok); } .erro { color: var(--erro); }
+  details summary { cursor: pointer; font-weight: 600; }
+  ol { padding-left: 20px; margin: 8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🌸 Painel do Atlas</h1>
+  <div class="sub" id="sub">Configure mensagens, canais, cargos e mais, direto do celular.</div>
+</header>
+<main>
+  <div class="card" id="cx-conexao">
+    <details id="det-conexao">
+      <summary>🔑 Conexão com o GitHub</summary>
+      <p class="dica">O token fica salvo só neste navegador. Ele é o mesmo <b>GITHUB_TOKEN</b> do arquivo .env do bot.</p>
+      <label for="repo">Repositório (dono/nome)</label>
+      <input type="text" id="repo" placeholder="chavescontas3021-pixel/Atlas" autocomplete="off">
+      <label for="token" style="margin-top:10px">Token do GitHub</label>
+      <input type="password" id="token" placeholder="github_pat_..." autocomplete="off">
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button id="bt-conectar">Conectar</button>
+        <button class="sec" id="bt-sair">Esquecer token</button>
+      </div>
+    </details>
+  </div>
+  <div id="status" class="dica"></div>
+  <div class="abas" id="abas"></div>
+  <div id="campos"></div>
+</main>
+<div class="barra">
+  <div class="msg" id="msg"></div>
+  <button id="bt-salvar" disabled>Salvar</button>
+</div>
+
+<script>
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === 'texto') el.textContent = attrs[k];
+      else if (k.indexOf('on') === 0) el.addEventListener(k.slice(2), attrs[k]);
+      else if (k === 'checked' || k === 'disabled' || k === 'selected') el[k] = !!attrs[k];
+      else if (k === 'value') el.value = attrs[k];
+      else el.setAttribute(k, attrs[k]);
+    });
+    for (var i = 2; i < arguments.length; i++) {
+      var f = arguments[i];
+      if (f == null) continue;
+      el.appendChild(typeof f === 'string' ? document.createTextNode(f) : f);
+    }
+    return el;
+  }
+
+  function guardar(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function ler(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function apagar(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  function paraB64(txt) {
+    var bytes = new TextEncoder().encode(txt), bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+
+  var RAMO = 'dados';
+  var estado = null, valores = {}, resetados = {}, grupoAtivo = null;
+
+  function repo() { return ($('#repo').value || '').trim(); }
+  function token() { return ($('#token').value || '').trim(); }
+
+  function gh(caminho, opc) {
+    opc = opc || {};
+    opc.cache = 'no-store';
+    opc.headers = Object.assign({
+      Authorization: 'Bearer ' + token(),
+      Accept: 'application/vnd.github+json'
+    }, opc.headers || {});
+    return fetch('https://api.github.com' + caminho, opc);
+  }
+
+  function aviso(txt, classe) {
+    var m = $('#msg');
+    m.className = 'msg ' + (classe || '');
+    m.textContent = txt || '';
+  }
+
+  // ---------- carregar estado ----------
+  async function carregar(silencioso) {
+    if (!repo() || !token()) {
+      $('#status').textContent = 'Informe o repositório e o token em "Conexão com o GitHub".';
+      $('#det-conexao').open = true;
+      return false;
+    }
+    if (!silencioso) $('#status').textContent = 'Carregando...';
+    var r;
+    try {
+      r = await gh('/repos/' + repo() + '/contents/estado.json?ref=' + RAMO, {
+        headers: { Accept: 'application/vnd.github.raw+json' }
+      });
+    } catch (e) {
+      $('#status').textContent = 'Sem conexão com o GitHub.';
+      return false;
+    }
+    if (r.status === 401 || r.status === 403) { $('#status').textContent = 'Token inválido ou sem permissão.'; return false; }
+    if (r.status === 404) {
+      $('#status').textContent = 'O bot ainda não publicou a configuração. No Discord, use /site sincronizar e tente de novo.';
+      return false;
+    }
+    if (!r.ok) { $('#status').textContent = 'Erro ' + r.status + ' ao ler o GitHub.'; return false; }
+    estado = await r.json();
+    valores = {}; resetados = {};
+    estado.campos.forEach(function (c) { valores[c.caminho] = JSON.parse(JSON.stringify(c.valor)); });
+    var quando = estado.atualizadoEm ? new Date(estado.atualizadoEm).toLocaleString('pt-BR') : '';
+    $('#status').textContent = 'Servidor: ' + estado.servidor.nome + (quando ? ' · atualizado em ' + quando : '');
+    $('#det-conexao').open = false;
+    if (!grupoAtivo || !estado.campos.some(function (c) { return c.grupo === grupoAtivo; })) grupoAtivo = estado.campos[0].grupo;
+    desenhar();
+    return true;
+  }
+
+  // ---------- desenho ----------
+  function alterado(c) {
+    if (resetados[c.caminho]) return true;
+    return JSON.stringify(valores[c.caminho]) !== JSON.stringify(c.valor);
+  }
+
+  function contarAlterados() {
+    if (!estado) return 0;
+    return estado.campos.filter(alterado).length;
+  }
+
+  function atualizarBarra() {
+    var n = contarAlterados();
+    $('#bt-salvar').disabled = n === 0;
+    $('#bt-salvar').textContent = n ? 'Salvar (' + n + ')' : 'Salvar';
+  }
+
+  function desenhar() {
+    var grupos = [];
+    estado.campos.forEach(function (c) { if (grupos.indexOf(c.grupo) < 0) grupos.push(c.grupo); });
+    var abas = $('#abas');
+    abas.textContent = '';
+    grupos.forEach(function (g) {
+      abas.appendChild(h('button', { texto: g, class: g === grupoAtivo ? 'ativa' : '', onclick: function () { grupoAtivo = g; desenhar(); } }));
+    });
+    var area = $('#campos');
+    area.textContent = '';
+    estado.campos.filter(function (c) { return c.grupo === grupoAtivo; }).forEach(function (c) { area.appendChild(campo(c)); });
+    atualizarBarra();
+  }
+
+  function opcoesSelect(lista, atual, rotuloVazio) {
+    var ops = [h('option', { value: '', texto: rotuloVazio })];
+    var achou = !atual;
+    lista.forEach(function (i) {
+      var t = i.categoria ? '#' + i.nome + '  (' + i.categoria + ')' : (i.categoria === undefined ? i.nome : '#' + i.nome);
+      if (i.id === atual) achou = true;
+      ops.push(h('option', { value: i.id, texto: t, selected: i.id === atual }));
+    });
+    if (!achou) ops.push(h('option', { value: atual, texto: 'ID ' + atual + ' (não existe neste servidor)', selected: true }));
+    return ops;
+  }
+
+  function campo(c) {
+    var cx = h('div', { class: 'card campo' + (alterado(c) ? ' alterado' : '') });
+    var tag = h('span', { class: 'tag' + (c.personalizado ? ' pers' : ''), texto: c.personalizado ? 'personalizado' : 'padrão' });
+    var reset = h('button', {
+      class: 'sec mini', texto: 'Voltar ao padrão', type: 'button',
+      onclick: function () {
+        resetados[c.caminho] = true;
+        valores[c.caminho] = JSON.parse(JSON.stringify(c.padrao));
+        desenhar();
+      }
+    });
+    cx.appendChild(h('div', { class: 'topo' }, h('label', { texto: c.rotulo }), tag));
+
+    function mudou(v) {
+      valores[c.caminho] = v;
+      delete resetados[c.caminho];
+      cx.classList.toggle('alterado', alterado(c));
+      atualizarBarra();
+    }
+
+    var v = valores[c.caminho];
+    var ctl;
+    if (c.tipo === 'texto') {
+      ctl = h('input', { type: 'text', value: v == null ? '' : v, maxlength: c.max || 200, oninput: function (e) { mudou(e.target.value); } });
+    } else if (c.tipo === 'longo') {
+      ctl = h('textarea', { rows: '6', maxlength: c.max || 2000, oninput: function (e) { mudou(e.target.value); } });
+      ctl.value = v == null ? '' : v;
+    } else if (c.tipo === 'numero') {
+      ctl = h('input', { type: 'number', min: c.min, max: c.max, value: v == null ? '' : v, oninput: function (e) { mudou(e.target.value === '' ? '' : Number(e.target.value)); } });
+    } else if (c.tipo === 'hora') {
+      ctl = h('input', { type: 'time', value: v || '', oninput: function (e) { mudou(e.target.value); } });
+    } else if (c.tipo === 'bool') {
+      ctl = h('label', { style: 'font-weight:400;display:flex;gap:8px;align-items:center' },
+        h('input', { type: 'checkbox', checked: !!v, onchange: function (e) { mudou(e.target.checked); } }), 'Ligado');
+    } else if (c.tipo === 'canal') {
+      ctl = h('select', { onchange: function (e) { mudou(e.target.value); } }, ...opcoesSelect(estado.canais, v, '— nenhum —'));
+    } else if (c.tipo === 'categoria') {
+      ctl = h('select', { onchange: function (e) { mudou(e.target.value); } }, ...opcoesSelect(estado.categorias, v, '— nenhuma —'));
+    } else if (c.tipo === 'cargo') {
+      ctl = h('select', { onchange: function (e) { mudou(e.target.value); } }, ...opcoesSelect(estado.cargos, v, '— nenhum —'));
+    } else if (c.tipo === 'cargos') {
+      ctl = h('div', { class: 'checks' });
+      var sel = (v || []).slice();
+      estado.cargos.forEach(function (r) {
+        ctl.appendChild(h('label', {},
+          h('input', {
+            type: 'checkbox', checked: sel.indexOf(r.id) >= 0,
+            onchange: function (e) {
+              var i = sel.indexOf(r.id);
+              if (e.target.checked && i < 0) sel.push(r.id);
+              if (!e.target.checked && i >= 0) sel.splice(i, 1);
+              mudou(sel.slice());
+            }
+          }), r.nome));
+      });
+    } else if (c.tipo === 'lista') {
+      ctl = h('textarea', { rows: '6', oninput: function (e) { mudou(e.target.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean)); } });
+      ctl.value = (v || []).join('\n');
+    } else if (c.tipo === 'tickettipos') {
+      ctl = h('div');
+      var lista = (v || []).map(function (t) { return Object.assign({}, t); });
+      var redesenhar = function () {
+        ctl.textContent = '';
+        lista.forEach(function (t, i) {
+          ctl.appendChild(h('div', { class: 'linha-tipo' },
+            h('input', { type: 'text', placeholder: 'emoji', value: t.emoji || '', oninput: function (e) { t.emoji = e.target.value; mudou(JSON.parse(JSON.stringify(lista))); } }),
+            h('input', { type: 'text', placeholder: 'Nome', maxlength: '40', value: t.nome || '', oninput: function (e) { t.nome = e.target.value; mudou(JSON.parse(JSON.stringify(lista))); } }),
+            h('input', { type: 'text', class: 'desc', placeholder: 'Descrição (opcional)', maxlength: '80', value: t.desc || '', oninput: function (e) { t.desc = e.target.value; mudou(JSON.parse(JSON.stringify(lista))); } }),
+            h('div', { class: 'acoes' },
+              h('button', { class: 'sec mini', type: 'button', texto: '↑', onclick: function () { if (i > 0) { lista.splice(i - 1, 0, lista.splice(i, 1)[0]); mudou(JSON.parse(JSON.stringify(lista))); redesenhar(); } } }),
+              h('button', { class: 'sec mini', type: 'button', texto: '↓', onclick: function () { if (i < lista.length - 1) { lista.splice(i + 1, 0, lista.splice(i, 1)[0]); mudou(JSON.parse(JSON.stringify(lista))); redesenhar(); } } }),
+              h('button', { class: 'sec mini', type: 'button', texto: 'Remover', onclick: function () { if (lista.length > 1) { lista.splice(i, 1); mudou(JSON.parse(JSON.stringify(lista))); redesenhar(); } } })
+            )));
+        });
+        if (lista.length < (c.maxItens || 15)) {
+          ctl.appendChild(h('button', { class: 'sec', type: 'button', texto: '+ Adicionar categoria', onclick: function () { lista.push({ emoji: '', nome: '', desc: '' }); mudou(JSON.parse(JSON.stringify(lista))); redesenhar(); } }));
+        }
+      };
+      redesenhar();
+    } else {
+      ctl = h('div', { texto: 'Campo não suportado.' });
+    }
+    cx.appendChild(ctl);
+    if (c.dica) cx.appendChild(h('div', { class: 'dica', texto: c.dica }));
+    cx.appendChild(h('div', { style: 'margin-top:8px' }, reset));
+    return cx;
+  }
+
+  // ---------- salvar ----------
+  async function salvar() {
+    var mud = {};
+    estado.campos.forEach(function (c) {
+      if (resetados[c.caminho]) mud[c.caminho] = null;
+      else if (alterado(c)) mud[c.caminho] = valores[c.caminho];
+    });
+    if (!Object.keys(mud).length) return;
+    var id = String(Date.now());
+    $('#bt-salvar').disabled = true;
+    aviso('Enviando...', '');
+
+    try {
+      var sha = null;
+      var atual = await gh('/repos/' + repo() + '/contents/pedido.json?ref=' + RAMO);
+      if (atual.ok) sha = (await atual.json()).sha;
+      var corpo = { message: 'Site: pedido de mudança', branch: RAMO, content: paraB64(JSON.stringify({ id: id, mudancas: mud })) };
+      if (sha) corpo.sha = sha;
+      var r = await gh('/repos/' + repo() + '/contents/pedido.json', { method: 'PUT', body: JSON.stringify(corpo) });
+      if (!r.ok) {
+        aviso(r.status === 401 || r.status === 403 ? 'Token sem permissão de escrita (Contents: Read and write).' : 'Erro ' + r.status + ' ao enviar.', 'erro');
+        atualizarBarra();
+        return;
+      }
+    } catch (e) {
+      aviso('Sem conexão com o GitHub.', 'erro');
+      atualizarBarra();
+      return;
+    }
+
+    aviso('Enviado! Esperando o bot aplicar (até 1 min)...', '');
+    for (var t = 0; t < 30; t++) {
+      await new Promise(function (ok) { setTimeout(ok, 4000); });
+      try {
+        var e = await gh('/repos/' + repo() + '/contents/estado.json?ref=' + RAMO, { headers: { Accept: 'application/vnd.github.raw+json' } });
+        if (!e.ok) continue;
+        var novo = await e.json();
+        if (novo.resultado && String(novo.resultado.id) === id) {
+          var res = novo.resultado;
+          var nomes = {};
+          estado.campos.forEach(function (c) { nomes[c.caminho] = c.rotulo; });
+          if (res.erros.length) {
+            aviso('✅ ' + res.ok.length + ' aplicado(s). ❌ ' + res.erros.map(function (x) { return (nomes[x.caminho] || x.caminho) + ': ' + x.erro; }).join(' | '), 'erro');
+          } else {
+            aviso('✅ Tudo aplicado! Painéis já postados só mudam se você postar de novo.', 'ok');
+          }
+          await carregar(true);
+          return;
+        }
+      } catch (x) { /* tenta de novo */ }
+    }
+    aviso('O bot ainda não respondeu. Veja se ele está online e use /site sincronizar.', 'erro');
+    atualizarBarra();
+  }
+
+  // ---------- início ----------
+  $('#repo').value = ler('atlas_repo') || 'chavescontas3021-pixel/Atlas';
+  $('#token').value = ler('atlas_token');
+  $('#bt-conectar').addEventListener('click', function () {
+    guardar('atlas_repo', repo());
+    guardar('atlas_token', token());
+    carregar(false);
+  });
+  $('#bt-sair').addEventListener('click', function () {
+    apagar('atlas_token');
+    $('#token').value = '';
+    estado = null;
+    $('#campos').textContent = '';
+    $('#abas').textContent = '';
+    $('#status').textContent = 'Token removido deste navegador.';
+    atualizarBarra();
+  });
+  $('#bt-salvar').addEventListener('click', salvar);
+  carregar(false);
+})();
+</script>
+</body>
+  </html>
