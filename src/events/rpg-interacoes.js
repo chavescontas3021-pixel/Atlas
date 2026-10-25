@@ -67,7 +67,7 @@ async function duelo(interaction, partes) {
   const b = N.obter(alvoId);
   if (!a || !b) return interaction.update({ content: 'Um dos personagens não existe mais.', components: [] });
   if (a.moedas < aposta || b.moedas < aposta) {
-    return interaction.update({ content: 'Alguém não tem mais moedas para a aposta. Duelo cancelado.', components: [] });
+    return interaction.update({ content: 'Alguém não tem mais stars para a aposta. Duelo cancelado.', components: [] });
   }
 
   const r = C.simularDuelo(a, b);
@@ -90,7 +90,7 @@ async function duelo(interaction, partes) {
     .setDescription(
       `🏆 Vencedor: <@${venceu}>\n💀 Perdedor: <@${perdeu}>\n🔁 Rodadas: ${r.rounds}\n` +
       `❤️ Vida final: <@${desafianteId}> ${r.hpA}/${a.hpMax} · <@${alvoId}> ${r.hpB}/${b.hpMax}\n` +
-      `${aposta ? `💰 Aposta: ${aposta} moedas\n` : ''}⭐ Vencedor ganhou +20 XP${subiu ? ` e subiu para o nível ${jv.nivel}!` : '.'}`,
+      `${aposta ? `⭐ Aposta: ${aposta} stars\n` : ''}✨ Vencedor ganhou +20 XP${subiu ? ` e subiu para o nível ${jv.nivel}!` : '.'}`,
     );
   return interaction.update({ content: '', embeds: [emb], components: [] });
 }
