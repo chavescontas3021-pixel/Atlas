@@ -1,6 +1,7 @@
 const { MessageFlags, PermissionFlagsBits } = require('discord.js');
 const db = require('../db');
 const F = require('../recepcao/fluxo');
+const A = require('../recepcao/aprovacao');
 
 const EPH = MessageFlags.Ephemeral;
 
@@ -9,7 +10,11 @@ async function botao(interaction) {
   if (interaction.user.id !== userId) {
     return interaction.reply({ content: 'Esse botão não é para você 💜', flags: EPH });
   }
-  if (acao === 'verificar') return F.verificar(interaction);
+  if (acao === 'verificar') {
+    // Com autorização ligada, o pedido vai para a staff em vez de verificar na hora
+    if (A.usa(userId)) return A.pedir(interaction);
+    return F.verificar(interaction);
+  }
   if (acao === 'trocar') return F.trocar(interaction);
 }
 
