@@ -2,7 +2,7 @@ const { MessageFlags } = require('discord.js');
 const { ITENS, LOJA } = require('../rpg/dados');
 const N = require('../rpg/nucleo');
 const C = require('../rpg/combate');
-const { EmbedBuilder } = require('discord.js');
+const Duelo = require('../rpg/duelo');
 
 const EPH = MessageFlags.Ephemeral;
 
@@ -70,29 +70,52 @@ async function duelo(interaction, partes) {
     return interaction.update({ content: 'Alguém não tem mais stars para a aposta. Duelo cancelado.', components: [] });
   }
 
-  const r = C.simularDuelo(a, b);
-  const venceu = r.vencedor === 'a' ? desafianteId : alvoId;
-  const perdeu = r.vencedor === 'a' ? alvoId : desafianteId;
-  const jv = r.vencedor === 'a' ? a : b;
-  const jp = r.vencedor === 'a' ? b : a;
+  if (Duelo.emDuelo(desafianteId) || Duelo.emDuelo(alvoId)) {
+    return interaction.reply({ content: 'Um dos dois já está em um duelo.', flags: EPH });
+  }
 
-  jv.moedas += aposta;
-  jp.moedas -= aposta;
-  jv.vitorias++;
-  jp.derrotas++;
-  const subiu = N.ganharXp(jv, 20);
-  N.salvar(venceu, jv);
-  N.salvar(perdeu, jp);
+  const d = Duelo.iniciar(desafianteId, a, alvoId, b, aposta, async (duel) => {
+    // Tempo esgotado: quem estava na vez perde (W.O.)
+    const quem = Duelo.vez(duel);
+    duel.log = [`⌛ <@${quem.id}> demorou demais e perdeu por W.O.!`];
+    const venc = quem.id === duel.a.id ? duel.b : duel.a;
+    const r = Duelo.finalizar(duel, venc);
+    if (duel.msg) await duel.msg.edit({ content: '', embeds: [Duelo.embedFim(duel, r)], components: [] }).catch(() => {});
+  });
+  await interaction.update({
+    content: `⚔️ <@${Duelo.vez(d).id}>, é a sua vez!`,
+    embeds: [Duelo.embedDuelo(d)],
+    components: Duelo.botoes(d),
+  });
+  d.msg = interaction.message;
+}
 
-  const emb = new EmbedBuilder()
-    .setColor(N.COR)
-    .setTitle('⚔️ Resultado do duelo')
-    .setDescription(
-      `🏆 Vencedor: <@${venceu}>\n💀 Perdedor: <@${perdeu}>\n🔁 Rodadas: ${r.rounds}\n` +
-      `❤️ Vida final: <@${desafianteId}> ${r.hpA}/${a.hpMax} · <@${alvoId}> ${r.hpB}/${b.hpMax}\n` +
-      `${aposta ? `⭐ Aposta: ${aposta} stars\n` : ''}✨ Vencedor ganhou +20 XP${subiu ? ` e subiu para o nível ${jv.nivel}!` : '.'}`,
-    );
-  return interaction.update({ content: '', embeds: [emb], components: [] });
+// Botões do duelo em andamento (rpg:u:acao:id)
+async function duelando(interaction, partes) {
+  const acao = partes[2];
+  const d = Duelo.obter(partes[3]);
+  if (!d) return interaction.update({ content: '⌛ Esse duelo já terminou.', components: [] });
+
+  if (!Duelo.lado(d, interaction.user.id)) {
+    return interaction.reply({ content: 'Esse duelo não é seu.', flags: EPH });
+  }
+  if (Duelo.vez(d).id !== interaction.user.id) {
+    return interaction.reply({ content: 'Calma, ainda não é a sua vez! ⏳', flags: EPH });
+  }
+
+  const r = Duelo.agir(d, acao);
+  if (r.invalido) return interaction.reply({ content: r.invalido, flags: EPH });
+
+  if (r.fim) {
+    const fim = Duelo.finalizar(d, r.vencedor);
+    return interaction.update({ content: '', embeds: [Duelo.embedFim(d, fim)], components: [] });
+  }
+  d.msg = interaction.message;
+  return interaction.update({
+    content: `⚔️ <@${Duelo.vez(d).id}>, é a sua vez!`,
+    embeds: [Duelo.embedDuelo(d)],
+    components: Duelo.botoes(d),
+  });
 }
 
 module.exports = {
@@ -107,6 +130,7 @@ module.exports = {
         const partes = interaction.customId.split(':');
         if (partes[1] === 'c') return await combate(interaction, partes);
         if (partes[1] === 'd') return await duelo(interaction, partes);
+        if (partes[1] === 'u') return await duelando(interaction, partes);
       }
     } catch (err) {
       console.error('[RPG]', err);
