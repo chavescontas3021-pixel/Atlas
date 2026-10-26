@@ -5,6 +5,7 @@ const {
 const db = require('../db');
 const R = require('../rpg/nucleo');
 const S = require('../extras/stars');
+const Dragao = require('./dragao');
 
 const COR = 0xf5a3c7;
 const CD_ATAQUE = 20 * 1000;
@@ -59,7 +60,8 @@ function embedChefe(a) {
       { name: '🎁 Prêmio', value: `⭐ ${fmt(a.premio)} · ✨ ${fmt(a.xp)} XP`, inline: true },
       { name: '👥 Lutando', value: `${Object.keys(a.dano || {}).length}`, inline: true },
       { name: '🏆 Maior dano', value: top },
-    );
+    )
+    .setImage(Dragao.URL);
 }
 
 function botoes(desligados) {
@@ -92,6 +94,7 @@ async function invocar(guild, cfg) {
       content: cfg.cargoId ? `<@&${cfg.cargoId}>` : undefined,
       embeds: [embedChefe(a)],
       components: [botoes()],
+      files: [Dragao.anexo()],
       allowedMentions: cfg.cargoId ? { roles: [cfg.cargoId] } : { parse: [] },
     });
     a.msgId = msg.id;
