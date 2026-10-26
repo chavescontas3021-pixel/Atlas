@@ -7,6 +7,11 @@ const Not = require('../noturno/nucleo');
 const Mod = require('../moderacao/nucleo');
 const Liv = require('../livraria/nucleo');
 const Tkt = require('../ticket/nucleo');
+const Ani = require('../aniversario/nucleo');
+const Vag = require('../vagas/nucleo');
+const Ina = require('../inatividade/nucleo');
+const Mis = require('../missoes/nucleo');
+const Che = require('../chefe/nucleo');
 
 const TIPOS_TEXTO = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 const specs = [];
@@ -23,6 +28,7 @@ function mensagens(grupo, base, padroes, info) {
 
 // ---------- Geral ----------
 add({ grupo: 'Geral', caminho: 'config.prefixo', rotulo: 'Prefixo dos comandos de texto (ex.: !cargo)', tipo: 'texto', max: 3, padrao: '!' });
+add({ grupo: 'Geral', caminho: 'config.mensagens.ativo', rotulo: 'Usar as mensagens editadas com /mensagens (desligado = textos originais)', tipo: 'bool', padrao: true });
 add({ grupo: 'Geral', caminho: 'config.rpg.canal', rotulo: 'Canal do RPG (vazio = todos os canais)', tipo: 'canal', padrao: null });
 
 // ---------- Recepção ----------
@@ -91,6 +97,57 @@ add({ grupo: 'Tickets', caminho: 'config.ticket.tipos', rotulo: 'Categorias do p
 mensagens('Tickets', 'config.ticket', Tkt.PADROES, {
   painel: ['Painel de tickets', ''],
   abertura: ['Abertura do ticket', '{usuario} {emoji} {numero} {categoria}'],
+});
+
+// ---------- Aniversário ----------
+add({ grupo: 'Aniversário', caminho: 'config.aniversario.ativo', rotulo: 'Aniversário ligado', tipo: 'bool', padrao: false });
+add({ grupo: 'Aniversário', caminho: 'config.aniversario.canal', rotulo: 'Canal da mensagem de festa', tipo: 'canal', padrao: null });
+add({ grupo: 'Aniversário', caminho: 'config.aniversario.cargo', rotulo: 'Cargo de aniversariante (marcado na mensagem)', tipo: 'cargo', padrao: null });
+add({ grupo: 'Aniversário', caminho: 'config.aniversario.hora', rotulo: 'Hora da mensagem', tipo: 'hora', padrao: Ani.PADROES.hora });
+mensagens('Aniversário', 'config.aniversario', Ani.PADROES, {
+  anuncio: ['Mensagem de festa', '{usuarios} {cargo}'],
+});
+
+// ---------- Ficha ----------
+add({ grupo: 'Ficha', caminho: 'config.ficha.canal', rotulo: 'Canal onde as fichas são publicadas', tipo: 'canal', padrao: null });
+add({ grupo: 'Ficha', caminho: 'config.ficha.limite', rotulo: 'Fichas por pessoa', tipo: 'numero', min: 1, max: 10, padrao: 3 });
+
+// ---------- Vagas ----------
+add({ grupo: 'Vagas', caminho: 'config.vagas.canalPedidos', rotulo: 'Canal onde a staff recebe os pedidos de vaga', tipo: 'canal', padrao: null });
+add({ grupo: 'Vagas', caminho: 'config.vagas.cargo', rotulo: 'Cargo dado a quem ocupa uma vaga (opcional)', tipo: 'cargo', padrao: null });
+add({ grupo: 'Vagas', caminho: 'config.vagas.limite', rotulo: 'Vagas por pessoa', tipo: 'numero', min: 1, max: 10, padrao: 1 });
+mensagens('Vagas', 'config.vagas', Vag.PADROES, {
+  painel: ['Painel de vagas', ''],
+});
+
+// ---------- Inatividade ----------
+add({ grupo: 'Inatividade', caminho: 'config.inatividade.ativo', rotulo: 'Controle de inatividade ligado', tipo: 'bool', padrao: false });
+add({ grupo: 'Inatividade', caminho: 'config.inatividade.canal', rotulo: 'Canal de justificativas', tipo: 'canal', padrao: null, dica: 'Para postar o painel com o botão, use /inatividadeconfig painel depois de salvar.' });
+add({ grupo: 'Inatividade', caminho: 'config.inatividade.canalAviso', rotulo: 'Canal dos avisos (vazio = só DM)', tipo: 'canal', padrao: null });
+add({ grupo: 'Inatividade', caminho: 'config.inatividade.avisoDias', rotulo: 'Dias sem aparecer até o aviso', tipo: 'numero', min: 1, max: 180, padrao: Ina.PADROES.avisoDias });
+add({ grupo: 'Inatividade', caminho: 'config.inatividade.liberarDias', rotulo: 'Dias sem aparecer até liberar a vaga', tipo: 'numero', min: 2, max: 365, padrao: Ina.PADROES.liberarDias, dica: 'Precisa ser maior que o dia do aviso.' });
+add({ grupo: 'Inatividade', caminho: 'config.inatividade.maxDias', rotulo: 'Máximo de dias que alguém pode justificar', tipo: 'numero', min: 1, max: 180, padrao: Ina.PADROES.maxDias });
+mensagens('Inatividade', 'config.inatividade', Ina.PADROES, {
+  painel: ['Painel de justificativa', ''],
+  aviso: ['Aviso de inatividade', '{usuario} {dias} {restam} {vagas} {canal}'],
+  liberada: ['Vaga liberada', '{usuario} {dias} {vagas}'],
+});
+
+// ---------- Missões ----------
+add({ grupo: 'Missões', caminho: 'config.missoes.ativo', rotulo: 'Missões e conquistas ligadas', tipo: 'bool', padrao: true });
+add({ grupo: 'Missões', caminho: 'config.missoes.canal', rotulo: 'Canal dos anúncios de conquista (vazio = DM)', tipo: 'canal', padrao: null });
+mensagens('Missões', 'config.missoes', Mis.PADROES, {
+  conquista: ['Conquista desbloqueada', '{usuario} {emoji} {conquista} {desc} {stars}'],
+});
+
+// ---------- Loja ----------
+add({ grupo: 'Loja', caminho: 'config.loja.canalPedidos', rotulo: 'Canal onde a staff recebe os pedidos da loja', tipo: 'canal', padrao: null });
+
+// ---------- Chefes ----------
+mensagens('Chefes', 'config.chefe', Che.PADROES, {
+  chamada: ['Aparição do chefe', '{emoji} {chefe}'],
+  vitoria: ['Vitória', '{chefe} {ultimo} {mvp}'],
+  fuga: ['Fuga', '{chefe}'],
 });
 
 const porCaminho = new Map(specs.map((c) => [c.caminho, c]));
