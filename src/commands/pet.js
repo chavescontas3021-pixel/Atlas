@@ -2,6 +2,7 @@ const { EmbedBuilder, MessageFlags, SlashCommandBuilder } = require('discord.js'
 const db = require('../db');
 const R = require('../rpg/nucleo');
 const S = require('../extras/stars');
+const Bichos = require('../extras/bichos');
 
 const EPH = MessageFlags.Ephemeral;
 const COR = 0xf5a3c7;
@@ -14,8 +15,12 @@ const ESPECIES = {
   coelho: { emoji: '🐰', nome: 'Coelho', preco: 200, desc: 'Ligeiro: pode passear a cada 40 minutos.', pocao: 0.1, stars: 1, xp: 1, cd: 40 },
   raposa: { emoji: '🦊', nome: 'Raposa', preco: 400, desc: 'Esperta: ganha 25% mais XP.', pocao: 0.1, stars: 1, xp: 1.25, cd: 60 },
   coruja: { emoji: '🦉', nome: 'Coruja', preco: 500, desc: 'Sábia: mais XP e um pouco mais de stars.', pocao: 0.15, stars: 1.05, xp: 1.2, cd: 60 },
+  dragonfox: { emoji: '🦊', nome: 'Dragonfox', preco: 0, exclusivo: true, animado: true, desc: 'ULTRA LENDÁRIO: uma raposa com asas de dragão. +60% de stars, +50% de XP, acha poções e passeia a cada 30 min.', pocao: 0.35, stars: 1.6, xp: 1.5, cd: 30 },
   dragao: { emoji: '🐉', nome: 'Dragãozinho', preco: 1500, desc: 'Lendário: +30% de stars e acha poções.', pocao: 0.2, stars: 1.3, xp: 1.1, cd: 60 },
 };
+
+// Espécies exclusivas (presentes da staff) não aparecem na lista nem podem ser compradas
+const COMPRAVEIS = Object.entries(ESPECIES).filter(([, e]) => !e.exclusivo);
 
 const caminho = (uid) => `extras.pets.${uid}`;
 const obter = (uid) => db.get(caminho(uid), null);
@@ -44,9 +49,9 @@ function embedPet(p, dono) {
   const agora = Date.now();
   const saciado = p.alimentadoAte > agora;
   const cd = Math.max(0, (p.cdPasseio || 0) - agora);
-  return new EmbedBuilder()
-    .setColor(COR)
-    .setTitle(`${e.emoji} ${p.nome}`)
+  const emb = new EmbedBuilder()
+    .setColor(e.exclusivo ? 0xffb347 : COR)
+    .setTitle(`${e.emoji} ${p.nome}${e.exclusivo ? ' ✨' : ''}`)
     .setDescription(`${e.nome} de **${dono}**\n_${e.desc}_`)
     .addFields(
       { name: 'Nível', value: `${p.nivel}${p.nivel >= NIVEL_MAX ? ' (máx.)' : ` — ${R.barra(p.xp, xpNecessario(p.nivel), 10)} ${p.xp}/${xpNecessario(p.nivel)}`}` },
@@ -54,16 +59,25 @@ function embedPet(p, dono) {
       { name: 'Passeio', value: cd ? `⏳ em ${fmtMs(cd)}` : '✅ disponível', inline: true },
       { name: 'Passeios feitos', value: `${p.passeios || 0}`, inline: true },
     );
+  if (e.animado) emb.setImage(Bichos.anexoDe(p.especie).url);
+  return emb;
 }
 
+// Arquivo da imagem animada (só para espécies que têm)
+const arquivosPet = (p) => (ESPECIES[p.especie] && ESPECIES[p.especie].animado ? [Bichos.anexoDe(p.especie).anexo()] : []);
+
 module.exports = {
+  ESPECIES,
+  embedPet,
+  arquivosPet,
+  caminho,
   data: new SlashCommandBuilder()
     .setName('pet')
     .setDescription('Seu bichinho de estimação')
     .addSubcommand((s) => s.setName('lista').setDescription('Mostra os bichinhos disponíveis para adotar'))
     .addSubcommand((s) => s.setName('adotar').setDescription('Adota um pet (gasta stars)')
       .addStringOption((o) => o.setName('especie').setDescription('Qual bichinho').setRequired(true)
-        .addChoices(...Object.entries(ESPECIES).map(([id, e]) => ({ name: `${e.emoji} ${e.nome} — ${e.preco} stars`, value: id }))))
+        .addChoices(...COMPRAVEIS.map(([id, e]) => ({ name: `${e.emoji} ${e.nome} — ${e.preco} stars`, value: id }))))
       .addStringOption((o) => o.setName('nome').setDescription('Nome do pet').setRequired(true).setMaxLength(30)))
     .addSubcommand((s) => s.setName('ver').setDescription('Mostra o pet de alguém')
       .addUserOption((o) => o.setName('membro').setDescription('De quem (padrão: você)')))
@@ -80,7 +94,7 @@ module.exports = {
     const responder = (content) => interaction.reply({ content, flags: EPH });
 
     if (sub === 'lista') {
-      const txt = Object.values(ESPECIES).map((e) => `${e.emoji} **${e.nome}** — ⭐ ${e.preco}\n${e.desc}`).join('\n\n');
+      const txt = COMPRAVEIS.map(([, e]) => `${e.emoji} **${e.nome}** — ⭐ ${e.preco}\n${e.desc}`).join('\n\n');
       return interaction.reply({ embeds: [new EmbedBuilder().setColor(COR).setTitle('🐾 Bichinhos para adotar').setDescription(txt).setFooter({ text: 'Use /pet adotar' })], flags: EPH });
     }
 
@@ -88,13 +102,14 @@ module.exports = {
       const alvo = interaction.options.getUser('membro') || interaction.user;
       const p = obter(alvo.id);
       if (!p) return responder(alvo.id === uid ? 'Você ainda não tem um pet. Veja `/pet lista` e adote com `/pet adotar`.' : 'Essa pessoa ainda não tem um pet.');
-      return interaction.reply({ embeds: [embedPet(p, alvo.username)] });
+      return interaction.reply({ embeds: [embedPet(p, alvo.username)], files: arquivosPet(p) });
     }
 
     if (sub === 'adotar') {
       if (obter(uid)) return responder('❌ Você já tem um pet. Solte-o com `/pet soltar` se quiser outro.');
       const id = interaction.options.getString('especie');
       const e = ESPECIES[id];
+      if (!e || e.exclusivo) return responder('❌ Esse bichinho não está à venda.');
       const r = S.gastar(uid, e.preco);
       if (r.erro) return responder(`❌ ${r.erro}`);
       const p = { especie: id, nome: interaction.options.getString('nome').trim(), nivel: 1, xp: 0, alimentadoAte: Date.now() + 6 * HORA, cdPasseio: 0, passeios: 0, adotadoEm: Date.now() };
@@ -114,6 +129,7 @@ module.exports = {
     }
 
     if (sub === 'soltar') {
+      if (e.exclusivo) return responder('💛 Esse pet é um presente especial e não pode ser solto.');
       if (!interaction.options.getBoolean('confirmar')) return responder('Ufa, o pet continua com você. 💜');
       db.remover(caminho(uid));
       return responder(`👋 ${e.emoji} **${p.nome}** foi solto na natureza.`);
