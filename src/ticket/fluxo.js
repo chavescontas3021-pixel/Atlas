@@ -57,7 +57,7 @@ async function abrirModal(interaction, tipoId) {
   return interaction.showModal(modal);
 }
 
-async function criarCanal(guild, member, numero) {
+async function criarCanal(guild, member, numero, painel) {
   const eu = guild.members.me ?? (await guild.members.fetchMe());
   const P = PermissionFlagsBits;
   const basico = [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AttachFiles, P.EmbedLinks];
@@ -67,7 +67,7 @@ async function criarCanal(guild, member, numero) {
     { id: member.id, allow: basico },
     { id: eu.id, allow: [...basico, P.ManageChannels, P.ManageMessages] },
   ];
-  for (const id of N.staffRoles(guild)) permissoes.push({ id, allow: [...basico, P.ManageMessages] });
+  for (const id of N.staffRoles(guild, painel)) permissoes.push({ id, allow: [...basico, P.ManageMessages] });
 
   const nome = `ticket-${N.numeroFmt(numero)}-${member.user.username}`
     .toLowerCase()
@@ -79,7 +79,7 @@ async function criarCanal(guild, member, numero) {
     topic: `Ticket de ${member.user.username} (${member.id})`,
     permissionOverwrites: permissoes,
   };
-  const categoria = N.cfg('categoria');
+  const categoria = N.cfgPainel(painel, 'categoria');
   if (categoria && guild.channels.cache.has(categoria)) opcoes.parent = categoria;
   return guild.channels.create(opcoes);
 }
@@ -100,10 +100,11 @@ async function criarTicket(interaction, tipoId) {
   const assunto = interaction.fields.getTextInputValue('assunto').trim();
   const descricao = interaction.fields.getTextInputValue('descricao').trim();
   const numero = N.proximoNumero();
+  const painel = N.painelDoTipo(tipo.id);
 
   let canal;
   try {
-    canal = await criarCanal(guild, member, numero);
+    canal = await criarCanal(guild, member, numero, painel);
   } catch (erro) {
     console.error('[Ticket] erro ao criar canal:', erro);
     return interaction.editReply('⚠️ Não consegui criar o canal. Avise a staff (o limite de canais da categoria pode ter acabado).');
@@ -114,6 +115,7 @@ async function criarTicket(interaction, tipoId) {
     userId: member.id,
     canalId: canal.id,
     tipoId: tipo.id,
+    painelId: painel ? painel.id : null,
     tipoNome: tipo.nome,
     tipoEmoji: tipo.emoji || '',
     assunto,
@@ -124,8 +126,8 @@ async function criarTicket(interaction, tipoId) {
   };
   db.set(`ticket.abertos.${canal.id}`, ticket);
 
-  const staff = N.staffRoles(guild);
-  const pings = N.cfg('pingStaff', true) ? staff : [];
+  const staff = N.staffRoles(guild, painel);
+  const pings = N.cfgPainel(painel, 'pingStaff', true) ? staff : [];
   const conteudo = [`<@${member.id}>`, ...pings.map((id) => `<@&${id}>`)].join(' ');
 
   const msg = await canal.send({
@@ -147,7 +149,7 @@ async function assumir(interaction) {
   const canal = interaction.channel;
   const t = N.ticketDoCanal(canal.id);
   if (!t) return interaction.reply({ content: 'Este canal não é um ticket aberto.', flags: EPH });
-  if (!N.ehStaff(interaction.member)) {
+  if (!N.ehStaff(interaction.member, t)) {
     return interaction.reply({ content: 'Só a staff pode assumir tickets.', flags: EPH });
   }
   if (t.assumidoPor && t.assumidoPor !== interaction.user.id) {
@@ -175,7 +177,7 @@ async function assumir(interaction) {
 // ---------- Fechar ----------
 
 function podeFechar(member, t) {
-  return N.ehStaff(member) || member.id === t.userId;
+  return N.ehStaff(member, t) || member.id === t.userId;
 }
 
 async function abrirModalFechar(interaction) {
@@ -244,7 +246,7 @@ async function encerrar(guild, canal, executor, motivo) {
       )
       .setTimestamp();
 
-    const logId = N.cfg('logCanal');
+    const logId = N.cfgPainel(N.painelDoTicket(t), 'logCanal');
     const log = logId && guild.channels.cache.get(logId);
     if (log) {
       await log
