@@ -150,6 +150,60 @@ const BICHOS = {
   },
 };
 
+// Bichos ESPECIAIS: não aparecem no sorteio do /bichinho (são presentes exclusivos).
+// Têm tamanho próprio (28x20) e um segundo quadro desenhado à mão (asas batendo e piscadinha).
+const ESPECIAIS = {
+  dragonfox: {
+    emoji: '🦊', nome: 'Dragonfox', escala: 8,
+    cores: { o: [74, 38, 22], c: [236, 150, 60], d: [170, 95, 40], w: [255, 226, 180], k: [24, 18, 24], b: [255, 255, 255], p: [250, 150, 150], n: [60, 30, 30], r: [205, 100, 50], t: [96, 48, 28], s: [250, 190, 110] },
+    q: [
+      '............................',
+      '.t.......o........o.......t.',
+      '.tr.....opo......opo.....rt.',
+      '.trr...ocpco....ocpco...rrt.',
+      '.trrr..occccoooocccco..rrrt.',
+      '..trrr.occcccccccccco.rrrt..',
+      '..trrrroccccccccccccorrrrt..',
+      '...trrrocckbccccbkccorrrt...',
+      '...trrrocckkcccckkccorrrt...',
+      '....trroppcccnncccpporrt....',
+      '....trr.owwwwwwwwwwo.rrt....',
+      '.....tr..oowwwwwwoo..rss....',
+      '......t.occwwwwwwcco.t.ds...',
+      '........occwwwwwwcco....ds..',
+      '........occwwwwwwcco....ds..',
+      '........occwwwwwwcco...ds...',
+      '........owwwwwwwwwwo..ds....',
+      '........owwowwwwowwodds.....',
+      '........oooowwwwoooo........',
+      '............................',
+    ],
+    q2: [
+      '............................',
+      '.........o........o.........',
+      '........opo......opo........',
+      '.......ocpco....ocpco.......',
+      '.......occccoooocccco.......',
+      't......occcccccccccco......t',
+      'tr.....occcccccccccco.....rt',
+      '.trr...occooccccoocco...rrt.',
+      '.trrr..occcccccccccco..rrrt.',
+      '..trrrroppcccnncccpporrrrt..',
+      '..trrrr.owwwwwwwwwwo.rrrrt..',
+      '...trrr..oowwwwwwoo..rsst...',
+      '....trr.occwwwwwwcco.rrds...',
+      '....trr.occwwwwwwcco.rrtds..',
+      '........occwwwwwwcco....ds..',
+      '........occwwwwwwcco...ds...',
+      '........owwwwwwwwwwo..ds....',
+      '........owwowwwwowwodds.....',
+      '........oooowwwwoooo........',
+      '............................',
+    ],
+  },
+};
+const TODOS = { ...BICHOS, ...ESPECIAIS };
+
 // Compressão LZW usada pelo formato GIF
 function lzw(indices, minCode) {
   const clear = 1 << minCode;
@@ -206,15 +260,16 @@ const chaves = Object.keys(BICHOS);
 function quadro(bicho, indice) {
   const grade = bicho.q.map((l) => l.split(''));
   if (indice === 0) return grade;
+  if (bicho.q2) return bicho.q2.map((l) => l.split(''));
   const novo = grade.map((l) => l.map(() => '.'));
   for (let y = 0; y < grade.length; y++) {
-    for (let x = 0; x < 16; x++) if (grade[y][x] !== '.' && y + 1 < grade.length) novo[y + 1][x] = grade[y][x];
+    for (let x = 0; x < grade[0].length; x++) if (grade[y][x] !== '.' && y + 1 < grade.length) novo[y + 1][x] = grade[y][x];
   }
   // piscadinha: o olho vira um tracinho
   for (let y = 0; y < novo.length; y++) {
     const linha = novo[y];
     const temBrilho = linha.includes('b');
-    for (let x = 0; x < 16; x++) {
+    for (let x = 0; x < linha.length; x++) {
       if (linha[x] === 'b') linha[x] = 'o';
       else if (linha[x] === 'k' && !temBrilho) {
         const vizinho = [linha[x - 1], linha[x + 1]].find((c) => c && c !== 'k' && c !== 'b' && c !== '.');
@@ -223,20 +278,21 @@ function quadro(bicho, indice) {
     }
   }
   // k da linha do brilho vira tracinho também
-  for (const linha of novo) if (linha.includes('o') && linha.includes('k')) for (let x = 0; x < 16; x++) if (linha[x] === 'k' && linha.slice(Math.max(0, x - 1), x + 2).includes('o')) linha[x] = 'o';
+  for (const linha of novo) if (linha.includes('o') && linha.includes('k')) for (let x = 0; x < linha.length; x++) if (linha[x] === 'k' && linha.slice(Math.max(0, x - 1), x + 2).includes('o')) linha[x] = 'o';
   for (const [dx, dy] of BRILHINHO) if (novo[dy][dx] === '.') novo[dy][dx] = '*';
   return novo;
 }
 
 function montarGif(chave, fundoIdx) {
-  const bicho = BICHOS[chave];
+  const bicho = TODOS[chave];
+  const escala = bicho.escala || ESCALA;
   const letras = Object.keys(bicho.cores);
   const paleta = [FUNDOS[fundoIdx % FUNDOS.length], ...letras.map((l) => bicho.cores[l]), BRILHO];
   const mapa = { '.': 0, '*': paleta.length - 1 };
   letras.forEach((l, i) => (mapa[l] = i + 1));
 
-  const larg = 16 * ESCALA;
-  const alt = 16 * ESCALA;
+  const larg = bicho.q[0].length * escala;
+  const alt = bicho.q.length * escala;
   const out = [];
   out.push(...Buffer.from('GIF89a'));
   out.push(...u16(larg), ...u16(alt), 0xf3, 0, 0); // tabela global de 16 cores
@@ -247,8 +303,8 @@ function montarGif(chave, fundoIdx) {
     const pixels = [];
     for (const linha of grade) {
       const expandida = [];
-      for (const c of linha) for (let e = 0; e < ESCALA; e++) expandida.push(mapa[c] || 0);
-      for (let e = 0; e < ESCALA; e++) pixels.push(...expandida);
+      for (const c of linha) for (let e = 0; e < escala; e++) expandida.push(mapa[c] || 0);
+      for (let e = 0; e < escala; e++) pixels.push(...expandida);
     }
     out.push(0x21, 0xf9, 0x04, 0x04, ...u16(ATRASO), 0, 0);
     out.push(0x2c, 0, 0, 0, 0, ...u16(larg), ...u16(alt), 0);
@@ -279,4 +335,10 @@ function sortear(chave) {
   return { chave: c, emoji: BICHOS[c].emoji, nome: BICHOS[c].nome, arquivo: nome, url: `attachment://${nome}`, anexo: () => new AttachmentBuilder(gif(c, fundo), { name: nome }) };
 }
 
-module.exports = { BICHOS, chaves, gif, sortear };
+// Anexo pronto para um bicho específico (inclusive os especiais), ex.: anexoDe('dragonfox')
+function anexoDe(chave, fundo = 0) {
+  const nome = `${chave}.gif`;
+  return { url: `attachment://${nome}`, anexo: () => new AttachmentBuilder(gif(chave, fundo), { name: nome }) };
+}
+
+module.exports = { BICHOS, ESPECIAIS, chaves, gif, sortear, anexoDe };
