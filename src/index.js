@@ -16,7 +16,12 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions,
-  ],
+    // Usados pelos logs do servidor
+    GatewayIntentBits.GuildModeration,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildInvites,
+    GatewayIntentBits.GuildExpressions || GatewayIntentBits.GuildEmojisAndStickers,
+  ].filter(Boolean),
   partials: [Partials.Channel, Partials.Message, Partials.Reaction],
 });
 
