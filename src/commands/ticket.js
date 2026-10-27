@@ -43,7 +43,7 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'fechar') {
-      if (!N.ehStaff(interaction.member) && interaction.user.id !== t.userId) {
+      if (!N.ehStaff(interaction.member, t) && interaction.user.id !== t.userId) {
         return responder(interaction, '❌ Só quem abriu o ticket ou a staff pode fechar.');
       }
       const motivo = interaction.options.getString('motivo') || '';
@@ -51,7 +51,7 @@ module.exports = {
       return F.encerrar(interaction.guild, interaction.channel, interaction.user, motivo);
     }
 
-    if (!N.ehStaff(interaction.member)) return responder(interaction, '❌ Só a staff pode usar este comando.');
+    if (!N.ehStaff(interaction.member, t)) return responder(interaction, '❌ Só a staff pode usar este comando.');
 
     if (sub === 'adicionar') return F.adicionar(interaction, interaction.options.getUser('membro'));
     if (sub === 'remover') return F.remover(interaction, interaction.options.getUser('membro'));
