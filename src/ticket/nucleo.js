@@ -44,10 +44,55 @@ function tipos() {
   return Array.isArray(t) && t.length ? t : PADROES.tipos;
 }
 
-const acharTipo = (id) => tipos().find((t) => t.id === id) || null;
+// ---------- Painéis separados ----------
+// O painel "padrão" usa config.ticket.* (como sempre foi). Painéis extras ficam em config.ticket.paineis.<id>
+// e podem ter categorias, staff, categoria de canais, logs e mensagens próprios.
+function paineis() {
+  const p = cfg('paineis');
+  return p && typeof p === 'object' ? p : {};
+}
 
-function mensagem(tipo) {
-  return { ...PADROES.mensagens[tipo], ...(cfg(`mensagens.${tipo}`) || {}) };
+const listaPaineis = () => Object.values(paineis()).sort((a, b) => (a.criado || 0) - (b.criado || 0));
+const acharPainel = (id) => (id ? paineis()[id] || null : null);
+
+function proximoIdPainel() {
+  const n = db.get('ticket.contadorPaineis', 0) + 1;
+  db.set('ticket.contadorPaineis', n);
+  return `p${n}`;
+}
+
+// Painel dono de uma categoria (null = painel padrão)
+function painelDoTipo(tipoId) {
+  if (tipos().some((t) => t.id === tipoId)) return null;
+  return listaPaineis().find((p) => (p.tipos || []).some((t) => t.id === tipoId)) || null;
+}
+
+function acharTipo(id) {
+  const d = tipos().find((t) => t.id === id);
+  if (d) return d;
+  for (const p of listaPaineis()) {
+    const t = (p.tipos || []).find((x) => x.id === id);
+    if (t) return t;
+  }
+  return null;
+}
+
+const painelDoTicket = (t) => (t && t.painelId ? acharPainel(t.painelId) : null);
+
+// Configurações com herança: se o painel não definiu, vale a global
+function cfgPainel(painel, chave, padrao) {
+  if (painel && painel[chave] !== undefined && painel[chave] !== null) return painel[chave];
+  return cfg(chave, padrao);
+}
+
+function staffIds(painel) {
+  if (painel && Array.isArray(painel.staff) && painel.staff.length) return painel.staff;
+  return cfgLista('staff');
+}
+
+function mensagem(tipo, painel) {
+  const doPainel = painel && painel.mensagens ? painel.mensagens[tipo] : null;
+  return { ...PADROES.mensagens[tipo], ...(cfg(`mensagens.${tipo}`) || {}), ...(doPainel || {}) };
 }
 
 function preencher(texto, vars) {
@@ -75,18 +120,19 @@ function ticketsDoUsuario(userId) {
 }
 
 // Cargos da staff que ainda existem no servidor
-function staffRoles(guild) {
-  return cfgLista('staff').filter((id) => guild.roles.cache.has(id));
+function staffRoles(guild, painel) {
+  return staffIds(painel).filter((id) => guild.roles.cache.has(id));
 }
 
-function ehStaff(member) {
+// ticket (opcional): usa a staff do painel em que ele foi aberto
+function ehStaff(member, ticket) {
   if (
     member.permissions.has(PermissionFlagsBits.Administrator) ||
     member.permissions.has(PermissionFlagsBits.ManageGuild)
   ) {
     return true;
   }
-  return cfgLista('staff').some((id) => member.roles.cache.has(id));
+  return staffIds(painelDoTicket(ticket)).some((id) => member.roles.cache.has(id));
 }
 
 // Aceita emoji normal (sem letras) ou emoji personalizado <:nome:id>
@@ -98,7 +144,7 @@ function emojiValido(txt) {
 }
 
 function embedAbertura(t) {
-  const msg = mensagem('abertura');
+  const msg = mensagem('abertura', painelDoTicket(t));
   const vars = {
     usuario: `<@${t.userId}>`,
     numero: numeroFmt(t.numero),
@@ -234,6 +280,14 @@ module.exports = {
   limite,
   tipos,
   acharTipo,
+  paineis,
+  listaPaineis,
+  acharPainel,
+  proximoIdPainel,
+  painelDoTipo,
+  painelDoTicket,
+  cfgPainel,
+  staffIds,
   mensagem,
   preencher,
   numeroFmt,
