@@ -27,6 +27,9 @@ const client = new Client({
 
 client.commands = new Collection();
 
+// O Atlas tem muitos módulos ouvindo os mesmos eventos (é normal). Isso tira o aviso de "MaxListeners".
+client.setMaxListeners(0);
+
 // Lê todos os .js de uma pasta, incluindo subpastas
 function listarArquivos(dir) {
   let resultado = [];
