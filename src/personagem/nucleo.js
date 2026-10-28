@@ -4,6 +4,7 @@ const {
 } = require('discord.js');
 const db = require('../db');
 const A = require('./arte');
+const { ESPECIAIS } = require('./especiais');
 
 const COR = 0x6d3aa6;
 const ARQUIVO = 'personagem.gif';
@@ -14,6 +15,17 @@ const tem = (uid) => !!obter(uid);
 const aparencia = (uid) => A.normalizar(obter(uid));
 const salvar = (uid, app) => db.set(caminho(uid), A.normalizar(app));
 
+// Personagens especiais (ex.: o Rei de Pele Branca): a staff libera para alguém, a pessoa liga e desliga no editor
+const caminhoDesb = (uid) => `personagem.desbloqueios.${uid}`;
+const desbloqueios = (uid) => (db.get(caminhoDesb(uid), []) || []).filter((id) => ESPECIAIS[id]);
+const liberar = (uid, id) => { const l = desbloqueios(uid); if (!l.includes(id)) l.push(id); db.set(caminhoDesb(uid), l); };
+const retirar = (uid, id) => {
+  db.set(caminhoDesb(uid), desbloqueios(uid).filter((x) => x !== id));
+  const app = obter(uid);
+  if (app && app.especial === id) salvar(uid, { ...app, especial: '' });
+};
+const especialAtivo = (uid) => { const a = obter(uid); return a && a.especial && desbloqueios(uid).includes(a.especial) ? a.especial : ''; };
+
 // Cache simples: o mesmo visual não é desenhado duas vezes
 const cache = new Map();
 function gif(app) {
@@ -21,13 +33,15 @@ function gif(app) {
   const chave = JSON.stringify(a);
   if (!cache.has(chave)) {
     if (cache.size >= 60) cache.delete(cache.keys().next().value);
-    cache.set(chave, A.gifDe(a));
+    const esp = a.especial && ESPECIAIS[a.especial];
+    cache.set(chave, esp ? esp.gif(a) : A.gifDe(a));
   }
   return cache.get(chave);
 }
 
 const anexo = (app) => new AttachmentBuilder(gif(app), { name: ARQUIVO });
-const arquivos = (uid) => (tem(uid) ? [anexo(aparencia(uid))] : []);
+const visual = (uid) => { const a = aparencia(uid); if (a.especial && !desbloqueios(uid).includes(a.especial)) a.especial = ''; return a; };
+const arquivos = (uid) => (tem(uid) ? [anexo(visual(uid))] : []);
 function comImagem(embed, uid) {
   if (tem(uid)) embed.setImage(`attachment://${ARQUIVO}`);
   return embed;
@@ -35,6 +49,7 @@ function comImagem(embed, uid) {
 
 // Resumo em texto do visual atual
 function resumo(app) {
+  if (app.especial && ESPECIAIS[app.especial]) return `${ESPECIAIS[app.especial].emoji} Personagem único ativo: **${ESPECIAIS[app.especial].nome}**\nDesligue o botão para voltar ao visual montado.`;
   const C = A.CATALOGO;
   const nomeEstilo = (p) => C[p].estilos[C[p].ids.indexOf(app[p].estilo)];
   return [
@@ -55,7 +70,7 @@ function corAtual(app, parte) {
 
 // Mensagem completa do editor (imagem + menus + botões). Só quem abriu consegue mexer.
 function painel(uid, parte = 'cabelo', aviso) {
-  const app = aparencia(uid);
+  const app = visual(uid);
   const cat = A.CATALOGO[parte];
   const embed = new EmbedBuilder()
     .setColor(COR)
@@ -82,13 +97,20 @@ function painel(uid, parte = 'cabelo', aviso) {
         .addOptions(cat.cores.map((c, i) => ({ label: c.nome, value: String(i), default: i === atual }))),
     ));
   }
-  linhas.push(new ActionRowBuilder().addComponents(
+  const botoes = [
     new ButtonBuilder().setCustomId(`pers:rand:${uid}:${parte}`).setLabel('Aleatório').setEmoji('🎲').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`pers:reset:${uid}:${parte}`).setLabel('Padrão').setEmoji('↩️').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`pers:fim:${uid}`).setLabel('Pronto').setEmoji('✅').setStyle(ButtonStyle.Success),
-  ));
+  ];
+  linhas.push(new ActionRowBuilder().addComponents(...botoes));
+  const livres = desbloqueios(uid);
+  if (livres.length) {
+    linhas.push(new ActionRowBuilder().addComponents(...livres.map((id) =>
+      new ButtonBuilder().setCustomId(`pers:esp:${uid}:${id}`).setLabel(ESPECIAIS[id].nome).setEmoji(ESPECIAIS[id].emoji)
+        .setStyle(app.especial === id ? ButtonStyle.Primary : ButtonStyle.Secondary))));
+  }
   return { content: aviso || '', embeds: [embed], components: linhas, files: [anexo(app)], attachments: [] };
 }
 
-module.exports = { COR, ARQUIVO, obter, tem, aparencia, salvar, gif, anexo, arquivos, comImagem, resumo, painel };
+module.exports = { ESPECIAIS, desbloqueios, liberar, retirar, especialAtivo, visual, COR, ARQUIVO, obter, tem, aparencia, salvar, gif, anexo, arquivos, comImagem, resumo, painel };
 // fim do arquivo
