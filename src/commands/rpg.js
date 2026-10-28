@@ -5,6 +5,7 @@ const db = require('../db');
 const { CLASSES, ITENS, LOJA } = require('../rpg/dados');
 const N = require('../rpg/nucleo');
 const C = require('../rpg/combate');
+const Pers = require('../personagem/nucleo');
 
 const EPH = MessageFlags.Ephemeral;
 const classesEscolhas = Object.entries(CLASSES).map(([v, c]) => ({ name: `${c.emoji} ${c.nome}`, value: v }));
@@ -66,7 +67,7 @@ module.exports = {
       const j = N.criar(id, classe, nome);
       const c = CLASSES[classe];
       return interaction.reply({
-        content: `${c.emoji} Personagem criado! Você é um(a) **${c.nome}** e ganhou ⭐ 100 stars e 3 poções pequenas.\nHabilidade: **${c.hab.nome}** — ${c.hab.desc}\nComece com \`/rpg explorar\`.`,
+        content: `${c.emoji} Personagem criado! Você é um(a) **${c.nome}** e ganhou ⭐ 100 stars e 3 poções pequenas.\nHabilidade: **${c.hab.nome}** — ${c.hab.desc}\nMonte o visual dele com \`/personagem editar\` e comece com \`/rpg explorar\`.`,
         embeds: [N.embedPerfil(j, interaction.user)],
       });
     }
@@ -75,7 +76,7 @@ module.exports = {
       const alvo = interaction.options.getUser('membro') || interaction.user;
       const j = N.obter(alvo.id);
       if (!j) return interaction.reply({ content: alvo.id === id ? 'Crie seu personagem com `/rpg criar`.' : 'Esse membro ainda não criou personagem.', flags: EPH });
-      return interaction.reply({ embeds: [N.embedPerfil(j, alvo)] });
+      return interaction.reply({ embeds: [Pers.comImagem(N.embedPerfil(j, alvo), alvo.id)], files: Pers.arquivos(alvo.id) });
     }
 
     if (sub === 'ranking') {
@@ -244,3 +245,4 @@ module.exports = {
     }
   },
 };
+// fim do arquivo
