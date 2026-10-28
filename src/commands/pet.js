@@ -17,6 +17,14 @@ const ESPECIES = {
   coruja: { emoji: '🦉', nome: 'Coruja', preco: 500, desc: 'Sábia: mais XP e um pouco mais de stars.', pocao: 0.15, stars: 1.05, xp: 1.2, cd: 60 },
   dragonfox: { emoji: '🦊', nome: 'Dragonfox', preco: 0, exclusivo: true, animado: true, desc: 'ULTRA LENDÁRIO: uma raposa com asas de dragão. +60% de stars, +50% de XP, acha poções e passeia a cada 30 min.', pocao: 0.35, stars: 1.6, xp: 1.5, cd: 30 },
   dragao: { emoji: '🐉', nome: 'Dragãozinho', preco: 1500, desc: 'Lendário: +30% de stars e acha poções.', pocao: 0.2, stars: 1.3, xp: 1.1, cd: 60 },
+
+  // Lendários dark fantasy: caros, mas com os melhores benefícios.
+  // jxp = XP que o dono ganha a cada passeio; raro = chance de trazer um material valioso
+  corvo: { emoji: '🐦‍⬛', nome: 'Corvo Agourento', preco: 2000, desc: 'Lendário: +25% de stars, +35% de XP, passeia a cada 45 min e traz XP ao dono.', pocao: 0.25, stars: 1.25, xp: 1.35, cd: 45, jxp: 25, raro: { item: 'pena_sombria', chance: 0.1 } },
+  lobo: { emoji: '🐺', nome: 'Lobo Espectral', preco: 2800, desc: 'Lendário: +45% de stars, passeia a cada 40 min e traz XP ao dono.', pocao: 0.3, stars: 1.45, xp: 1.25, cd: 40, jxp: 40, raro: { item: 'pena_sombria', chance: 0.15 } },
+  fenix: { emoji: '🔥', nome: 'Fênix Carmesim', preco: 3800, desc: 'Lendário: +60% de stars, +40% de XP, passeia a cada 35 min e traz cinzas raras.', pocao: 0.4, stars: 1.6, xp: 1.4, cd: 35, jxp: 60, raro: { item: 'cinza_fenix', chance: 0.18 } },
+  wyvern: { emoji: '🐲', nome: 'Wyvern das Trevas', preco: 5000, desc: 'Mítico: +80% de stars, +55% de XP, passeia a cada 30 min e traz XP e fragmentos do vazio.', pocao: 0.45, stars: 1.8, xp: 1.55, cd: 30, jxp: 90, raro: { item: 'fragmento_vazio', chance: 0.2 } },
+  quimera: { emoji: '👑', nome: 'Quimera Ancestral', preco: 7000, desc: 'Mítico supremo: dobra as stars, +70% de XP, passeia a cada 25 min e traz muito XP e fragmentos do vazio.', pocao: 0.5, stars: 2.0, xp: 1.7, cd: 25, jxp: 140, raro: { item: 'fragmento_vazio', chance: 0.3 } },
 };
 
 // Espécies exclusivas (presentes da staff) não aparecem na lista nem podem ser compradas
@@ -160,6 +168,14 @@ module.exports = {
         R.addItem(j, 'pocao_p', 1);
         extra = '\n🧪 Ele achou uma **Poção Pequena**!';
       }
+      if (e.raro && Math.random() < e.raro.chance) {
+        R.addItem(j, e.raro.item, 1);
+        extra += `\n✨ Ele trouxe um item raro: ${R.nomeItem(e.raro.item)}!`;
+      }
+      if (e.jxp) {
+        const subiuDono = R.ganharXp(j, e.jxp);
+        extra += `\n📈 Você ganhou **${e.jxp} XP** com o passeio!${subiuDono ? ` Subiu para o nível **${j.nivel}**! 🎉` : ''}`;
+      }
       R.salvar(uid, j);
       p.cdPasseio = agora + e.cd * 60000;
       p.passeios = (p.passeios || 0) + 1;
@@ -169,3 +185,4 @@ module.exports = {
     }
   },
 };
+// fim do arquivo
