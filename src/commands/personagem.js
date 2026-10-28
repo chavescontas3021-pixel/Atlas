@@ -41,7 +41,7 @@ module.exports = {
 
     if (sub === 'editar') {
       if (!P.tem(uid)) P.salvar(uid, A.PADRAO); // começa com o viajante padrão
-      return interaction.reply({ ...P.painel(uid, 'cabelo'), flags: EPH });
+      return interaction.reply({ ...P.painel(uid, 'cabelo'), allowedMentions: { parse: [] } }); // mensagem normal (não efêmera): não some sozinha
     }
 
     const alvo = interaction.options.getUser('membro') || interaction.user;
