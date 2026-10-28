@@ -12,6 +12,9 @@ const Vag = require('../vagas/nucleo');
 const Ina = require('../inatividade/nucleo');
 const Mis = require('../missoes/nucleo');
 const Che = require('../chefe/nucleo');
+const Cas = require('../casamento/nucleo');
+const Des = require('../destaque/nucleo');
+const Msg = require('../mensagens/nucleo');
 
 const TIPOS_TEXTO = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 const specs = [];
@@ -150,6 +153,76 @@ mensagens('Chefes', 'config.chefe', Che.PADROES, {
   fuga: ['Fuga', '{chefe}'],
 });
 
+// ---------- Casamento ----------
+add({ grupo: 'Casamento', caminho: 'config.casamento.categoria', rotulo: 'Categoria onde os canais de casamento são criados', tipo: 'categoria', padrao: null });
+add({ grupo: 'Casamento', caminho: 'config.casamento.staff', rotulo: 'Cargo da staff que acompanha os casamentos', tipo: 'cargo', padrao: null });
+add({ grupo: 'Casamento', caminho: 'config.casamento.cargo', rotulo: 'Cargo dado aos dois quando casam', tipo: 'cargo', padrao: null });
+add({ grupo: 'Casamento', caminho: 'config.casamento.anuncio', rotulo: 'Canal do anúncio de casamento', tipo: 'canal', padrao: null });
+add({ grupo: 'Casamento', caminho: 'config.casamento.limite', rotulo: 'Convidados por casamento', tipo: 'numero', min: 1, max: 200, padrao: Cas.MAX_CONVIDADOS });
+
+// ---------- Destaque do mês ----------
+add({ grupo: 'Destaque', caminho: 'config.destaque.ativo', rotulo: 'Entrega automática do destaque ligada', tipo: 'bool', padrao: false });
+add({ grupo: 'Destaque', caminho: 'config.destaque.cargo', rotulo: 'Cargo do destaque do mês', tipo: 'cargo', padrao: null, dica: 'O cargo do Atlas precisa estar acima desse cargo.' });
+add({ grupo: 'Destaque', caminho: 'config.destaque.canal', rotulo: 'Canal do anúncio', tipo: 'canal', padrao: null });
+add({ grupo: 'Destaque', caminho: 'config.destaque.minimo', rotulo: 'Mínimo de mensagens no mês para ganhar', tipo: 'numero', min: 1, max: 100000, padrao: Des.MINIMO_PADRAO });
+add({ grupo: 'Destaque', caminho: 'config.destaque.mensagem', rotulo: 'Texto do anúncio', tipo: 'longo', max: 1000, padrao: Des.mensagemPadrao, dica: 'Variáveis: {mes} {membro} {n} {cargo}' });
+
+// ---------- Painéis de ticket extras (criados com /ticketpainel; aparecem aqui sozinhos) ----------
+function especsPaineis() {
+  const lista = [];
+  for (const p of Tkt.listaPaineis()) {
+    const g = `Ticket · ${String(p.nome || p.id).slice(0, 24)}`;
+    const base = `config.ticket.paineis.${p.id}`;
+    lista.push({ grupo: g, caminho: `${base}.nome`, rotulo: 'Nome do painel', tipo: 'texto', max: 40, padrao: null });
+    lista.push({ grupo: g, caminho: `${base}.categoria`, rotulo: 'Categoria dos tickets deste painel (vazio = a geral)', tipo: 'categoria', padrao: null });
+    lista.push({ grupo: g, caminho: `${base}.logCanal`, rotulo: 'Canal de logs deste painel (vazio = o geral)', tipo: 'canal', padrao: null });
+    lista.push({ grupo: g, caminho: `${base}.staff`, rotulo: 'Cargos que atendem este painel (vazio = a staff geral)', tipo: 'cargos', padrao: [] });
+    for (const [tipo, m] of Object.entries(Tkt.PADROES.mensagens)) {
+      const rot = tipo === 'painel' ? 'Painel' : 'Abertura do ticket';
+      const dica = tipo === 'painel' ? 'Sem variáveis. Depois de salvar, poste o painel de novo.' : 'Variáveis: {usuario} {emoji} {numero} {categoria}';
+      lista.push({ grupo: g, caminho: `${base}.mensagens.${tipo}.titulo`, rotulo: `${rot} — título`, tipo: 'texto', max: 200, padrao: m.titulo, dica });
+      lista.push({ grupo: g, caminho: `${base}.mensagens.${tipo}.texto`, rotulo: `${rot} — texto`, tipo: 'longo', max: 2000, padrao: m.texto, dica });
+    }
+  }
+  return lista;
+}
+
+// ---------- Todos os textos do bot (os mesmos do /mensagens) ----------
+const FUNDIR = {
+  aniversarioconfig: 'aniversario', fichaconfig: 'ficha', inatividadeconfig: 'inatividade', missoesconfig: 'missoes',
+  statsconfig: 'stats', casamentoconfig: 'casamento', ticketconfig: 'ticket', ticketpainel: 'ticket',
+  lojaadmin: 'loja', vagaadmin: 'vagas', vagalote: 'vagas', vaga: 'vagas', recepcaoaprovar: 'recepcao',
+  rpgadmin: 'rpg', chefeadmin: 'chefe', evento: 'eventos', lembrete: 'lembretes', presentepet: 'pet',
+  petpresente: 'pet', bichinho: 'pet', profissao: 'rpg', divorcio: 'casal',
+};
+const IGNORADOS = new Set(['site', 'ready', 'interactionCreate', 'utils']);
+const ROTULOS = { ajuda: 'Ajuda', aniversario: 'Aniversário', aviso: 'Avisos', ban: 'Ban', cargo: 'Cargos', casal: 'Casais', casamento: 'Casamento', chefe: 'Chefes', comandos: 'Comandos', desbanir: 'Desbanir', destaque: 'Destaque', diversao: 'Diversão', eventos: 'Eventos', expulsar: 'Expulsar', extras: 'Extras', ficha: 'Ficha', inatividade: 'Inatividade', info: 'Info', lembretes: 'Lembretes', livraria: 'Livraria', logs: 'Logs', loja: 'Loja', missoes: 'Missões', moderacao: 'Moderação', noturno: 'Noturno', pet: 'Pets', ping: 'Ping', prefixo: 'Prefixo', recepcao: 'Recepção', regras: 'Regras', rpg: 'RPG', sorteio: 'Sorteios', stats: 'Estatísticas', ticket: 'Tickets', utilidade: 'Utilidade', vagas: 'Vagas' };
+const nomeGrupo = (g) => FUNDIR[g] || g;
+const ehTextoDeVerdade = (m) => !/^[a-z][A-Za-z0-9_.:-]*$/.test(m) && m.trim().length > 1;
+
+let textosCache = null;
+function especsTextos() {
+  const cat = Msg.catalogo();
+  if (textosCache && textosCache.cat === cat) return textosCache.lista;
+  const lista = [];
+  for (const e of cat.lista) {
+    if (!ehTextoDeVerdade(e.modelo) || e.modelo.length > 3500) continue;
+    const grupos = [...new Set([...e.grupos].filter((g) => !IGNORADOS.has(g)).map(nomeGrupo))].sort();
+    if (!grupos.length) continue;
+    const g = grupos[0];
+    const vars = e.vars.length ? `Mantenha as variáveis: ${e.vars.map((v, i) => `{${i + 1}} = ${Msg.limpar(v, 40)}`).join(' · ')}` : 'Sem variáveis.';
+    lista.push({
+      grupo: `Textos · ${ROTULOS[g] || g}`, caminho: `mensagens.edicoes.${e.id}`, rotulo: Msg.limpar(e.modelo, 80),
+      tipo: 'msgcat', id: e.id, max: 4000, padrao: e.modelo, dica: vars, nvars: e.vars.length,
+    });
+  }
+  textosCache = { cat, lista };
+  return lista;
+}
+
+const todos = () => [...specs, ...especsPaineis(), ...especsTextos()];
+const achar = (caminho) => porCaminho.get(caminho) || especsPaineis().find((c) => c.caminho === caminho) || (caminho.startsWith('mensagens.edicoes.') ? especsTextos().find((c) => c.caminho === caminho) : null) || null;
+
 const porCaminho = new Map(specs.map((c) => [c.caminho, c]));
 
 // ---------- Validação ----------
@@ -238,21 +311,31 @@ function validar(c, v, guild) {
       }
       return { valor: lista };
     }
+    case 'msgcat': {
+      if (typeof v !== 'string') return { erro: 'Texto inválido.' };
+      const t = v.trim();
+      if (!t) return { erro: 'O texto não pode ficar vazio (use "Restaurar" para voltar ao original).' };
+      if (t.length > c.max) return { erro: `Máximo de ${c.max} caracteres.` };
+      for (let i = 1; i <= c.nvars; i++) if (!t.includes(`{${i}}`)) return { erro: `Faltou a variável {${i}}.` };
+      return { valor: t };
+    }
     default:
       return { erro: 'Tipo de campo desconhecido.' };
   }
 }
 
 function aplicar(caminho, valor, guild) {
-  const c = porCaminho.get(caminho);
+  const c = achar(caminho);
   if (!c) return { erro: 'Campo desconhecido.' };
   if (valor === null) {
-    db.remover(caminho);
+    if (c.tipo === 'msgcat') Msg.restaurar(c.id);
+    else db.remover(caminho);
     return { ok: true };
   }
   const r = validar(c, valor, guild);
   if (r.erro) return { erro: r.erro };
-  if (r.remover) db.remover(caminho);
+  if (c.tipo === 'msgcat') Msg.salvarEdicao(c.id, r.valor, 'site');
+  else if (r.remover) db.remover(caminho);
   else db.set(caminho, r.valor);
   return { ok: true };
 }
@@ -271,7 +354,14 @@ function processarPedido(pedido, guild) {
 
 // ---------- Estado publicado para o site ----------
 function montarEstado(guild, resultado) {
-  const campos = specs.map((c) => {
+  const campos = todos().map((c) => {
+    if (c.tipo === 'msgcat') {
+      const ed = Msg.editada(c.id);
+      return {
+        grupo: c.grupo, caminho: c.caminho, rotulo: c.rotulo, tipo: 'longo', dica: c.dica, max: c.max,
+        padrao: c.padrao, valor: ed ? ed.texto : c.padrao, personalizado: !!ed,
+      };
+    }
     const salvo = db.get(c.caminho, undefined);
     return {
       grupo: c.grupo,
@@ -313,3 +403,4 @@ function montarEstado(guild, resultado) {
 }
 
 module.exports = { specs, aplicar, processarPedido, montarEstado };
+// fim do arquivo
