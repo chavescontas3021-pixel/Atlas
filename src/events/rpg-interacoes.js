@@ -45,12 +45,14 @@ async function combate(interaction, partes) {
   const r = C.agir(e, j, acao);
   if (r.invalido) return interaction.reply({ content: r.invalido, flags: EPH });
 
+  await interaction.deferUpdate(); // desenhar o GIF leva um instante
   if (r.fim) {
+    const files = C.arquivos(e, j, r.fim);
     const res = C.finalizar(e, j, r.fim);
-    return interaction.update({ embeds: [C.embedFim(e, j, r.fim, res)], components: [] });
+    return interaction.editReply({ embeds: [C.embedFim(e, j, r.fim, res)], components: [], files, attachments: [] });
   }
   N.salvar(userId, j);
-  return interaction.update({ embeds: [C.embedCombate(e, j)], components: C.botoes(userId) });
+  return interaction.editReply({ embeds: [C.embedCombate(e, j)], components: C.botoes(userId), files: C.arquivos(e, j), attachments: [] });
 }
 
 async function duelo(interaction, partes) {
@@ -74,18 +76,22 @@ async function duelo(interaction, partes) {
     return interaction.reply({ content: 'Um dos dois já está em um duelo.', flags: EPH });
   }
 
+  await interaction.deferUpdate(); // desenhar o GIF leva um instante
   const d = Duelo.iniciar(desafianteId, a, alvoId, b, aposta, async (duel) => {
     // Tempo esgotado: quem estava na vez perde (W.O.)
     const quem = Duelo.vez(duel);
     duel.log = [`⌛ <@${quem.id}> demorou demais e perdeu por W.O.!`];
     const venc = quem.id === duel.a.id ? duel.b : duel.a;
     const r = Duelo.finalizar(duel, venc);
-    if (duel.msg) await duel.msg.edit({ content: '', embeds: [Duelo.embedFim(duel, r)], components: [] }).catch(() => {});
+    duel.eventos = [];
+    if (duel.msg) await duel.msg.edit({ content: '', embeds: [Duelo.embedFim(duel, r)], components: [], files: Duelo.arquivos(duel, r.perdedor.id), attachments: [] }).catch(() => {});
   });
-  await interaction.update({
+  await interaction.editReply({
     content: `⚔️ <@${Duelo.vez(d).id}>, é a sua vez!`,
     embeds: [Duelo.embedDuelo(d)],
     components: Duelo.botoes(d),
+    files: Duelo.arquivos(d),
+    attachments: [],
   });
   d.msg = interaction.message;
 }
@@ -106,15 +112,18 @@ async function duelando(interaction, partes) {
   const r = Duelo.agir(d, acao);
   if (r.invalido) return interaction.reply({ content: r.invalido, flags: EPH });
 
+  await interaction.deferUpdate(); // desenhar o GIF leva um instante
   if (r.fim) {
     const fim = Duelo.finalizar(d, r.vencedor);
-    return interaction.update({ content: '', embeds: [Duelo.embedFim(d, fim)], components: [] });
+    return interaction.editReply({ content: '', embeds: [Duelo.embedFim(d, fim)], components: [], files: Duelo.arquivos(d, fim.perdedor.id), attachments: [] });
   }
   d.msg = interaction.message;
-  return interaction.update({
+  return interaction.editReply({
     content: `⚔️ <@${Duelo.vez(d).id}>, é a sua vez!`,
     embeds: [Duelo.embedDuelo(d)],
     components: Duelo.botoes(d),
+    files: Duelo.arquivos(d),
+    attachments: [],
   });
 }
 
@@ -142,3 +151,4 @@ module.exports = {
     }
   },
 };
+// fim do arquivo
