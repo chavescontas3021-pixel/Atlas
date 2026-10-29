@@ -354,7 +354,7 @@ function gifRei(app) {
 }
 
 const ESPECIAIS = {
-  rei: { nome: 'O Rei de Pele Branca', emoji: '👑', grade: gradeRei, gif: gifRei },
+  rei: { nome: 'O Rei de Pele Branca', emoji: '👑', grade: gradeRei, gif: gifRei, sprite: reiPersonagem, cores: coresRei, quadros: QUADROS },
 };
 
 module.exports = { ESPECIAIS, gradeRei, gifRei, CW, CH, SW, SH };
