@@ -2,6 +2,11 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { CLASSES, ITENS, MONSTROS } = require('./dados');
 const N = require('./nucleo');
+const B = require('../personagem/batalha');
+const Pers = require('../personagem/nucleo');
+
+// Visual do golpe de cada classe no GIF
+const VISUAL = { guerreiro: 'cruz', mago: 'explosao', arqueiro: 'flechas', curandeiro: 'luz', ladino: 'furtivo' };
 
 const ativos = new Map(); // userId -> estado do combate
 const EXPIRA = 10 * 60 * 1000;
@@ -28,7 +33,8 @@ function escolherMonstro(nivel) {
 function iniciar(userId, j) {
   const antigo = ativos.get(userId);
   if (antigo && Date.now() - antigo.inicio < EXPIRA) return null;
-  const e = { userId, monstro: escolherMonstro(j.nivel), cdHab: 0, log: ['⚔️ O combate começou!'], inicio: Date.now() };
+  const monstro = escolherMonstro(j.nivel);
+  const e = { userId, monstro, cdHab: 0, log: ['⚔️ O combate começou!'], inicio: Date.now(), eventos: [], hpIni: { a: j.hp, b: monstro.hp } };
   ativos.set(userId, e);
   return e;
 }
@@ -44,6 +50,9 @@ function agir(e, j, tipo) {
   const cl = CLASSES[j.classe];
   const m = e.monstro;
   const linhas = [];
+  e.eventos = [];
+  e.hpIni = { a: j.hp, b: m.hp };
+  const reg = (ev) => e.eventos.push({ hpA: Math.max(0, j.hp), hpB: Math.max(0, m.hp), ...ev });
 
   if (tipo === 'hab' && e.cdHab > 0) return { invalido: `Sua habilidade está em recarga (${e.cdHab} turno(s)).` };
 
@@ -55,6 +64,7 @@ function agir(e, j, tipo) {
     const cura = Math.min(ITENS[id].cura, j.hpMax - j.hp);
     j.hp += cura;
     linhas.push(`🧪 Você usou **${ITENS[id].nome}** e recuperou **${cura}** HP.`);
+    reg({ por: 'a', tipo: 'poc', cura });
   } else if (tipo === 'fug') {
     const chance = Math.min(85, 45 + j.attr.agilidade * 2);
     if (Math.random() * 100 < chance) {
@@ -78,11 +88,14 @@ function agir(e, j, tipo) {
     const r = golpe(N.ataque(j), N.critChance(j), m.def, opts);
     m.hp -= r.dano;
     linhas.push(`${tipo === 'hab' ? '💥' : '🗡️'} **${nome}**: ${r.dano} de dano${r.crit ? ' (**CRÍTICO!**)' : ''}.`);
+    let curou = 0;
     if (cura) {
       const c = Math.min(cura, j.hpMax - j.hp);
       j.hp += c;
+      curou = c;
       linhas.push(`✨ Você recuperou **${c}** HP.`);
     }
+    reg({ por: 'a', tipo: tipo === 'hab' ? 'hab' : 'atq', visual: tipo === 'hab' ? (VISUAL[j.classe] || 'cruz') : 'corte', dano: r.dano, crit: r.crit, cura: curou });
   }
 
   if (m.hp <= 0) {
@@ -94,10 +107,12 @@ function agir(e, j, tipo) {
   // Turno do monstro
   if (Math.random() * 100 < N.esquiva(j)) {
     linhas.push(`💨 Você desviou do ataque de ${m.nome}!`);
+    reg({ por: 'b', tipo: 'atq', visual: 'corte', esq: true });
   } else {
     const r = golpe(Math.round(m.atk * rolar(80, 120) / 100), 5, N.defesa(j));
     j.hp -= r.dano;
     linhas.push(`${m.emoji} ${m.nome} causou **${r.dano}** de dano${r.crit ? ' (**CRÍTICO!**)' : ''}.`);
+    reg({ por: 'b', tipo: 'atq', visual: 'corte', dano: r.dano, crit: r.crit });
   }
   if (e.cdHab > 0) e.cdHab--;
 
@@ -144,12 +159,29 @@ function embedCombate(e, j) {
       { name: `${cl.emoji} ${j.personagem || 'Você'}`, value: `${N.barra(j.hp, j.hpMax)} ${j.hp}/${j.hpMax}`, inline: false },
       { name: 'Último turno', value: e.log.join('\n').slice(0, 1000) || '—', inline: false },
     )
+    .setImage(`attachment://${B.ARQUIVO}`)
     .setFooter({ text: e.cdHab > 0 ? `${cl.hab.nome}: recarga ${e.cdHab} turno(s)` : `${cl.hab.nome}: pronta! · ${cl.hab.desc}` });
+}
+
+// GIF da cena do turno (fim: 'vitoria' | 'derrota' | 'fuga' | undefined). Devolve a lista de arquivos para a mensagem.
+function arquivos(e, j, fim) {
+  if (fim === 'fuga') return [];
+  const m = e.monstro;
+  return [B.anexo({
+    esq: { tipo: 'heroi', app: Pers.visual(e.userId) },
+    dir: { tipo: 'monstro', nome: m.nome },
+    eventos: e.eventos || [],
+    hpIni: e.hpIni || { a: j.hp, b: m.hp },
+    hpMax: { a: j.hpMax, b: m.hpMax },
+    fim: !!fim,
+    perdedor: fim === 'vitoria' ? 'b' : 'a',
+  })];
 }
 
 function embedFim(e, j, fim, res) {
   const m = e.monstro;
   const emb = new EmbedBuilder().setColor(N.COR).setTitle(`${m.emoji} ${m.nome} (Nv ${m.nivel})`);
+  if (fim !== 'fuga') emb.setImage(`attachment://${B.ARQUIVO}`);
   if (fim === 'vitoria') {
     let d = `🏆 **Vitória!**\n${e.log.join('\n')}\n\n✨ +${res.xp} XP · ⭐ +${res.moedas} stars`;
     if (res.drop) d += `\n🎁 Drop: ${N.nomeItem(res.drop)}`;
@@ -208,4 +240,5 @@ function simularDuelo(a, b) {
   return { vencedor: pa >= pb ? 'a' : 'b', rounds, hpA: Math.max(0, A.hp), hpB: Math.max(0, B.hp) };
 }
 
-module.exports = { iniciar, obterAtivo, agir, finalizar, embedCombate, embedFim, botoes, simularDuelo };
+module.exports = { iniciar, obterAtivo, agir, finalizar, embedCombate, embedFim, arquivos, botoes, simularDuelo };
+// fim do arquivo
