@@ -19,7 +19,7 @@ const ARQUIVO = 'batalha.gif';
 const toRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const toHex = (c) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 const mistura = (a, b, f) => { const x = toRgb(a); const y = toRgb(b); return toHex(x.map((v, i) => v + (y[i] - v) * f)); };
-const px = (g, x, y, c) => { x = Math.round(x); y = Math.round(y); if (y >= 0 && y < H && x >= 0 && x < W) g[y][x] = c; };
+const px = (g, x, y, c) => { x = Math.round(x); y = Math.round(y); if (y >= 0 && y < g.length && x >= 0 && x < g[0].length) g[y][x] = c; };
 const ret = (g, x, y, w, h, c) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) px(g, x + i, y + j, c); };
 function lin(g, x0, y0, x1, y1, c, esp = 1) {
   const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
@@ -280,5 +280,5 @@ function gif(cfg) {
 
 const anexo = (cfg) => new AttachmentBuilder(gif(cfg), { name: ARQUIVO });
 
-module.exports = { ARQUIVO, W, H, gif, anexo, gradeHeroi };
+module.exports = { ARQUIVO, W, H, gif, anexo, gradeHeroi, efeito, numero, mistura, tintar, dissolver, px, ret, elip, lin, anel, K };
 // fim do arquivo
