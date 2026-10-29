@@ -8,6 +8,7 @@ const S = require('../extras/stars');
 const Tipos = require('./tipos');
 const Cena = require('../personagem/chefecena');
 const Pers = require('../personagem/nucleo');
+const Placar = require('../ranking/nucleo');
 
 const COR = 0xf5a3c7;
 const CD_ATAQUE = 20 * 1000;
@@ -236,6 +237,7 @@ async function finalizar(client, tipo, agora = Date.now()) {
     await canal.send({ embeds: [emb], allowedMentions: { parse: [] } }).catch(() => {});
   }
 
+   if (tipo === 'vitoria') Placar.registrarMvp(mvp);
   const hist = db.get('chefe.historico', []) || [];
   hist.push({ nome: a.nome, emoji: a.emoji, resultado: tipo, quando: agora, mvp, lutadores: ganhos.length, hpMax: a.hpMax });
   db.set('chefe.historico', hist.slice(-10));
