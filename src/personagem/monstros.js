@@ -189,32 +189,118 @@ function golem(t) {
 }
 
 // ---------- Dragão Jovem ----------
-function dragao(t) {
+const DRAGAO_VERMELHO = { esc: ['#6e1220', '#b01e2e', '#ee5a64'], mem: '#5a0e1c', osso: '#e8d9a0', costela: '#8a1a2a', ventre: '#e0b060', listra: '#b8843c', olho: '#ffe14a', fogo: '#ffb040' };
+function dragao(t, pal = DRAGAO_VERMELHO) {
   const g = nova(44, 34);
-  const esc = ['#6e1220', '#b01e2e', '#ee5a64'];
-  const mem = '#5a0e1c';
+  const esc = pal.esc;
+  const mem = pal.mem;
   const alto = t % 2 === 0;
   const asa = alto ? [[26, 15], [34, 1], [43, 6], [40, 13], [36, 11], [32, 16]] : [[26, 15], [37, 14], [43, 24], [38, 24], [34, 20], [30, 19]];
   poli(g, asa, mem);
   const [[sx, sy], [px1, py1]] = [asa[0], asa[1]];
-  lin(g, sx, sy, px1, py1, '#e8d9a0', 1);
-  for (const q of asa.slice(2, 5)) lin(g, sx, sy, q[0], q[1], '#8a1a2a', 1);
+  lin(g, sx, sy, px1, py1, pal.osso, 1);
+  for (const q of asa.slice(2, 5)) lin(g, sx, sy, q[0], q[1], pal.costela, 1);
   lin(g, 33, 22, 42, 27 + (t % 2), esc[0], 4); lin(g, 33, 22, 42, 27 + (t % 2), esc[1], 2);
-  poli(g, [[41, 24 + (t % 2)], [44, 27 + (t % 2)], [41, 30 + (t % 2)]], '#e8d9a0');
+  poli(g, [[41, 24 + (t % 2)], [44, 27 + (t % 2)], [41, 30 + (t % 2)]], pal.osso);
   ret(g, 17, 26, 3, 6, esc[0]); ret(g, 28, 26, 3, 6, esc[0]);
-  ret(g, 15, 31, 5, 2, '#e8d9a0'); ret(g, 27, 31, 5, 2, '#e8d9a0');
+  ret(g, 15, 31, 5, 2, pal.osso); ret(g, 27, 31, 5, 2, pal.osso);
   corpo(g, 25, 21, 11.5, 7.4, esc);
-  elip(g, 22, 24, 7, 4, '#e0b060'); for (let x = 17; x <= 28; x += 3) ret(g, x, 22, 1, 5, '#b8843c');
+  elip(g, 22, 24, 7, 4, pal.ventre); for (let x = 17; x <= 28; x += 3) ret(g, x, 22, 1, 5, pal.listra);
   lin(g, 16, 17, 9, 11, esc[0], 5); lin(g, 16, 17, 9, 11, esc[1], 3);
   corpo(g, 8, 10, 5.4, 4.4, esc);
   ret(g, 1, 9, 6, 4, esc[1]); ret(g, 1, 9, 6, 1, esc[2]); px(g, 1, 10, K);
   const boca = t === 1 || t === 2;
   ret(g, 2, boca ? 14 : 13, 5, 1, esc[0]);
-  if (boca) { ret(g, 2, 13, 5, 1, '#ffb040'); px(g, 3, 12, '#ffffff'); px(g, 6, 12, '#ffffff'); }
+  if (boca) { ret(g, 2, 13, 5, 1, pal.fogo); px(g, 3, 12, '#ffffff'); px(g, 6, 12, '#ffffff'); }
   else { px(g, 3, 13, '#ffffff'); px(g, 6, 13, '#ffffff'); }
-  lin(g, 9, 6, 13, 1, '#e8d9a0', 2); lin(g, 12, 7, 17, 4, '#e8d9a0', 2);
-  ret(g, 6, 8, 2, 2, '#ffe14a'); px(g, 6, 9, K);
+  lin(g, 9, 6, 13, 1, pal.osso, 2); lin(g, 12, 7, 17, 4, pal.osso, 2);
+  ret(g, 6, 8, 2, 2, pal.olho); px(g, 6, 9, K);
   if (t === 1 || t === 3) { px(g, 0, 7, '#9a96a8'); px(g, 1, 6, '#7a768a'); }
+  return contorno(g);
+}
+
+
+// ---------- Lobo Infernal (chefe) ----------
+function loboInfernal(t) {
+  const g = nova(44, 30);
+  const pel = ['#1c0f1a', '#3e1a2a', '#8a3040'];
+  const m = t % 2;
+  const perna = (x, a) => { ret(g, x + a, 19, 3, 6, pel[0]); ret(g, x + a, 24, 4, 3, K); px(g, x + a, 26, '#ff7a1c'); };
+  perna(11, m ? 1 : -1); perna(16, m ? -1 : 1); perna(29, m ? -1 : 1); perna(34, m ? 1 : -1);
+  lin(g, 36, 13, 42, 6 + m, pel[0], 4);
+  poli(g, [[41, 8 + m], [44, 0 + m], [40, 4 + m]], '#ff7a1c'); px(g, 42, 5 + m, '#ffd24a');
+  corpo(g, 24, 15, 14, 7.6, pel);
+  corpo(g, 12, 16, 6.4, 6.4, pel);
+  for (let x = 15; x <= 36; x += 3) {
+    const h = 3 + (((x / 3) + t) % 3) * 2;
+    poli(g, [[x - 1, 9], [x + 2, 9], [x + 0.5, 9 - h]], '#ff7a1c');
+    px(g, x, 9 - h + 2, '#ffd24a'); px(g, x + 1, 8, '#ffd24a');
+  }
+  corpo(g, 8, 11, 6.2, 5.4, pel);
+  ret(g, 0, 12, 7, 4, pel[1]); ret(g, 1, 12, 5, 1, pel[2]); px(g, 0, 12, '#ff3b3b');
+  const boca = t === 1 || t === 2;
+  ret(g, 1, boca ? 17 : 16, 6, 1, pel[0]);
+  if (boca) { ret(g, 1, 16, 6, 1, '#ff7a1c'); px(g, 2, 15, '#ffd24a'); px(g, 1, 15, '#ffffff'); px(g, 5, 15, '#ffffff'); px(g, 3, 17, '#ffffff'); px(g, 6, 17, '#ffffff'); }
+  else { px(g, 1, 15, '#ffffff'); px(g, 5, 15, '#ffffff'); }
+  ret(g, 6, 3, 2, 5, pel[0]); px(g, 6, 2, '#ff7a1c'); ret(g, 10, 4, 2, 4, pel[0]); px(g, 10, 3, '#ff7a1c');
+  ret(g, 5, 9, 3, 2, '#ff3b3b'); px(g, 5, 9, '#ffffff'); px(g, 7, 9, t === 3 ? '#ffd24a' : '#ff3b3b');
+  ret(g, 4, 8, 4, 1, pel[0]);
+  return contorno(g);
+}
+
+// ---------- Aranha Gigante (chefe) ----------
+function aranha(t) {
+  const g = nova(48, 34);
+  const per = ['#3d2260', '#9a6ad0'];
+  const perna = (ax, ay, lado, i, perto) => {
+    const k = i - 1.5;
+    const jx = ax + lado * (4 + i * 1.5);
+    const jy = 4 + Math.abs(k) * 2 + (perto ? 0 : 1);
+    const fx = ax + lado * (9 + i * 3) + (((t + i) % 2) ? 1 : -1);
+    lin(g, ax, ay, jx, jy, per[0], 2); lin(g, jx, jy, fx, 31, per[0], 2);
+    px(g, jx, jy, per[1]); px(g, fx, 31, per[1]); px(g, fx, 30, per[1]);
+  };
+  for (let i = 0; i < 4; i++) { perna(27 + i * 3, 17, 1, i, false); }
+  for (let i = 0; i < 4; i++) { perna(15 + i * 3, 17, -1, i, false); perna(17 + i * 3, 19, -1, i, true); }
+  corpo(g, 34, 17, 11, 9, ['#14081c', '#2f1647', '#5a2f82']);
+  for (const [x, y] of [[33, 14], [33, 15], [32, 16], [34, 16], [33, 17], [33, 18], [32, 19], [34, 19]]) px(g, x, y, '#e0283c');
+  for (let y = 9; y < 25; y += 3) px(g, 41, y, '#5a2f82');
+  corpo(g, 17, 18, 7.4, 6.2, ['#14081c', '#2f1647', '#5a2f82']);
+  corpo(g, 9, 17, 5, 4.6, ['#14081c', '#3a1d57', '#6a3a94']);
+  for (const [x, y] of [[5, 14], [8, 13], [6, 16], [9, 15], [4, 17], [7, 18]]) { px(g, x, y, '#ff3b3b'); }
+  px(g, 5, 14, '#ffffff'); px(g, 8, 13, '#ffffff');
+  const boca = t === 1 || t === 2 ? 1 : 0;
+  ret(g, 3, 20 + boca, 2, 3, '#e8e2cc'); ret(g, 7, 20 + boca, 2, 3, '#e8e2cc'); px(g, 3, 22 + boca, '#9c9680'); px(g, 8, 22 + boca, '#9c9680');
+  if (boca) { px(g, 3, 24, '#7a3cff'); px(g, 8, 24, '#7a3cff'); }
+  return contorno(g);
+}
+
+// ---------- Rei Esqueleto (chefe) ----------
+function reiEsqueleto(t) {
+  const g = nova(34, 44);
+  const osso = ['#8f8870', '#e4dec6', '#fffdf0'];
+  const azul = t % 2 ? '#9fe6ff' : '#5cc8ff';
+  poli(g, [[11, 15], [27, 15], [33, 40], [26, 38], [20, 42], [12, 39], [6, 41]], '#3a1058');
+  poli(g, [[22, 15], [27, 15], [33, 40], [26, 38], [22, 30]], '#240838');
+  lin(g, 11, 15, 8, 40, '#6a2a98', 1);
+  ret(g, 12, 29, 2, 12, osso[1]); ret(g, 18, 29, 2, 12, osso[1]);
+  ret(g, 10, 41, 5, 3, osso[0]); ret(g, 17, 41, 5, 3, osso[0]);
+  ret(g, 10, 25, 11, 4, '#4a1a5a'); ret(g, 10, 28, 3, 1, '#2a0838'); ret(g, 16, 28, 4, 1, '#2a0838');
+  ret(g, 13, 23, 5, 3, osso[1]); ret(g, 14, 15, 3, 9, osso[0]);
+  for (const y of [16, 18, 20]) { ret(g, 9, y, 13, 1, osso[1]); px(g, 9, y + 1, osso[0]); px(g, 21, y + 1, osso[0]); }
+  ret(g, 8, 14, 15, 1, osso[1]); ret(g, 8, 15, 15, 1, osso[0]);
+  corpo(g, 7, 15, 3.4, 2.6, ['#c9a227', '#f2c230', '#fff4b8']); corpo(g, 24, 15, 3.4, 2.6, ['#c9a227', '#f2c230', '#fff4b8']);
+  lin(g, 7, 16, 4, 25, osso[1], 2); lin(g, 24, 16, 28, 25, osso[1], 2);
+  lin(g, 3, 8, 3, 28, '#4a3022', 2); elip(g, 3, 6, 2.8, 2.8, '#c9a227'); elip(g, 3, 6, 1.8, 1.8, azul); px(g, 2, 5, '#ffffff');
+  px(g, 0, 3, azul); px(g, 6, 9, azul);
+  corpo(g, 16, 9, 6, 5.6, osso);
+  ret(g, 11, 13, 10, 2, osso[1]);
+  for (const x of [12, 14, 16, 18, 20]) px(g, x, 14, '#3a3524');
+  ret(g, 12, 7, 3, 3, K); ret(g, 17, 7, 3, 3, K); px(g, 13, 8, azul); px(g, 18, 8, azul);
+  px(g, 16, 11, '#3a3524');
+  ret(g, 11, 2, 11, 3, '#f2c230'); ret(g, 11, 4, 11, 1, '#a8731a');
+  for (const x of [11, 14, 17, 20]) { px(g, x, 1, '#f2c230'); px(g, x, 0, '#fff4b8'); }
+  px(g, 16, 3, '#e0283c'); px(g, 13, 3, '#3b6bff'); px(g, 19, 3, '#3b6bff');
   return contorno(g);
 }
 
@@ -336,8 +422,11 @@ function sombra(t) {
 
 const ARTE = {
   'Slime Verde': slime, 'Lobo Selvagem': lobo, 'Goblin Saqueador': goblin, 'Esqueleto Guerreiro': esqueleto,
-  'Orc Brutamontes': orc, 'Golem de Pedra': golem, 'Dragão Jovem': dragao, 'Lich Ancião': lich,
+  'Orc Brutamontes': orc, 'Golem de Pedra': golem, 'Dragão Jovem': (t) => dragao(t), 'Lich Ancião': lich,
   'Cavaleiro das Trevas': cavaleiro, 'Hidra Abissal': hidra, 'Devorador de Almas': devorador,
+  // chefes
+  'Dragão Negro': (t) => dragao(t, { esc: ['#08060c', '#221a2c', '#5a4668'], mem: '#7a0f22', osso: '#c9bfa8', costela: '#a01830', ventre: '#8a1428', listra: '#4a0a14', olho: '#ff3b3b', fogo: '#ff7a1c' }),
+  'Lobo Infernal': loboInfernal, 'Aranha Gigante': aranha, 'Rei Esqueleto': reiEsqueleto,
 };
 
 // Registra um monstro novo (usado pelos chefes): nome -> função (t 0..3) que devolve uma grade
