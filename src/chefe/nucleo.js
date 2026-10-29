@@ -1,11 +1,13 @@
 // Eventos de chefe: um monstro gigante que a house inteira ataca junto.
 const {
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder,
+  ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder,
 } = require('discord.js');
 const db = require('../db');
 const R = require('../rpg/nucleo');
 const S = require('../extras/stars');
-const Dragao = require('./dragao');
+const Tipos = require('./tipos');
+const Cena = require('../personagem/chefecena');
+const Pers = require('../personagem/nucleo');
 
 const COR = 0xf5a3c7;
 const CD_ATAQUE = 20 * 1000;
@@ -61,7 +63,7 @@ function embedChefe(a) {
       { name: '👥 Lutando', value: `${Object.keys(a.dano || {}).length}`, inline: true },
       { name: '🏆 Maior dano', value: top },
     )
-    .setImage(Dragao.URL);
+    .setImage(`attachment://${Cena.ARQUIVO}`);
 }
 
 function botoes(desligados) {
@@ -78,6 +80,28 @@ function textoPlacar(a, max = 15) {
   return linhas.join('\n') || 'Ninguém atacou ainda.';
 }
 
+// ---------- Cena (GIF do grupo atacando o chefe) ----------
+const VISUAL = { guerreiro: 'cruz', mago: 'explosao', arqueiro: 'flechas', curandeiro: 'luz', ladino: 'furtivo' };
+const cacheCena = new Map();
+function anexoCena(a, fim) {
+  const nomeBoss = Tipos.info(a.tipo).nome;
+  const herois = (a.recentes || []).slice(-Cena.MAX_HEROIS).map((uid) => {
+    const u = (a.ultimo && a.ultimo[uid]) || {};
+    let app = null;
+    try { app = Pers.visual(uid); } catch { app = null; }
+    return { app, visual: VISUAL[u.classe] || 'cruz', forte: !!u.forte, dano: u.dano, crit: !!u.crit };
+  }).filter((h) => h.app);
+  const balde = Math.round((a.hp / a.hpMax) * 40);
+  const chave = JSON.stringify([nomeBoss, balde, fim ? 1 : 0, herois]);
+  let buf = cacheCena.get(chave);
+  if (!buf) {
+    if (cacheCena.size > 6) cacheCena.delete(cacheCena.keys().next().value);
+    buf = Cena.gif({ boss: nomeBoss, hp: a.hp, hpMax: a.hpMax, herois, fim: !!fim });
+    cacheCena.set(chave, buf);
+  }
+  return new AttachmentBuilder(buf, { name: Cena.ARQUIVO });
+}
+
 // ---------- Invocar ----------
 async function invocar(guild, cfg) {
   const canal = guild.channels.cache.get(cfg.canalId);
@@ -85,7 +109,7 @@ async function invocar(guild, cfg) {
   if (ativo()) return { erro: 'Já existe um chefe ativo.' };
   const agora = Date.now();
   const a = {
-    id: proximoId(), guildId: guild.id, nome: cfg.nome, emoji: cfg.emoji || '👹',
+    id: proximoId(), guildId: guild.id, nome: cfg.nome, emoji: cfg.emoji || Tipos.info(cfg.tipo).emoji, tipo: Tipos.TIPOS[cfg.tipo] ? cfg.tipo : Tipos.PADRAO, recentes: [], ultimo: {},
     hpMax: cfg.hp, hp: cfg.hp, inicio: agora, fim: agora + cfg.duracaoMs,
     canalId: canal.id, premio: cfg.premio, xp: cfg.xp, dano: {}, golpes: {}, cd: {}, cdForte: {},
   };
@@ -94,7 +118,7 @@ async function invocar(guild, cfg) {
       content: cfg.cargoId ? `<@&${cfg.cargoId}>` : undefined,
       embeds: [embedChefe(a)],
       components: [botoes()],
-      files: [Dragao.anexo()],
+      files: [anexoCena(a)],
       allowedMentions: cfg.cargoId ? { roles: [cfg.cargoId] } : { parse: [] },
     });
     a.msgId = msg.id;
@@ -124,7 +148,7 @@ function atualizarDepois(client) {
     const guild = client.guilds.cache.get(a.guildId);
     const canal = guild && guild.channels.cache.get(a.canalId);
     const msg = canal && (await canal.messages.fetch(a.msgId).catch(() => null));
-    if (msg) await msg.edit({ embeds: [embedChefe(a)], components: [botoes()] }).catch(() => {});
+    if (msg) await msg.edit({ embeds: [embedChefe(a)], components: [botoes()], files: [anexoCena(a)], attachments: [] }).catch(() => {});
   }, 4000));
 }
 
@@ -146,6 +170,11 @@ async function atacar(client, uid, forte) {
   a.golpes[uid] = (a.golpes[uid] || 0) + 1;
   a[chaveCd][uid] = agora + (forte ? CD_FORTE : CD_ATAQUE);
   if (a.hp === 0) a.ultimoUid = uid;
+  a.recentes = (a.recentes || []).filter((x) => x !== uid).concat(uid).slice(-Cena.MAX_HEROIS);
+  a.ultimo = a.ultimo || {};
+  a.ultimo[uid] = { dano: r.dano, crit: r.crit, forte: !!forte, classe: j.classe };
+  const vivos = new Set(a.recentes);
+  for (const k of Object.keys(a.ultimo)) if (!vivos.has(k)) delete a.ultimo[k];
   salvarAtivo(a);
 
   const derrotou = a.hp === 0;
@@ -203,7 +232,7 @@ async function finalizar(client, tipo, agora = Date.now()) {
   const canal = guild && guild.channels.cache.get(a.canalId);
   if (canal) {
     const msg = await canal.messages.fetch(a.msgId).catch(() => null);
-    if (msg) await msg.edit({ embeds: [embedChefe(a)], components: [botoes(true)] }).catch(() => {});
+    if (msg) await msg.edit({ embeds: [embedChefe(a)], components: [botoes(true)], files: [anexoCena(a, true)], attachments: [] }).catch(() => {});
     await canal.send({ embeds: [emb], allowedMentions: { parse: [] } }).catch(() => {});
   }
 
@@ -220,7 +249,7 @@ async function cancelar(client) {
   const canal = guild && guild.channels.cache.get(a.canalId);
   if (canal) {
     const msg = await canal.messages.fetch(a.msgId).catch(() => null);
-    if (msg) await msg.edit({ content: '🚫 Esse evento de chefe foi cancelado pela staff.', embeds: [embedChefe(a)], components: [botoes(true)] }).catch(() => {});
+    if (msg) await msg.edit({ content: '🚫 Esse evento de chefe foi cancelado pela staff.', embeds: [embedChefe(a)], components: [botoes(true)], files: [anexoCena(a, true)], attachments: [] }).catch(() => {});
   }
   db.remover('chefe.ativo');
   return true;
@@ -248,3 +277,4 @@ module.exports = {
   PADROES, CD_ATAQUE, CD_FORTE, mensagem, fmt, ativo, agenda, proximoId, rank,
   embedChefe, botoes, textoPlacar, invocar, atacar, finalizar, cancelar, tick,
 };
+// fim do arquivo
