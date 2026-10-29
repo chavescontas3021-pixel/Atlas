@@ -5,6 +5,7 @@ const {
 const db = require('../db');
 const E = require('../eventos/nucleo');
 const N = require('../chefe/nucleo');
+const Tipos = require('../chefe/tipos');
 
 const EPH = MessageFlags.Ephemeral;
 const responder = (interaction, content) => interaction.reply({ content, flags: EPH });
@@ -20,7 +21,8 @@ module.exports = {
       .addStringOption((o) => o.setName('duracao').setDescription('Quanto tempo dura. Ex: 2h, 90m (padrão 2h)'))
       .addIntegerOption((o) => o.setName('premio').setDescription('Total de stars do prêmio (padrão 1000)').setMinValue(0).setMaxValue(10000000))
       .addIntegerOption((o) => o.setName('xp').setDescription('Total de XP do prêmio (padrão 500)').setMinValue(0).setMaxValue(10000000))
-      .addStringOption((o) => o.setName('emoji').setDescription('Emoji do chefe (padrão 👹)').setMaxLength(20))
+      .addStringOption((o) => o.setName('tipo').setDescription('Que monstro é o chefe (padrão: Dragão Negro)').addChoices(...Tipos.escolhas()))
+      .addStringOption((o) => o.setName('emoji').setDescription('Emoji do chefe (padrão: o do tipo)').setMaxLength(20))
       .addChannelOption((o) => o.setName('canal').setDescription('Onde aparece (padrão: este canal)').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
       .addRoleOption((o) => o.setName('cargo').setDescription('Cargo marcado quando o chefe aparecer'))
       .addStringOption((o) => o.setName('quando').setDescription('Agendar. Ex: 20:00 ou 25/10 20:00 (vazio = agora)')))
@@ -48,7 +50,8 @@ module.exports = {
         duracaoMs,
         premio: g.getInteger('premio') ?? 1000,
         xp: g.getInteger('xp') ?? 500,
-        emoji: (g.getString('emoji') || '👹').trim(),
+        tipo: g.getString('tipo') || Tipos.PADRAO,
+        emoji: (g.getString('emoji') || Tipos.info(g.getString('tipo') || Tipos.PADRAO).emoji).trim(),
         canalId: canal.id,
         cargoId: cargo ? cargo.id : null,
       };
@@ -96,3 +99,4 @@ module.exports = {
     }
   },
 };
+// fim do arquivo
