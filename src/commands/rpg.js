@@ -116,7 +116,8 @@ module.exports = {
       if (!e) return interaction.reply({ content: 'Você já está em um combate! Termine-o primeiro.', flags: EPH });
       N.definirCd(j, 'explorar', 20 * 1000);
       N.salvar(id, j);
-      return interaction.reply({ embeds: [C.embedCombate(e, j)], components: C.botoes(id) });
+      await interaction.deferReply(); // desenhar o GIF leva um instante
+      return interaction.editReply({ embeds: [C.embedCombate(e, j)], components: C.botoes(id), files: C.arquivos(e, j) });
     }
 
     if (sub === 'treinar') {
