@@ -2,6 +2,11 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { CLASSES } = require('./dados');
 const N = require('./nucleo');
+const B = require('../personagem/batalha');
+const Pers = require('../personagem/nucleo');
+
+// Visual do golpe de cada classe no GIF
+const VISUAL = { guerreiro: 'cruz', mago: 'explosao', arqueiro: 'flechas', curandeiro: 'luz', ladino: 'furtivo' };
 
 const duelos = new Map(); // id -> estado
 const TEMPO_TURNO = 3 * 60 * 1000;
@@ -27,11 +32,11 @@ function iniciar(idA, jA, idB, jB, aposta, aoExpirar) {
   const id = `${Date.now().toString(36)}${(contador++).toString(36)}`;
   const mk = (uid, j) => ({ id: uid, j, hp: j.hpMax, cd: 0, def: false });
   const A = mk(idA, jA);
-  const B = mk(idB, jB);
+  const Bx = mk(idB, jB);
   // Quem tem mais agilidade começa
   const turno = jA.attr.agilidade >= jB.attr.agilidade ? 'a' : 'b';
   const d = {
-    id, a: A, b: B, turno, aposta, turnos: 0, log: ['⚔️ O duelo começou!'], msg: null, timer: null, aoExpirar,
+    id, a: A, b: Bx, turno, aposta, turnos: 0, eventos: [], hpIni: { a: A.hp, b: Bx.hp }, log: ['⚔️ O duelo começou!'], msg: null, timer: null, aoExpirar,
   };
   duelos.set(id, d);
   armarTimer(d);
@@ -55,6 +60,9 @@ function agir(d, tipo) {
   const y = alvoDa(d);
   const cl = CLASSES[x.j.classe];
   const linhas = [];
+  d.eventos = [];
+  d.hpIni = { a: d.a.hp, b: d.b.hp };
+  const reg = (ev) => d.eventos.push({ por: d.turno, hpA: Math.max(0, d.a.hp), hpB: Math.max(0, d.b.hp), ...ev });
 
   if (tipo === 'hab' && x.cd > 0) return { invalido: `Sua habilidade está em recarga (${x.cd} turno(s)).` };
 
@@ -66,6 +74,7 @@ function agir(d, tipo) {
   if (tipo === 'def') {
     x.def = true;
     linhas.push(`🛡️ ${nomeDe(x)} se preparou para defender (dano pela metade no próximo golpe).`);
+    reg({ tipo: 'def' });
   } else {
     const opts = {};
     let nome = 'Ataque';
@@ -81,6 +90,7 @@ function agir(d, tipo) {
     }
     if (Math.random() * 100 < N.esquiva(y.j)) {
       linhas.push(`💨 ${nomeDe(y)} desviou de **${nome}**!`);
+      reg({ tipo: tipo === 'hab' ? 'hab' : 'atq', visual: tipo === 'hab' ? (VISUAL[x.j.classe] || 'cruz') : 'corte', esq: true });
     } else {
       const r = golpe(N.ataque(x.j), N.critChance(x.j), N.defesa(y.j), opts);
       let dano = r.dano;
@@ -89,12 +99,15 @@ function agir(d, tipo) {
       }
       y.hp -= dano;
       linhas.push(`${tipo === 'hab' ? '💥' : '🗡️'} ${nomeDe(x)} usou **${nome}**: ${dano} de dano${r.crit ? ' (**CRÍTICO!**)' : ''}${y.def ? ' (defendido)' : ''}.`);
+      reg({ tipo: tipo === 'hab' ? 'hab' : 'atq', visual: tipo === 'hab' ? (VISUAL[x.j.classe] || 'cruz') : 'corte', dano, crit: r.crit, cura: 0 });
     }
     y.def = false;
     if (cura) {
       const c = Math.min(cura, x.j.hpMax - x.hp);
       x.hp += c;
       linhas.push(`✨ ${nomeDe(x)} recuperou **${c}** HP.`);
+      const ult = d.eventos[d.eventos.length - 1];
+      if (ult) { ult.cura = c; ult.hpA = Math.max(0, d.a.hp); ult.hpB = Math.max(0, d.b.hp); }
     }
   }
 
@@ -150,13 +163,28 @@ function embedDuelo(d) {
     .setColor(N.COR)
     .setTitle(`⚔️ Duelo${d.aposta ? ` · ⭐ ${d.aposta}` : ''}`)
     .addFields(linha(d.a), linha(d.b), { name: 'Último turno', value: d.log.join('\n').slice(0, 1000) || '—' })
+    .setImage(`attachment://${B.ARQUIVO}`)
     .setFooter({ text: x.cd > 0 ? `${cl.hab.nome}: recarga ${x.cd} turno(s)` : `${cl.hab.nome}: pronta! · ${cl.hab.desc}` });
+}
+
+// GIF da cena do turno. perdedorId: quando o duelo acabou, quem cai (some da cena).
+function arquivos(d, perdedorId) {
+  return [B.anexo({
+    esq: { tipo: 'heroi', app: Pers.visual(d.a.id) },
+    dir: { tipo: 'heroi', app: Pers.visual(d.b.id) },
+    eventos: d.eventos || [],
+    hpIni: d.hpIni || { a: d.a.hp, b: d.b.hp },
+    hpMax: { a: d.a.j.hpMax, b: d.b.j.hpMax },
+    fim: !!perdedorId,
+    perdedor: perdedorId === d.b.id ? 'b' : 'a',
+  })];
 }
 
 function embedFim(d, r, extra) {
   return new EmbedBuilder()
     .setColor(N.COR)
     .setTitle('⚔️ Resultado do duelo')
+    .setImage(`attachment://${B.ARQUIVO}`)
     .setDescription(
       `${d.log.join('\n')}\n\n🏆 Vencedor: <@${r.vencedor.id}>\n💀 Perdedor: <@${r.perdedor.id}>\n` +
       `❤️ Vida final: <@${d.a.id}> ${Math.max(0, d.a.hp)}/${d.a.j.hpMax} · <@${d.b.id}> ${Math.max(0, d.b.hp)}/${d.b.j.hpMax}\n` +
@@ -174,4 +202,5 @@ function botoes(d) {
   )];
 }
 
-module.exports = { iniciar, obter, lado, vez, emDuelo, agir, finalizar, embedDuelo, embedFim, botoes };
+module.exports = { iniciar, obter, lado, vez, emDuelo, agir, finalizar, embedDuelo, embedFim, arquivos, botoes };
+// fim do arquivo
