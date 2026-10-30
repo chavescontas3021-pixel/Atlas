@@ -134,7 +134,20 @@ async function avisar(client, guild, uid, tipo, vars) {
   if (canal) await canal.send({ content: `<@${uid}>`, embeds: [emb], allowedMentions: { users: [uid] } }).catch(() => {});
 }
 
+// Quem ficou sem nenhuma vaga perde o cargo de verificado e volta a ser "sem vaga"
+async function trocarCargos(guild, uid) {
+  if (cfg('trocarCargos', true) === false) return;
+  if (V.doUsuario(uid).length > 0) return;
+  const verificado = db.get('config.recepcao.cargos.verificado', null);
+  const semVaga = db.get('config.recepcao.cargos.semVaga', null);
+  const membro = await guild.members.fetch(uid).catch(() => null);
+  if (!membro) return;
+  if (verificado && membro.roles.cache.has(verificado)) await membro.roles.remove(verificado, 'Vaga liberada por inatividade').catch(() => {});
+  if (semVaga && !membro.roles.cache.has(semVaga)) await membro.roles.add(semVaga, 'Vaga liberada por inatividade').catch(() => {});
+}
+
 // ---------- Verificação periódica ----------
+
 async function tick(client, agora = Date.now()) {
   if (!cfg('ativo', false)) return;
   for (const guild of client.guilds.cache.values()) {
@@ -161,6 +174,7 @@ async function tick(client, agora = Date.now()) {
 
       if (dias >= liberarDias()) {
         for (const v of vagas) await V.liberar(guild, v);
+        await trocarCargos(guild, uid);
         db.remover(`inatividade.avisados.${uid}`);
         await avisar(client, guild, uid, 'liberada', vars);
       } else if (dias >= avisoDias() && db.get(`inatividade.avisados.${uid}`, 0) !== base) {
@@ -176,3 +190,4 @@ module.exports = {
   justificativa, justificativas, ultima, marco, registrarAtividade,
   justificar, encerrarJustificativa, publicarPainel, tick,
 };
+// fim do arquivo
