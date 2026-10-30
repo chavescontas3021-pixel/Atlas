@@ -8,7 +8,7 @@ const PADROES = {
   mensagens: {
     painel: {
       titulo: '📋 Vagas da house',
-      texto: 'Veja abaixo as vagas livres e ocupadas.\nPara pedir uma vaga livre use `/vaga pedir`.',
+      texto: 'Veja abaixo os personagens que já têm dono.\nQualquer personagem que não esteja aqui está livre! Para pedir um, use `/vaga pedir` e busque pelo nome.',
     },
   },
 };
@@ -54,6 +54,12 @@ function acharVaga(ref) {
   return todas().find((v) => v.id === String(ref) || norm(v.nome) === r) || null;
 }
 
+// Chave estável de um personagem: AniList (al:123) ou manual (m:nome|obra)
+const chaveManual = (nome, obra) => `m:${norm(nome)}|${norm(obra)}`;
+function acharPorChave(chave, nome, grupo) {
+  return todas().find((v) => (v.ext && v.ext === chave) || (norm(v.nome) === norm(nome) && norm(v.grupo) === norm(grupo))) || null;
+}
+
 // ---------- Ocupar / liberar ----------
 async function mexerCargo(guild, userId, dar) {
   const cargoId = cfg('cargo');
@@ -81,71 +87,91 @@ async function liberar(guild, vaga) {
   vaga.desde = null;
   salvar(vaga);
   if (antigo) await mexerCargo(guild, antigo, false);
+  if (vaga.auto) apagar(vaga.id); // vaga criada por pedido some quando fica livre
   await atualizarPainel(guild);
   return antigo;
 }
 
 // ---------- Painel ----------
-function embedPainel(guild) {
-  const m = mensagem('painel');
-  const emb = new EmbedBuilder().setColor(COR).setTitle(m.titulo).setDescription(m.texto);
-  const lista = todas();
-  if (!lista.length) {
-    emb.addFields({ name: 'Vagas', value: 'Nenhuma vaga cadastrada ainda.' });
-    return emb;
-  }
-  const grupos = new Map();
+const LIMITE_PAGINA = 3600;
+
+// Divide a lista em páginas de texto (uma obra por bloco, ocupadas e livres)
+function paginasPainel() {
+  const lista = todas().slice().sort((a, b) => norm(a.grupo || 'geral').localeCompare(norm(b.grupo || 'geral')) || norm(a.nome).localeCompare(norm(b.nome)));
+  const paginas = [];
+  let atual = '';
+  let grupoAtual = null;
+  const empurra = () => { if (atual) paginas.push(atual); atual = ''; };
   for (const v of lista) {
     const g = v.grupo || 'Geral';
-    if (!grupos.has(g)) grupos.set(g, []);
-    grupos.get(g).push(v);
-  }
-  let campos = 0;
-  for (const [g, vs] of grupos) {
-    const linhas = vs.map((v) => (v.ocupanteId ? `🔴 **${v.nome}** — <@${v.ocupanteId}>` : `🟢 **${v.nome}** — livre`));
-    // quebra em pedaços de até 1000 caracteres
-    let atual = '';
-    let parte = 0;
-    const empurra = () => {
-      if (!atual || campos >= 24) return;
-      emb.addFields({ name: parte ? `${g} (cont.)` : g, value: atual });
-      campos++;
-      parte++;
-      atual = '';
-    };
-    for (const l of linhas) {
-      if ((atual + '\n' + l).length > 1000) empurra();
-      atual += (atual ? '\n' : '') + l;
+    const linha = v.ocupanteId ? `🔴 ${v.nome} — <@${v.ocupanteId}>` : `🟢 ${v.nome} — livre`;
+    const troca = g !== grupoAtual;
+    let cont = false;
+    if (atual && atual.length + (troca ? g.length + 8 : 0) + linha.length + 1 > LIMITE_PAGINA) {
+      empurra();
+      cont = !troca;
     }
-    empurra();
+    if (troca || cont) {
+      atual += `${atual ? '\n' : ''}**${g}${cont ? ' (cont.)' : ''}**\n`;
+      grupoAtual = g;
+    }
+    atual += `${linha}\n`;
   }
-  const livresN = lista.filter((v) => !v.ocupanteId).length;
-  emb.setFooter({ text: `${livresN} livre(s) de ${lista.length}` });
-  return emb;
+  empurra();
+  return paginas;
 }
+
+// Lista de embeds do painel (cada uma vira uma mensagem; o limite do Discord é por mensagem)
+function embedsPainel() {
+  const m = mensagem('painel');
+  const lista = todas();
+  const paginas = paginasPainel();
+  const ocupadas = lista.filter((v) => v.ocupanteId).length;
+  const rodape = `${ocupadas} ocupada(s)${lista.length > ocupadas ? ` · ${lista.length - ocupadas} livre(s) cadastrada(s)` : ''}`;
+  if (!paginas.length) {
+    return [new EmbedBuilder().setColor(COR).setTitle(m.titulo).setDescription(`${String(m.texto).slice(0, 600)}\n\nNenhum personagem ocupado ainda.`)];
+  }
+  return paginas.map((txt, i) => {
+    const e = new EmbedBuilder().setColor(COR).setDescription(i === 0 ? `${String(m.texto).slice(0, 400)}\n\n${txt}` : txt);
+    if (i === 0) e.setTitle(m.titulo);
+    if (i === paginas.length - 1) e.setFooter({ text: rodape });
+    return e;
+  });
+}
+const embedPainel = () => embedsPainel()[0];
 
 async function atualizarPainel(guild) {
   const canalId = cfg('canalPainel');
   if (!canalId) return false;
   const canal = guild.channels.cache.get(canalId);
   if (!canal) return false;
-  const payload = { embeds: [embedPainel(guild)], allowedMentions: { parse: [] } };
-  const msgId = cfg('painelMsgId');
-  if (msgId && cfg('painelCanalId') === canalId) {
-    const msg = await canal.messages.fetch(msgId).catch(() => null);
+  const embeds = embedsPainel();
+  let ids = cfg('painelMsgIds') || (cfg('painelMsgId') ? [cfg('painelMsgId')] : []);
+  if (cfg('painelCanalId') !== canalId) ids = [];
+  const novos = [];
+  for (let i = 0; i < embeds.length; i++) {
+    const payload = { embeds: [embeds[i]], allowedMentions: { parse: [] } };
+    const msg = ids[i] ? await canal.messages.fetch(ids[i]).catch(() => null) : null;
     if (msg) {
       await msg.edit(payload).catch(() => {});
-      return true;
+      novos.push(msg.id);
+      continue;
+    }
+    try {
+      const nova = await canal.send(payload);
+      novos.push(nova.id);
+    } catch {
+      return false;
     }
   }
-  try {
-    const nova = await canal.send(payload);
-    db.set('config.vagas.painelMsgId', nova.id);
-    db.set('config.vagas.painelCanalId', canal.id);
-    return true;
-  } catch {
-    return false;
+  for (const extra of ids.slice(embeds.length)) {
+    const m = await canal.messages.fetch(extra).catch(() => null);
+    if (m) await m.delete().catch(() => {});
   }
+  db.set('config.vagas.painelMsgIds', novos);
+  db.set('config.vagas.painelCanalId', canal.id);
+  db.remover('config.vagas.painelMsgId');
+  return true;
 }
 
 // ---------- Pedidos ----------
@@ -156,12 +182,22 @@ function botoesPedido(id, desligados) {
   );
 }
 
+// Nome, obra e foto do que está sendo pedido (vaga já cadastrada ou personagem novo)
+function infoPedido(p, vaga) {
+  if (vaga) return { nome: vaga.nome, grupo: vaga.grupo || '', foto: vaga.foto || null };
+  if (p.novo) return { nome: p.novo.nome, grupo: p.novo.grupo || '', foto: p.novo.foto || null };
+  return { nome: '(removida)', grupo: '', foto: null };
+}
+
 function embedPedido(p, vaga, estado) {
+  const i = infoPedido(p, vaga);
+  const origem = p.novo ? (p.novo.ext ? ' · achado no AniList' : ' · digitado à mão, confira se existe') : '';
   const emb = new EmbedBuilder()
     .setColor(estado === 'aprovado' ? 0x57f287 : estado === 'recusado' ? 0xed4245 : COR)
     .setTitle('📨 Pedido de vaga')
-    .setDescription(`**Membro:** <@${p.userId}>\n**Vaga:** ${vaga ? vaga.nome : '(removida)'}${p.obs ? `\n**Observação:** ${p.obs}` : ''}`)
-    .setFooter({ text: `Pedido #${p.id}` });
+    .setDescription(`**Membro:** <@${p.userId}>\n**Personagem:** ${i.nome}${i.grupo ? `\n**Obra:** ${i.grupo}` : ''}${p.obs ? `\n**Observação:** ${p.obs}` : ''}`)
+    .setFooter({ text: `Pedido #${p.id}${origem}` });
+  if (i.foto) emb.setThumbnail(i.foto);
   if (estado) emb.addFields({ name: 'Resultado', value: `${estado === 'aprovado' ? '✅ Aprovado' : '❌ Recusado'} por <@${p.porId}>` });
   return emb;
 }
@@ -170,5 +206,7 @@ module.exports = {
   PADROES, cfg, mensagem, limite, norm,
   todas, obter, salvar, apagar, doUsuario, livres, proximoId,
   pedidos, pedido, proximoPedido, acharVaga,
-  ocupar, liberar, embedPainel, atualizarPainel, botoesPedido, embedPedido,
+  chaveManual, acharPorChave, infoPedido,
+  ocupar, liberar, embedPainel, embedsPainel, atualizarPainel, botoesPedido, embedPedido,
 };
+// fim do arquivo
