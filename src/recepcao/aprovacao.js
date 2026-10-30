@@ -5,6 +5,7 @@ const {
 } = require('discord.js');
 const db = require('../db');
 const U = require('./util');
+const V = require('../vagas/nucleo');
 
 const COR = 0xf5a3c7;
 const EPH = MessageFlags.Ephemeral;
@@ -155,6 +156,11 @@ async function decidir(interaction) {
     return interaction.followUp({ content: `⚠️ Não consegui ${problemas.join(' e ')}. Arrume e aperte Autorizar de novo.`, flags: EPH });
   }
 
+  const reg = await V.registrarDaRecepcao(guild, userId, sessao.personagem).catch((e) => { console.error('[Recepção] registrar vaga:', e.message); return null; });
+  if (reg && reg.pulou === 'ocupado') {
+    await interaction.followUp({ content: `⚠️ O membro foi verificado, mas **${sessao.personagem}** já consta como ocupado por <@${reg.vaga.ocupanteId}> no registro de vagas. Confira com \`/vagaadmin\`.`, flags: EPH, allowedMentions: { parse: [] } }).catch(() => {});
+  }
+
   const seg = Number(U.cfg('apagarSegundos', U.PADROES.apagarSegundos));
   const msg = U.mensagem('sucesso');
   const v = {
@@ -175,3 +181,4 @@ async function decidir(interaction) {
 }
 
 module.exports = { ativo, usa, pedir, decidir, MSG_PADRAO, cfg };
+// fim do arquivo
