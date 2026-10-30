@@ -92,6 +92,23 @@ async function liberar(guild, vaga) {
   return antigo;
 }
 
+// Registra o personagem que o membro fechou na recepção (não passa por pedido nem pelo limite).
+// Devolve { ok, vaga } ou { pulou: motivo }. Nunca tira um personagem de outra pessoa.
+async function registrarDaRecepcao(guild, userId, personagem) {
+  const nome = String(personagem || '').trim();
+  if (!nome) return { pulou: 'sem nome' };
+  if (doUsuario(userId).some((v) => norm(v.nome) === norm(nome))) return { pulou: 'ja-registrado' };
+  const iguais = todas().filter((v) => norm(v.nome) === norm(nome));
+  let vaga = iguais.find((v) => !v.ocupanteId);
+  if (!vaga && iguais.length) return { pulou: 'ocupado', vaga: iguais[0] };
+  if (!vaga) {
+    vaga = { id: proximoId(), nome, grupo: '', ext: chaveManual(nome, ''), auto: true, ocupanteId: null, desde: null };
+    salvar(vaga);
+  }
+  await ocupar(guild, vaga, userId);
+  return { ok: true, vaga };
+}
+
 // ---------- Painel ----------
 const LIMITE_PAGINA = 3600;
 
@@ -206,7 +223,7 @@ module.exports = {
   PADROES, cfg, mensagem, limite, norm,
   todas, obter, salvar, apagar, doUsuario, livres, proximoId,
   pedidos, pedido, proximoPedido, acharVaga,
-  chaveManual, acharPorChave, infoPedido,
+  chaveManual, acharPorChave, infoPedido, registrarDaRecepcao,
   ocupar, liberar, embedPainel, embedsPainel, atualizarPainel, botoesPedido, embedPedido,
 };
 // fim do arquivo
