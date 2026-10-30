@@ -45,7 +45,7 @@ module.exports = {
         { name: 'Pedidos', value: c('canalPedidos') ? `<#${c('canalPedidos')}>` : 'não definido', inline: true },
         { name: 'Cargo de ocupante', value: c('cargo') ? `<@&${c('cargo')}>` : 'nenhum', inline: true },
         { name: 'Limite por pessoa', value: `${N.limite()}`, inline: true },
-        { name: 'Vagas', value: `${N.todas().length} (${N.livres().length} livres)`, inline: true },
+        { name: 'Personagens', value: `${N.todas().filter((v) => v.ocupanteId).length} ocupados · ${N.livres().length} livres cadastrados`, inline: true },
       );
       return interaction.reply({ embeds: [embed], flags: EPH });
     }
@@ -73,6 +73,7 @@ module.exports = {
       const canal = interaction.options.getChannel('canal');
       db.set('config.vagas.canalPainel', canal.id);
       db.remover('config.vagas.painelMsgId');
+      db.remover('config.vagas.painelMsgIds');
       db.remover('config.vagas.painelCanalId');
       await interaction.deferReply({ flags: EPH });
       const ok = await N.atualizarPainel(guild);
@@ -128,3 +129,4 @@ module.exports = {
     }
   },
 };
+// fim do arquivo
