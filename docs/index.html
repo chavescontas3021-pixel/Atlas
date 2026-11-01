@@ -390,9 +390,6 @@
             h('input', { type: 'text', placeholder: 'Nome', maxlength: '40', value: t.nome || '', oninput: function (e) { t.nome = e.target.value; mudou(JSON.parse(JSON.stringify(lista))); } }),
             h('input', { type: 'text', class: 'desc', placeholder: 'Descrição (opcional)', maxlength: '80', value: t.desc || '', oninput: function (e) { t.desc = e.target.value; mudou(JSON.parse(JSON.stringify(lista))); } }),
             h('div', { class: 'acoes' },
-              h('button', { class: 'sec mini', type: 'button', texto: '↑', onclick: function () { if (i > 0) { lista.splice(i - 1, 0, lista.splice(i, 1)[0]); mudou(JSON.parse(JSON.stringify(lista))); } }),
-            h('input', { type: 'text', class: 'desc', placeholder: 'Descrição (opcional)', maxlength: '80', value: t.desc || '', oninput: function (e) { t.desc = e.target.value; mudou(JSON.parse(JSON.stringify(lista))); } }),
-            h('div', { class: 'acoes' },
               h('button', { class: 'sec mini', type: 'button', texto: '↑', onclick: function () { if (i > 0) { lista.splice(i - 1, 0, lista.splice(i, 1)[0]); mudou(JSON.parse(JSON.stringify(lista))); redesenhar(); } } }),
               h('button', { class: 'sec mini', type: 'button', texto: '↓', onclick: function () { if (i < lista.length - 1) { lista.splice(i + 1, 0, lista.splice(i, 1)[0]); mudou(JSON.parse(JSON.stringify(lista))); redesenhar(); } } }),
               h('button', { class: 'sec mini', type: 'button', texto: 'Remover', onclick: function () { if (lista.length > 1) { lista.splice(i, 1); mudou(JSON.parse(JSON.stringify(lista))); redesenhar(); } } })
