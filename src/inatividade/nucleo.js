@@ -2,6 +2,7 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const db = require('../db');
 const V = require('../vagas/nucleo');
+const Rep = require('../recepcao/rep');
 
 const COR = 0xf5a3c7;
 const DIA = 24 * 3600 * 1000;
@@ -44,7 +45,7 @@ const maxDias = () => Number(cfg('maxDias', PADROES.maxDias));
 
 // "7", "7d", "7 dias", "2 semanas", "1 mês" -> número de dias
 function parseDias(txt) {
-  const t = String(txt || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  const t = String(txt || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const m = t.match(/^(\d{1,3})\s*([a-z]*)$/);
   if (!m) return null;
   const n = Number(m[1]);
@@ -82,6 +83,9 @@ function registrarAtividade(uid) {
 // ---------- Justificar ----------
 // Retorna { erro } ou { j }
 async function justificar(guild, user, tempoTxt, motivo) {
+  if (await Rep.uidSoRep(guild, user.id)) {
+    return { erro: 'Você é rep de parceria/aliança, então não precisa justificar. 💜' };
+  }
   if (V.doUsuario(user.id).length === 0) {
     return { erro: 'Você não ocupa nenhuma vaga, então não precisa justificar. 💜' };
   }
@@ -158,6 +162,7 @@ async function tick(client, agora = Date.now()) {
       porUsuario.get(v.ocupanteId).push(v);
     }
     for (const [uid, vagas] of porUsuario) {
+      if (await Rep.uidSoRep(guild, uid)) continue; // só rep de parceria/aliança: não entra na inatividade
       const j = justificativa(uid);
       if (j) {
         if (j.fim > agora) continue; // justificativa em andamento: vaga guardada
