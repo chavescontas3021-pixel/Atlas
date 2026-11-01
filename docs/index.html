@@ -159,7 +159,7 @@
     valores = {}; resetados = {};
     estado.campos.forEach(function (c) { valores[c.caminho] = JSON.parse(JSON.stringify(c.valor)); });
     var quando = estado.atualizadoEm ? new Date(estado.atualizadoEm).toLocaleString('pt-BR') : '';
-    $('#status').textContent = 'Servidor: ' + estado.servidor.nome + (quando ? ' · atualizado em ' + quando : '') + ' · página v4';
+    $('#status').textContent = 'Servidor: ' + estado.servidor.nome + (quando ? ' · atualizado em ' + quando : '') + ' · página v5';
     $('#det-conexao').open = false;
     if (!grupoAtivo || !estado.campos.some(function (c) { return c.grupo === grupoAtivo; })) grupoAtivo = estado.campos[0].grupo;
     desenhar();
@@ -196,6 +196,8 @@
     area.textContent = '';
     // Aba "Tickets": adicionar painel + lista dos painéis extras no topo
     if (grupoAtivo === 'Tickets') desenharPaineis(area);
+    // Aba "Parcerias": variáveis + rank de promotores (pontos editáveis) no topo
+    if (grupoAtivo === 'Parcerias') desenharRanking(area);
     // Aba "Ticket · Nome": botões de postar/apagar daquele painel no topo
     var painelDaAba = (estado.paineis || []).filter(function (p) { return grupoAtivo === 'Ticket · ' + String(p.nome || p.id).slice(0, 24); })[0];
     if (painelDaAba) area.appendChild(cartaoPainel(painelDaAba, false));
@@ -275,6 +277,50 @@
     area.appendChild(h('div', { class: 'dica', texto: 'Estes são os painéis extras. As configurações do painel original ficam logo abaixo.' }));
   }
 
+  function desenharRanking(area) {
+    var info = estado.parceria || { ranking: [], total: 0, variaveis: '' };
+
+    area.appendChild(h('div', { class: 'card' },
+      h('label', { texto: '🧩 Variáveis dos textos' }),
+      h('div', { class: 'dica', texto: info.variaveis }),
+      h('div', { class: 'dica', texto: '{servidor_parceiro} = servidor do convite · {representante} = quem o promotor marcou junto do convite · {promotor} = quem fez a parceria · {pontos} = parcerias do promotor · {rank} = posição dele no rank · {cargo} = cargo de notificação · {servidor} = onde o convite foi postado' })));
+
+    var lista = info.ranking || [];
+    var card = h('div', { class: 'card' },
+      h('label', { texto: '🏆 Rank de promotores' }),
+      h('div', { class: 'dica', texto: lista.length + ' promotor(es) · ' + info.total + ' parceria(s) no total. Os pontos são aplicados na hora (sem o botão Salvar). Pontos 0 tiram a pessoa do rank.' }));
+
+    lista.forEach(function (x) {
+      var inp = h('input', { type: 'number', min: '0', max: '100000', value: x.pontos, style: 'width:96px' });
+      card.appendChild(h('div', { class: 'acoes-linha', style: 'align-items:center' },
+        h('span', { texto: '#' + x.rank + ' · ' + x.nome, style: 'flex:1;min-width:120px' }),
+        inp,
+        h('button', {
+          class: 'sec mini', type: 'button', texto: 'Salvar',
+          onclick: function () {
+            if (inp.value === '') { aviso('Informe os pontos.', 'erro'); return; }
+            acao({ tipo: 'parceria.definirPontos', userId: x.id, pontos: Number(inp.value) });
+          }
+        })));
+    });
+    if (!lista.length) card.appendChild(h('div', { class: 'dica', texto: 'Ainda não há parcerias registradas.' }));
+
+    var idIn = h('input', { type: 'text', inputmode: 'numeric', placeholder: 'ID do membro (Discord > Copiar ID)', maxlength: '20' });
+    var ptIn = h('input', { type: 'number', min: '0', max: '100000', placeholder: 'Pontos', style: 'width:96px' });
+    card.appendChild(h('div', { style: 'margin-top:14px' },
+      h('label', { texto: '➕ Adicionar / ajustar um promotor' }),
+      h('div', { class: 'acoes-linha', style: 'align-items:center' }, idIn, ptIn,
+        h('button', {
+          type: 'button', texto: 'Aplicar',
+          onclick: function () {
+            if (!/^[0-9]{17,20}$/.test(idIn.value.trim())) { aviso('Cole o ID numérico do membro.', 'erro'); return; }
+            if (ptIn.value === '') { aviso('Informe os pontos.', 'erro'); return; }
+            acao({ tipo: 'parceria.definirPontos', userId: idIn.value.trim(), pontos: Number(ptIn.value) });
+          }
+        }))));
+    area.appendChild(card);
+  }
+
   function campo(c) {
     var cx = h('div', { class: 'card campo' + (alterado(c) ? ' alterado' : '') });
     var tag = h('span', { class: 'tag' + (c.personalizado ? ' pers' : ''), texto: c.personalizado ? 'personalizado' : 'padrão' });
@@ -342,6 +388,9 @@
           ctl.appendChild(h('div', { class: 'linha-tipo' },
             h('input', { type: 'text', placeholder: 'emoji', value: t.emoji || '', oninput: function (e) { t.emoji = e.target.value; mudou(JSON.parse(JSON.stringify(lista))); } }),
             h('input', { type: 'text', placeholder: 'Nome', maxlength: '40', value: t.nome || '', oninput: function (e) { t.nome = e.target.value; mudou(JSON.parse(JSON.stringify(lista))); } }),
+            h('input', { type: 'text', class: 'desc', placeholder: 'Descrição (opcional)', maxlength: '80', value: t.desc || '', oninput: function (e) { t.desc = e.target.value; mudou(JSON.parse(JSON.stringify(lista))); } }),
+            h('div', { class: 'acoes' },
+              h('button', { class: 'sec mini', type: 'button', texto: '↑', onclick: function () { if (i > 0) { lista.splice(i - 1, 0, lista.splice(i, 1)[0]); mudou(JSON.parse(JSON.stringify(lista))); } }),
             h('input', { type: 'text', class: 'desc', placeholder: 'Descrição (opcional)', maxlength: '80', value: t.desc || '', oninput: function (e) { t.desc = e.target.value; mudou(JSON.parse(JSON.stringify(lista))); } }),
             h('div', { class: 'acoes' },
               h('button', { class: 'sec mini', type: 'button', texto: '↑', onclick: function () { if (i > 0) { lista.splice(i - 1, 0, lista.splice(i, 1)[0]); mudou(JSON.parse(JSON.stringify(lista))); redesenhar(); } } }),
