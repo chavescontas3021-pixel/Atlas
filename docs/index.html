@@ -46,6 +46,7 @@
   .ok { color: var(--ok); } .erro { color: var(--erro); }
   details summary { cursor: pointer; font-weight: 600; }
   ol { padding-left: 20px; margin: 8px 0; }
+  .acoes-linha { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -110,7 +111,8 @@
   }
 
   var RAMO = 'dados';
-  var estado = null, valores = {}, resetados = {}, grupoAtivo = null;
+  var ESPECIAL = '➕ Painéis de ticket';
+  var estado = null, valores = {}, resetados = {}, grupoAtivo = null, ocupado = false;
 
   function repo() { return ($('#repo').value || '').trim(); }
   function token() { return ($('#token').value || '').trim(); }
@@ -160,7 +162,7 @@
     var quando = estado.atualizadoEm ? new Date(estado.atualizadoEm).toLocaleString('pt-BR') : '';
     $('#status').textContent = 'Servidor: ' + estado.servidor.nome + (quando ? ' · atualizado em ' + quando : '');
     $('#det-conexao').open = false;
-    if (!grupoAtivo || !estado.campos.some(function (c) { return c.grupo === grupoAtivo; })) grupoAtivo = estado.campos[0].grupo;
+    if (!grupoAtivo || (grupoAtivo !== ESPECIAL && !estado.campos.some(function (c) { return c.grupo === grupoAtivo; }))) grupoAtivo = estado.campos[0].grupo;
     desenhar();
     return true;
   }
@@ -185,6 +187,11 @@
   function desenhar() {
     var grupos = [];
     estado.campos.forEach(function (c) { if (grupos.indexOf(c.grupo) < 0) grupos.push(c.grupo); });
+    // aba especial de painéis de ticket: logo depois das abas "Ticket..."
+    var ultimoTicket = -1;
+    grupos.forEach(function (g, i) { if (g.indexOf('Ticket') === 0) ultimoTicket = i; });
+    grupos.splice(ultimoTicket >= 0 ? ultimoTicket + 1 : grupos.length, 0, ESPECIAL);
+    if (grupos.indexOf(grupoAtivo) < 0) grupoAtivo = grupos[0];
     var abas = $('#abas');
     abas.textContent = '';
     grupos.forEach(function (g) {
@@ -192,7 +199,8 @@
     });
     var area = $('#campos');
     area.textContent = '';
-    estado.campos.filter(function (c) { return c.grupo === grupoAtivo; }).forEach(function (c) { area.appendChild(campo(c)); });
+    if (grupoAtivo === ESPECIAL) desenharPaineis(area);
+    else estado.campos.filter(function (c) { return c.grupo === grupoAtivo; }).forEach(function (c) { area.appendChild(campo(c)); });
     atualizarBarra();
   }
 
@@ -206,6 +214,63 @@
     });
     if (!achou) ops.push(h('option', { value: atual, texto: 'ID ' + atual + ' (não existe neste servidor)', selected: true }));
     return ops;
+  }
+
+  function nomeCanal(id) {
+    var achado = (estado.canais || []).filter(function (c) { return c.id === id; })[0];
+    return achado ? achado.nome : id;
+  }
+
+  function acao(a, textoConfirma) {
+    if (textoConfirma && !confirm(textoConfirma)) return;
+    if (contarAlterados() && !confirm('Você tem alterações não salvas. Elas serão perdidas. Continuar?')) return;
+    enviar({}, [a]);
+  }
+
+  function desenharPaineis(area) {
+    var lista = estado.paineis || [];
+    var limite = estado.limitePaineis || 10;
+    var nomeIn = h('input', { type: 'text', maxlength: '40', placeholder: 'Ex.: Suporte, Benefícios, Denúncias' });
+    area.appendChild(h('div', { class: 'card' },
+      h('label', { texto: 'Criar painel novo' }),
+      nomeIn,
+      h('div', { class: 'dica', texto: 'Cada painel tem categorias (botões), staff, categoria de canais e logs próprios. Você tem ' + lista.length + ' de ' + limite + ' painéis.' }),
+      h('div', { class: 'acoes-linha' },
+        h('button', {
+          type: 'button', texto: 'Criar painel', disabled: lista.length >= limite,
+          onclick: function () {
+            var n = nomeIn.value.trim();
+            if (!n) { aviso('Escreva o nome do painel.', 'erro'); return; }
+            acao({ tipo: 'ticket.criarPainel', nome: n });
+          }
+        }))));
+    if (!lista.length) {
+      area.appendChild(h('div', { class: 'card dica', texto: 'Nenhum painel extra ainda. Crie o primeiro acima!' }));
+    }
+    lista.forEach(function (p) {
+      var sel = h('select', {}, ...opcoesSelect(estado.canais, p.canal, '— escolha o canal —'));
+      area.appendChild(h('div', { class: 'card' },
+        h('label', { texto: p.nome }),
+        h('div', { class: 'dica', texto: p.qtdTipos + ' categoria(s) · ' + (p.canal ? 'postado em #' + nomeCanal(p.canal) : 'ainda não postado') }),
+        h('div', { style: 'margin-top:8px' }, sel),
+        h('div', { class: 'acoes-linha' },
+          h('button', {
+            type: 'button', texto: p.canal ? 'Postar de novo' : 'Postar painel',
+            onclick: function () {
+              if (!sel.value) { aviso('Escolha o canal onde postar.', 'erro'); return; }
+              acao({ tipo: 'ticket.postarPainel', painelId: p.id, canalId: sel.value });
+            }
+          }),
+          h('button', {
+            class: 'sec', type: 'button', texto: 'Editar',
+            onclick: function () { grupoAtivo = 'Ticket · ' + String(p.nome || p.id).slice(0, 24); desenhar(); }
+          }),
+          h('button', {
+            class: 'sec', type: 'button', texto: 'Apagar',
+            onclick: function () { acao({ tipo: 'ticket.removerPainel', painelId: p.id }, 'Apagar o painel "' + p.nome + '"? As mensagens antigas dele param de funcionar.'); }
+          }))));
+    });
+    area.appendChild(h('div', { class: 'dica', texto: 'O painel original continua sendo configurado na aba "Tickets".' }));
   }
 
   function campo(c) {
@@ -230,7 +295,7 @@
 
     var v = valores[c.caminho];
     var ctl;
-    if (c.tipo === 'texto') {
+    if (c.tipo === 'texto' || c.tipo === 'url') {
       ctl = h('input', { type: 'text', value: v == null ? '' : v, maxlength: c.max || 200, oninput: function (e) { mudou(e.target.value); } });
     } else if (c.tipo === 'longo') {
       ctl = h('textarea', { rows: '6', maxlength: c.max || 2000, oninput: function (e) { mudou(e.target.value); } });
@@ -296,14 +361,10 @@
     return cx;
   }
 
-  // ---------- salvar ----------
-  async function salvar() {
-    var mud = {};
-    estado.campos.forEach(function (c) {
-      if (resetados[c.caminho]) mud[c.caminho] = null;
-      else if (alterado(c)) mud[c.caminho] = valores[c.caminho];
-    });
-    if (!Object.keys(mud).length) return;
+  // ---------- enviar pedido ao bot ----------
+  async function enviar(mud, acoes) {
+    if (ocupado) return;
+    ocupado = true;
     var id = String(Date.now());
     $('#bt-salvar').disabled = true;
     aviso('Enviando...', '');
@@ -312,16 +373,18 @@
       var sha = null;
       var atual = await gh('/repos/' + repo() + '/contents/pedido.json?ref=' + RAMO);
       if (atual.ok) sha = (await atual.json()).sha;
-      var corpo = { message: 'Site: pedido de mudança', branch: RAMO, content: paraB64(JSON.stringify({ id: id, mudancas: mud })) };
+      var corpo = { message: 'Site: pedido de mudança', branch: RAMO, content: paraB64(JSON.stringify({ id: id, mudancas: mud, acoes: acoes || [] })) };
       if (sha) corpo.sha = sha;
       var r = await gh('/repos/' + repo() + '/contents/pedido.json', { method: 'PUT', body: JSON.stringify(corpo) });
       if (!r.ok) {
         aviso(r.status === 401 || r.status === 403 ? 'Token sem permissão de escrita (Contents: Read and write).' : 'Erro ' + r.status + ' ao enviar.', 'erro');
+        ocupado = false;
         atualizarBarra();
         return;
       }
     } catch (e) {
       aviso('Sem conexão com o GitHub.', 'erro');
+      ocupado = false;
       atualizarBarra();
       return;
     }
@@ -337,18 +400,33 @@
           var res = novo.resultado;
           var nomes = {};
           estado.campos.forEach(function (c) { nomes[c.caminho] = c.rotulo; });
-          if (res.erros.length) {
-            aviso('✅ ' + res.ok.length + ' aplicado(s). ❌ ' + res.erros.map(function (x) { return (nomes[x.caminho] || x.caminho) + ': ' + x.erro; }).join(' | '), 'erro');
-          } else {
-            aviso('✅ Tudo aplicado! Painéis já postados só mudam se você postar de novo.', 'ok');
-          }
+          var partes = [], falhou = false;
+          (res.acoes || []).forEach(function (a) { partes.push((a.ok ? '✅ ' : '❌ ') + a.msg); if (!a.ok) falhou = true; });
+          if (res.ok.length) partes.push('✅ ' + res.ok.length + ' campo(s) aplicado(s)');
+          res.erros.forEach(function (x) { partes.push('❌ ' + (nomes[x.caminho] || x.caminho) + ': ' + x.erro); falhou = true; });
+          if (!partes.length) partes.push('✅ Tudo aplicado!');
+          else if (!falhou && res.ok.length) partes.push('Painéis já postados só mudam se você postar de novo.');
+          aviso(partes.join(' | '), falhou ? 'erro' : 'ok');
+          ocupado = false;
           await carregar(true);
           return;
         }
       } catch (x) { /* tenta de novo */ }
     }
+    ocupado = false;
     aviso('O bot ainda não respondeu. Veja se ele está online e use /site sincronizar.', 'erro');
     atualizarBarra();
+  }
+
+  // ---------- salvar ----------
+  function salvar() {
+    var mud = {};
+    estado.campos.forEach(function (c) {
+      if (resetados[c.caminho]) mud[c.caminho] = null;
+      else if (alterado(c)) mud[c.caminho] = valores[c.caminho];
+    });
+    if (!Object.keys(mud).length) return;
+    return enviar(mud, []);
   }
 
   // ---------- início ----------
@@ -373,4 +451,4 @@
 })();
 </script>
 </body>
-  </html>
+</html>
