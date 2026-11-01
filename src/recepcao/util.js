@@ -2,6 +2,7 @@ const db = require('../db');
 
 // Passos mostrados ao membro (o "id" é usado no comando /recepcao canal)
 const PASSOS = [
+  { id: 'moldes', nome: 'Moldes', desc: 'Veja os moldes para fechar a vaga do seu personagem.' },
   { id: 'pings', nome: 'Pings', desc: 'Escolha os cargos de ping que você quer receber.' },
   { id: 'apresentacao', nome: 'Apresentação', desc: 'Faça a sua apresentação.' },
   { id: 'fechar_vaga', nome: 'Fechar vaga (obrigatório)', desc: 'Feche a vaga do seu personagem. É o único passo exigido para a verificação.' },
