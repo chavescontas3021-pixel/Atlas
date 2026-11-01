@@ -1,4 +1,4 @@
-// Extras do site: campos de parceria, banner da recepção, categorias dos painéis de ticket
+// Extras do site: campos de parceria, pontos dos promotores, banner da recepção, categorias dos painéis de ticket
 // e ações (criar / postar / apagar painel de ticket). Fica por cima do campos.js, sem alterá-lo.
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder,
@@ -36,7 +36,8 @@ function specs() {
     }
     lista.push({ grupo: g, caminho: `${base}.banner`, rotulo: `${nome} — banner (link da imagem)`, tipo: 'url', max: 500, padrao: null, dica: 'Vazio = sem banner.' });
     lista.push({ grupo: g, caminho: `${base}.titulo`, rotulo: `${nome} — título`, tipo: 'texto', max: 200, permiteVazio: true, padrao: Par.PADROES[tipo].titulo, dica: 'Pode ficar vazio para não ter título.' });
-    lista.push({ grupo: g, caminho: `${base}.texto`, rotulo: `${nome} — texto`, tipo: 'longo', max: 2000, padrao: Par.PADROES[tipo].texto, dica: 'Variáveis: {convite} {membro} {servidor} {cargo}' });
+    lista.push({ grupo: g, caminho: `${base}.texto`, rotulo: `${nome} — texto`, tipo: 'longo', max: 2000, padrao: Par.PADROES[tipo].texto, dica: `Variáveis: ${Par.VARIAVEIS} (também {membro} = {promotor})` });
+    lista.push({ grupo: g, caminho: `${base}.semRepresentante`, rotulo: `${nome} — texto quando não há representante`, tipo: 'texto', max: 100, padrao: Par.SEM_REP, dica: 'Aparece no lugar de {representante} se o promotor não marcar ninguém junto do convite.' });
   }
 
   for (const p of Tkt.listaPaineis()) {
@@ -142,6 +143,11 @@ function linhasBotoes(tipos) {
   return rows;
 }
 
+const nomeMembro = (guild, uid) => {
+  const m = guild.members.cache.get(uid);
+  return m ? m.displayName : uid;
+};
+
 async function executarAcao(a, guild) {
   const tipo = a && a.tipo;
   const falha = (msg) => ({ tipo, ok: false, msg });
@@ -158,6 +164,22 @@ async function executarAcao(a, guild) {
       staff: [],
     });
     return sucesso(`Painel "${nome}" criado! Ajuste na aba "Ticket · ${nome.slice(0, 24)}" e depois poste.`);
+  }
+
+  if (tipo === 'parceria.definirPontos') {
+    const uid = String((a && a.userId) || '').trim();
+    if (!/^\d{17,20}$/.test(uid)) return falha('ID de membro inválido. Use o ID numérico do Discord.');
+    const n = Number(a.pontos);
+    if (!Number.isInteger(n) || n < 0 || n > 100000) return falha('Os pontos precisam ser um número inteiro de 0 a 100000.');
+    let m = guild.members.cache.get(uid) || null;
+    if (n > 0) {
+      m = m || (await guild.members.fetch(uid).catch(() => null));
+      if (!m) return falha('Não achei esse membro no servidor.');
+      if (m.user.bot) return falha('Bots não fazem parcerias.');
+    }
+    const antes = Par.pontosDe(uid);
+    Par.definirPontos(uid, n);
+    return sucesso(`${m ? m.displayName : uid}: ${antes} → ${n} parceria(s).${n === 0 ? ' (saiu do rank)' : ''}`);
   }
 
   const p = Tkt.acharPainel(String(a && a.painelId));
@@ -248,6 +270,15 @@ function montarEstado(guild, resultado) {
     id: p.id, nome: p.nome, canal: p.canal || null, qtdTipos: (p.tipos || []).length,
   }));
   estado.limitePaineis = MAX_PAINEIS;
+
+  const todosPromotores = Par.ranking(100000);
+  estado.parceria = {
+    variaveis: Par.VARIAVEIS,
+    total: todosPromotores.reduce((soma, x) => soma + x.pontos, 0),
+    ranking: todosPromotores.slice(0, 50).map((x) => ({
+      id: x.uid, nome: nomeMembro(guild, x.uid), pontos: x.pontos, rank: Par.rankDe(x.uid),
+    })),
+  };
   return estado;
 }
 
