@@ -44,7 +44,19 @@ module.exports = {
         .setDescription('Os noivos tiram um convidado do casamento')
         .addUserOption((o) => o.setName('membro').setDescription('Quem tirar').setRequired(true))
     )
-    .addSubcommand((s) => s.setName('convidados').setDescription('Mostra a lista de convidados do seu casamento'))
+    .addSubcommand((s) =>
+      s
+        .setName('padrinho')
+        .setDescription('Os noivos escolhem um padrinho ou madrinha para o casamento')
+        .addUserOption((o) => o.setName('membro').setDescription('Quem será padrinho ou madrinha').setRequired(true))
+    )
+    .addSubcommand((s) =>
+      s
+        .setName('tirarpadrinho')
+        .setDescription('Os noivos tiram alguém dos padrinhos (a pessoa continua convidada)')
+        .addUserOption((o) => o.setName('membro').setDescription('Quem tirar dos padrinhos').setRequired(true))
+    )
+    .addSubcommand((s) => s.setName('convidados').setDescription('Mostra a lista de convidados e os padrinhos do seu casamento'))
     .addSubcommand((s) => s.setName('info').setDescription('Mostra como está o seu casamento')),
 
   async execute(interaction) {
@@ -86,6 +98,7 @@ module.exports = {
             '**Como funciona**\n' +
             '• Este canal é **privado**: só entram os convidados de vocês.\n' +
             '• Para convidar alguém, um dos dois usa `/casamento convidar` (e `/casamento desconvidar` para tirar).\n' +
+            `• Para escolher padrinhos e madrinhas (até ${N.limitePadrinhos()}), usem \`/casamento padrinho\`. Eles abençoam o casal durante a cerimônia.\n` +
             '• Quando todos estiverem aqui, avisem a staff: ela dá o comando para começar a cerimônia.\n' +
             `• O Atlas faz de padre: faz as perguntas e vocês respondem pelos botões. Limite de ${N.limiteConvidados()} convidados.`
         );
@@ -129,7 +142,7 @@ module.exports = {
         const emb = new EmbedBuilder()
           .setColor(N.COR)
           .setTitle('💒 Seu casamento')
-          .setDescription(`${N.mencao(c.a)} e ${N.mencao(c.b)}\n${STATUS[c.status] || c.status}\nCanal: <#${c.canalId}>\nConvidados: **${(c.convidados || []).length}** / ${N.limiteConvidados()}`);
+          .setDescription(`${N.mencao(c.a)} e ${N.mencao(c.b)}\n${STATUS[c.status] || c.status}\nCanal: <#${c.canalId}>\nConvidados: **${(c.convidados || []).length}** / ${N.limiteConvidados()}\nPadrinhos: ${(c.padrinhos || []).length ? c.padrinhos.map((id) => N.mencao(id)).join(' ') : 'ninguém ainda (use `/casamento padrinho`)'}`);
         return interaction.reply({ embeds: [emb], flags: EPH, allowedMentions: { parse: [] } });
       }
       const casal = N.casalDe(eu);
@@ -148,10 +161,12 @@ module.exports = {
     const canal = guild.channels.cache.get(c.canalId);
     if (!canal) return responder(interaction, '⚠️ Não encontrei o canal do casamento. Avise a staff.');
     c.convidados = c.convidados || [];
+    c.padrinhos = c.padrinhos || [];
 
     if (sub === 'convidados') {
-      const txt = c.convidados.length ? c.convidados.map((id) => `• <@${id}>`).join('\n') : 'Ninguém convidado ainda. Use `/casamento convidar`.';
-      return interaction.reply({ content: `💌 **Convidados** (${c.convidados.length}/${N.limiteConvidados()})\n${txt}`.slice(0, 1900), flags: EPH, allowedMentions: { parse: [] } });
+      const txt = c.convidados.length ? c.convidados.map((id) => `• <@${id}>${c.padrinhos.includes(id) ? ' 💐' : ''}`).join('\n') : 'Ninguém convidado ainda. Use `/casamento convidar`.';
+      const pad = c.padrinhos.length ? c.padrinhos.map((id) => `• <@${id}>`).join('\n') : 'Ninguém ainda. Use `/casamento padrinho`.';
+      return interaction.reply({ content: `💌 **Convidados** (${c.convidados.length}/${N.limiteConvidados()})\n${txt}\n\n💐 **Padrinhos e madrinhas** (${c.padrinhos.length}/${N.limitePadrinhos()})\n${pad}`.slice(0, 1900), flags: EPH, allowedMentions: { parse: [] } });
     }
 
     const alvo = interaction.options.getUser('membro');
@@ -175,10 +190,47 @@ module.exports = {
       return responder(interaction, `✅ ${alvo} foi convidado(a) e já pode ver o canal ${canal}.`);
     }
 
+    if (sub === 'padrinho' || sub === 'tirarpadrinho') {
+      if (c.status === 'andamento') return responder(interaction, '⏳ A cerimônia está acontecendo agora. Os padrinhos já não podem mudar.');
+      if (c.status === 'concluido') return responder(interaction, '💍 A cerimônia já aconteceu, então os padrinhos já estão registrados.');
+    }
+
+    if (sub === 'padrinho') {
+      if (alvo.bot) return responder(interaction, '❌ Escolha uma pessoa, não um bot. 🤖');
+      if (N.ehNoivo(c, alvo.id)) return responder(interaction, '❌ Os noivos não podem ser os próprios padrinhos. 😄');
+      if (c.padrinhos.includes(alvo.id)) return responder(interaction, 'ℹ️ Essa pessoa já é padrinho ou madrinha do casamento.');
+      if (c.padrinhos.length >= N.limitePadrinhos()) return responder(interaction, `❌ O limite é ${N.limitePadrinhos()} padrinhos e madrinhas. Use \`/casamento tirarpadrinho\` para trocar alguém.`);
+      const jaConvidado = c.convidados.includes(alvo.id);
+      if (!jaConvidado && c.convidados.length >= N.limiteConvidados()) return responder(interaction, `❌ O limite é ${N.limiteConvidados()} convidados.`);
+      try {
+        await N.darAcesso(canal, alvo.id, c.status !== 'andamento');
+      } catch (e) {
+        return responder(interaction, '⚠️ Não consegui dar acesso ao canal. Avise a staff.');
+      }
+      if (!jaConvidado) c.convidados.push(alvo.id);
+      c.padrinhos.push(alvo.id);
+      N.salvarCerimonia(c);
+      await canal.send({ content: `💐 ${interaction.user} escolheu ${alvo} como padrinho/madrinha do casamento! Que honra!`, allowedMentions: { users: [alvo.id] } }).catch(() => {});
+      if (!jaConvidado) {
+        alvo
+          .send({ embeds: [new EmbedBuilder().setColor(N.COR).setTitle('💐 Você foi escolhido(a) como padrinho/madrinha!').setDescription(`${interaction.user.username} escolheu você para ser padrinho ou madrinha do casamento de ${N.mencao(c.a)} e ${N.mencao(c.b)} em **${guild.name}**.\nO canal é ${canal}.`)] })
+          .catch(() => {});
+      }
+      return responder(interaction, `✅ ${alvo} agora é padrinho/madrinha do casamento (${c.padrinhos.length}/${N.limitePadrinhos()}).`);
+    }
+
+    if (sub === 'tirarpadrinho') {
+      if (!c.padrinhos.includes(alvo.id)) return responder(interaction, 'ℹ️ Essa pessoa não é padrinho nem madrinha.');
+      c.padrinhos = c.padrinhos.filter((id) => id !== alvo.id);
+      N.salvarCerimonia(c);
+      return responder(interaction, `✅ ${alvo} saiu dos padrinhos (continua convidado(a)). Se quiser tirar do canal também, use \`/casamento desconvidar\`.`);
+    }
+
     if (sub === 'desconvidar') {
       if (!c.convidados.includes(alvo.id)) return responder(interaction, 'ℹ️ Essa pessoa não está na lista de convidados.');
       await canal.permissionOverwrites.delete(alvo.id).catch(() => {});
       c.convidados = c.convidados.filter((id) => id !== alvo.id);
+      c.padrinhos = c.padrinhos.filter((id) => id !== alvo.id);
       N.salvarCerimonia(c);
       return responder(interaction, `✅ ${alvo} foi retirado(a) da lista de convidados.`);
     }
