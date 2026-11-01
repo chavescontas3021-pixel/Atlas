@@ -1,5 +1,5 @@
 // Boas-vindas e saída: mensagem de TEXTO (sem embed) marcando o membro, com log opcional.
-const { PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../db');
 const L = require('../logs/nucleo');
 
@@ -11,9 +11,17 @@ const PADROES = {
   saida: '😢 {usuario} (**{nome}**) saiu da **{servidor}**. Agora somos **{contagem}** membros.',
 };
 
-// config.boasvindas.entrada.{ativo,canal,texto} | config.boasvindas.saida.{ativo,canal,texto} | config.boasvindas.canalLog
+// config.boasvindas.entrada.{ativo,canal,texto,banner} | config.boasvindas.saida.{ativo,canal,texto,banner} | config.boasvindas.canalLog
 const cfg = (chave, padrao) => db.get(`config.boasvindas.${chave}`, padrao);
 const texto = (tipo) => cfg(`${tipo}.texto`) || PADROES[tipo];
+
+// Banner (imagem grande) opcional: link direto de uma imagem
+function bannerValido(url) {
+  if (typeof url !== 'string') return null;
+  const t = url.trim();
+  return /^https?:\/\/\S+$/i.test(t) && t.length <= 500 ? t : null;
+}
+const banner = (tipo) => bannerValido(cfg(`${tipo}.banner`));
 
 function preencher(modelo, vars) {
   return String(modelo).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
@@ -36,7 +44,7 @@ async function pegarCanal(guild, id) {
   return canal && canal.isTextBased() ? canal : null;
 }
 
-async function enviarTexto(guild, canalId, conteudo, userId, pingar) {
+async function enviarTexto(guild, canalId, conteudo, userId, pingar, bannerUrl) {
   if (!canalId) return { ok: false, motivo: 'nenhum canal configurado' };
   const canal = await pegarCanal(guild, canalId);
   if (!canal) return { ok: false, motivo: 'canal não encontrado' };
@@ -46,12 +54,15 @@ async function enviarTexto(guild, canalId, conteudo, userId, pingar) {
     return { ok: false, motivo: `sem permissão para enviar em <#${canal.id}>` };
   }
   try {
-    await canal.send({
+    const msg = {
       content: String(conteudo).slice(0, 2000),
       // Entrada: marca (e notifica) o membro. Saída: mostra a marcação, mas sem notificar.
       allowedMentions: pingar ? { users: [userId] } : { parse: [] },
       [IGNORAR_TRADUCAO]: true,
-    });
+    };
+    // Com banner, o texto continua normal e a imagem aparece logo abaixo
+    if (bannerUrl) msg.embeds = [new EmbedBuilder().setColor(0xf5a3c7).setImage(bannerUrl)];
+    await canal.send(msg);
     return { ok: true, canalId: canal.id };
   } catch (e) {
     return { ok: false, motivo: e.message };
@@ -73,7 +84,7 @@ const situacao = (r) => (r.ok ? `✅ enviada em <#${r.canalId}>` : `⚠️ não 
 async function entrada(member) {
   if (member.user.bot || !cfg('entrada.ativo', false)) return;
   const guild = member.guild;
-  const r = await enviarTexto(guild, cfg('entrada.canal'), preencher(texto('entrada'), variaveis(member)), member.id, true);
+  const r = await enviarTexto(guild, cfg('entrada.canal'), preencher(texto('entrada'), variaveis(member)), member.id, true, banner('entrada'));
   if (!r.ok) console.warn(`[Boas-vindas] entrada de ${member.id}: ${r.motivo}`);
 
   const nova = Date.now() - member.user.createdTimestamp < 7 * 86400000;
@@ -87,7 +98,7 @@ async function entrada(member) {
 async function saida(member) {
   if (member.user.bot || !cfg('saida.ativo', false)) return;
   const guild = member.guild;
-  const r = await enviarTexto(guild, cfg('saida.canal'), preencher(texto('saida'), variaveis(member)), member.id, false);
+  const r = await enviarTexto(guild, cfg('saida.canal'), preencher(texto('saida'), variaveis(member)), member.id, false, banner('saida'));
   if (!r.ok) console.warn(`[Boas-vindas] saída de ${member.id}: ${r.motivo}`);
 
   const cargos = member.roles ? [...member.roles.cache.values()].filter((x) => x.id !== guild.id).map((x) => `<@&${x.id}>`) : [];
