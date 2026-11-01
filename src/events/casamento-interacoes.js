@@ -11,10 +11,12 @@ module.exports = {
         if (acao === 'sim') return await Cer.botaoSim(client, interaction, canalId, passoId);
         if (acao === 'nao') return await Cer.botaoNao(client, interaction, canalId, passoId);
         if (acao === 'voto') return await Cer.botaoVoto(interaction, canalId);
+        if (acao === 'pad') return await Cer.botaoBencao(interaction, canalId);
         if (acao === 'obj') return await Cer.botaoObjecao(interaction, canalId);
         return;
       }
       if (interaction.isModalSubmit() && acao === 'votomodal') return await Cer.enviarVoto(client, interaction, canalId);
+      if (interaction.isModalSubmit() && acao === 'padmodal') return await Cer.enviarBencao(client, interaction, canalId);
     } catch (erro) {
       console.error('[Casamento] erro na interação:', erro);
       const msg = { content: 'Ops, deu erro nessa etapa. Chame a staff.', flags: 64 };
