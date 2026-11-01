@@ -16,6 +16,69 @@ const EPH = MessageFlags.Ephemeral;
 const chave = (id) => `recepcao.sessoes.${id}`;
 const emAndamento = new Set();
 
+// ---------- Assumir atendimento (staff) ----------
+function botaoAssumir(userId, assumido) {
+  return new ButtonBuilder()
+    .setCustomId(`recepcao:assumir:${userId}`)
+    .setLabel(assumido ? 'Devolver ao Atlas' : 'Assumir atendimento')
+    .setEmoji(assumido ? '🤖' : '🙋')
+    .setStyle(assumido ? ButtonStyle.Secondary : ButtonStyle.Danger);
+}
+
+function linhaAssumir(userId, assumido) {
+  return new ActionRowBuilder().addComponents(botaoAssumir(userId, assumido));
+}
+
+// Staff = quem tem Gerenciar Servidor ou o cargo de staff da recepção
+function ehStaffRecepcao(interaction) {
+  const p = interaction.memberPermissions;
+  if (p && p.has(PermissionFlagsBits.ManageGuild)) return true;
+  const cargo = U.cfg('cargos.staff');
+  return !!(cargo && interaction.member && interaction.member.roles.cache.has(cargo));
+}
+
+// true quando a staff assumiu o atendimento desse membro (o bot fica em silêncio)
+function estaAssumido(userId) {
+  const s = db.get(chave(userId));
+  return !!(s && s.assumido);
+}
+
+const MSG_ASSUMIDO =
+  '🙋 A staff assumiu o seu atendimento. Aguarde, ela vai falar com você aqui no canal.';
+
+function bannerValido(url) {
+  if (typeof url !== 'string') return null;
+  const t = url.trim();
+  if (!/^https?:\/\/\S+$/i.test(t) || t.length > 500) return null;
+  return t;
+}
+
+// Botão "Assumir atendimento" / "Devolver ao Atlas"
+async function alternarAtendimento(interaction, userId) {
+  const sessao = db.get(chave(userId));
+  if (!sessao) {
+    return interaction.reply({ content: 'Essa recepção já foi encerrada.', flags: EPH });
+  }
+  if (!ehStaffRecepcao(interaction)) {
+    return interaction.reply({ content: '❌ Só a staff pode assumir o atendimento.', flags: EPH });
+  }
+
+  const assumir = !sessao.assumido;
+  const nova = { ...sessao };
+  if (assumir) nova.assumido = { por: interaction.user.id, em: Date.now() };
+  else delete nova.assumido;
+  db.set(chave(userId), nova);
+
+  await interaction.update({ components: [linhaAssumir(userId, assumir)] });
+
+  const aviso = assumir
+    ? `🙋 <@${interaction.user.id}> assumiu o atendimento de <@${userId}>. O Atlas vai ficar em silêncio até a staff devolver.`
+    : `🤖 O Atlas voltou a cuidar do atendimento. <@${userId}>, pode continuar de onde parou!`;
+  await interaction.channel
+    .send({ content: aviso, allowedMentions: { users: [userId] } })
+    .catch(() => {});
+}
+
 function variaveis(member, sessao) {
   return {
     usuario: `<@${member.id}>`,
@@ -76,15 +139,19 @@ async function iniciarRecepcao(member, { teste = false } = {}) {
 
   const msg = U.mensagem('boasVindas');
   const vars = variaveis(member, null);
-  await canal.send({
+  const embed = new EmbedBuilder()
+    .setColor(COR)
+    .setTitle(U.preencher(msg.titulo, vars))
+    .setDescription(U.preencher(msg.texto, vars));
+  const banner = bannerValido(msg.banner);
+  if (banner) embed.setImage(banner);
+
+  const enviada = await canal.send({
     content: `<@${member.id}>`,
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COR)
-        .setTitle(U.preencher(msg.titulo, vars))
-        .setDescription(U.preencher(msg.texto, vars)),
-    ],
+    embeds: [embed],
+    components: [linhaAssumir(member.id, false)],
   });
+  db.set(chave(member.id), { ...db.get(chave(member.id)), msgInicial: enviada.id });
   return canal;
 }
 
@@ -250,7 +317,9 @@ async function trocar(interaction) {
   const sessao = db.get(chave(interaction.user.id));
   if (!sessao) return interaction.reply({ content: 'Não achei sua recepção.', flags: EPH });
 
-  db.set(chave(interaction.user.id), { canalId: sessao.canalId, etapa: 'personagem', teste: sessao.teste });
+  // Zera só os dados do personagem; mantém canal, teste, mensagem inicial e "assumido"
+  const { personagem, molde, emoji, nick, pedido, ...mantem } = sessao;
+  db.set(chave(interaction.user.id), { ...mantem, etapa: 'personagem' });
   await interaction.update({ components: [] });
   await interaction.channel.send('🔄 Tudo bem! Me envie o nome do **novo personagem**.');
 }
@@ -322,4 +391,7 @@ module.exports = {
   escolherEmoji,
   trocar,
   verificar,
+  alternarAtendimento,
+  estaAssumido,
+  MSG_ASSUMIDO,
 };
