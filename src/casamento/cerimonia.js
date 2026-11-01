@@ -16,6 +16,7 @@ const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const pausa = () => dormir(N.ajustes.pausa);
 const avancando = new Set(); // canais que estão trocando de passo agora
 const TEMPO_OBJECAO = () => (N.ajustes.pausa === 0 ? 20 : 20000);
+const TEMPO_PADRINHOS = () => (N.ajustes.pausa === 0 ? 20 : 90000); // 90 segundos para as bênçãos
 
 // Os passos depois da abertura. "ambos" = os dois noivos precisam clicar.
 const PASSOS = [
@@ -30,6 +31,7 @@ const PASSOS = [
     texto: '{a}, você aceita {b} como seu amor, para estar ao lado dessa pessoa na alegria e na tristeza, nos dias fáceis e nos difíceis, cuidando e sendo cuidado(a)?\nE você, {b}, aceita {a} do mesmo jeito?',
     sim: 'Aceito!',
   },
+  { id: 'padrinhos', tipo: 'padrinhos' }, // só acontece se o casal escolheu padrinhos
   { id: 'objecao', tipo: 'objecao' },
   { id: 'fim', tipo: 'fim' },
 ];
@@ -87,7 +89,10 @@ async function proximo(client, canalId) {
     const canal = await canalDe(client, c);
     if (!canal) return {};
     c.passo++;
+    // pula o passo dos padrinhos se o casal não escolheu ninguém
+    while (PASSOS[c.passo] && PASSOS[c.passo].tipo === 'padrinhos' && !(c.padrinhos || []).length) c.passo++;
     c.resp = {};
+    c.bencaos = {};
     const passo = PASSOS[c.passo];
     N.salvarCerimonia(c);
     if (!passo) return {};
@@ -117,6 +122,36 @@ async function proximo(client, canalId) {
         components: [botoes],
       });
       c.msgId = msg.id;
+    } else if (passo.tipo === 'padrinhos') {
+      const lista = c.padrinhos.map((id) => N.mencao(id)).join(' ');
+      const botoes = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`cas:pad:${canalId}`).setLabel('Abençoar o casal').setEmoji('💐').setStyle(ButtonStyle.Primary)
+      );
+      const msg = await canal.send({
+        content: lista,
+        allowedMentions: { users: c.padrinhos },
+        embeds: [
+          embed(
+            '💐 Padrinhos e madrinhas',
+            `${v.a} e ${v.b} escolheram pessoas muito especiais para estar ao lado deles hoje: ${lista}.\nPadrinhos e madrinhas, cliquem no botão e deixem uma palavra de carinho (se quiserem). Ao clicar, vocês também **assinam como testemunhas** deste casamento. ✍️`,
+            'Vocês têm 90 segundos'
+          ),
+        ],
+        components: [botoes],
+      });
+      c.msgId = msg.id;
+      N.salvarCerimonia(c);
+      const alvoPasso = c.passo;
+      setTimeout(async () => {
+        const atual = N.cerimoniaDoCanal(canalId);
+        if (!atual || atual.status !== 'andamento' || atual.passo !== alvoPasso) return;
+        await msg.edit({ components: [] }).catch(() => {});
+        await canal.send('⏳ O tempo das bênçãos acabou. Vamos seguir com a cerimônia!').catch(() => {});
+        await pausa();
+        avancando.delete(canalId);
+        proximo(client, canalId).catch((e) => console.error('[Casamento]', e));
+      }, TEMPO_PADRINHOS());
+      return {};
     } else if (passo.tipo === 'objecao') {
       const botoes = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`cas:obj:${canalId}`).setLabel('Eu me oponho!').setEmoji('🙋').setStyle(ButtonStyle.Danger)
@@ -154,7 +189,8 @@ async function finalizar(client, c, canal) {
   c.status = 'concluido';
   c.msgId = null;
   N.salvarCerimonia(c);
-  const casal = N.registrarCasal(c.a, c.b, c.canalId);
+  const casal = N.registrarCasal(c.a, c.b, c.canalId, c.padrinhos || []);
+  const padrinhosTxt = (c.padrinhos || []).length ? `\n\n💐 Padrinhos e madrinhas: ${c.padrinhos.map((id) => N.mencao(id)).join(' ')}` : '';
   await N.travarConvidados(canal, c, false);
 
   await canal.send({
@@ -165,7 +201,7 @@ async function finalizar(client, c, canal) {
   await canal.send({
     content: `${v.a} ${v.b}`,
     allowedMentions: { users: [c.a, c.b] },
-    embeds: [embed('💋 Podem se beijar!', `Parabéns, ${v.a} e ${v.b}! 🎉🥂\nQue a vida de vocês seja cheia de carinho, risadas e muita cumplicidade.\n\n🎊 Convidados, a festa está liberada!`, `Casados desde ${new Date(casal.desde).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`)],
+    embeds: [embed('💋 Podem se beijar!', `Parabéns, ${v.a} e ${v.b}! 🎉🥂\nQue a vida de vocês seja cheia de carinho, risadas e muita cumplicidade.${padrinhosTxt}\n\n🎊 Convidados, a festa está liberada!`, `Casados desde ${new Date(casal.desde).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`)],
   });
 
   // Aviso público (se a staff configurou um canal de anúncios)
@@ -279,6 +315,61 @@ async function enviarVoto(client, interaction, canalId) {
   }
 }
 
+async function botaoBencao(interaction, canalId) {
+  const c = N.cerimoniaDoCanal(canalId);
+  if (!c || c.status !== 'andamento' || !PASSOS[c.passo] || PASSOS[c.passo].id !== 'padrinhos') {
+    return interaction.reply({ content: 'A hora das bênçãos já passou.', flags: EPH });
+  }
+  if (!(c.padrinhos || []).includes(interaction.user.id)) {
+    return interaction.reply({ content: 'Só os padrinhos e madrinhas abençoam nesta hora. 💐', flags: EPH });
+  }
+  if ((c.bencaos || {})[interaction.user.id]) return interaction.reply({ content: 'Você já abençoou o casal! 💐', flags: EPH });
+  const modal = new ModalBuilder()
+    .setCustomId(`cas:padmodal:${canalId}`)
+    .setTitle('Sua bênção')
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('bencao')
+          .setLabel('Uma palavra de carinho (pode deixar vazio)')
+          .setStyle(TextInputStyle.Paragraph)
+          .setMaxLength(400)
+          .setRequired(false)
+      )
+    );
+  return interaction.showModal(modal);
+}
+
+async function enviarBencao(client, interaction, canalId) {
+  const c = N.cerimoniaDoCanal(canalId);
+  if (!c || c.status !== 'andamento' || !PASSOS[c.passo] || PASSOS[c.passo].id !== 'padrinhos' || !(c.padrinhos || []).includes(interaction.user.id)) {
+    return interaction.reply({ content: 'A hora das bênçãos já passou.', flags: EPH });
+  }
+  c.bencaos = c.bencaos || {};
+  if (c.bencaos[interaction.user.id]) return interaction.reply({ content: 'Você já abençoou o casal! 💐', flags: EPH });
+  const texto = interaction.fields.getTextInputValue('bencao').trim();
+  c.bencaos[interaction.user.id] = true;
+  N.salvarCerimonia(c);
+  const nome = interaction.member ? interaction.member.displayName : interaction.user.username;
+  await interaction.reply({
+    embeds: [
+      embed(
+        `💐 Bênção de ${nome}`,
+        texto ? texto.slice(0, 4000) : `${N.mencao(interaction.user.id)} assinou como testemunha deste casamento. ✍️`
+      ),
+    ],
+    allowedMentions: { parse: [] },
+  });
+  if (c.padrinhos.every((id) => c.bencaos[id])) {
+    if (c.msgId) {
+      const m = await interaction.channel.messages.fetch(c.msgId).catch(() => null);
+      if (m) await m.edit({ components: [] }).catch(() => {});
+    }
+    await pausa();
+    return proximo(client, canalId);
+  }
+}
+
 async function botaoObjecao(interaction, canalId) {
   const c = N.cerimoniaDoCanal(canalId);
   if (!c || c.status !== 'andamento' || !PASSOS[c.passo] || PASSOS[c.passo].id !== 'objecao') {
@@ -290,4 +381,4 @@ async function botaoObjecao(interaction, canalId) {
   });
 }
 
-module.exports = { iniciar, proximo, botaoSim, botaoNao, botaoVoto, enviarVoto, botaoObjecao, PASSOS };
+module.exports = { iniciar, proximo, botaoSim, botaoNao, botaoVoto, enviarVoto, botaoBencao, enviarBencao, botaoObjecao, PASSOS };
