@@ -3,7 +3,7 @@
 //   pedido.json  -> o site publica as mudanças (o bot lê, valida e aplica)
 const crypto = require('crypto');
 const db = require('../db');
-const campos = require('./campos');
+const extras = require('./extras');
 
 const REPO = process.env.GITHUB_REPO || 'chavescontas3021-pixel/Atlas';
 const RAMO = 'dados';
@@ -81,13 +81,13 @@ async function ciclo(client) {
     let resultado = db.get('site.resultado', null);
     const pedido = await ler('pedido.json');
     if (pedido && pedido.dados && pedido.dados.id && String(pedido.dados.id) !== db.get('site.ultimoPedido', null)) {
-      resultado = campos.processarPedido(pedido.dados, guild);
+      resultado = await extras.processarPedido(pedido.dados, guild);
       db.set('site.ultimoPedido', String(pedido.dados.id));
       db.set('site.resultado', resultado);
-      console.log(`[Site] pedido ${resultado.id}: ${resultado.ok.length} aplicado(s), ${resultado.erros.length} erro(s)`);
+      console.log(`[Site] pedido ${resultado.id}: ${resultado.ok.length} aplicado(s), ${resultado.erros.length} erro(s), ${(resultado.acoes || []).length} ação(ões)`);
     }
 
-    const estado = campos.montarEstado(guild, resultado);
+    const estado = extras.montarEstado(guild, resultado);
     const hash = crypto.createHash('sha1').update(JSON.stringify(estado)).digest('hex');
     if (hash !== info.ultimoHash) {
       const atual = await ler('estado.json');
