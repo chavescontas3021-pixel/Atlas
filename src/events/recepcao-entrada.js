@@ -1,5 +1,12 @@
 const U = require('../recepcao/util');
 const F = require('../recepcao/fluxo');
+const Rep = require('../recepcao/rep');
+
+// ===== MUDE AQUI =====
+// Com os cargos de rep configurados, o Atlas espera o membro escolher os cargos no onboarding.
+// Se passar esse tempo e nada decidir, ele começa a recepção normal (menos para quem é só rep).
+const ESPERA_MINUTOS = 15;
+// =====================
 
 module.exports = {
   name: 'guildMemberAdd',
@@ -7,7 +14,22 @@ module.exports = {
     if (member.user.bot) return;
     if (!U.cfg('ativo', false)) return;
     try {
-      await F.iniciarRecepcao(member);
+      // Sem cargos de rep configurados: funciona como antes
+      if (!Rep.repConfigurado()) {
+        await F.iniciarRecepcao(member);
+        return;
+      }
+      // Já entrou com os cargos? Decide agora
+      await Rep.talvezIniciar(member);
+      // Se ainda não decidiu, tenta de novo depois do tempo de espera
+      setTimeout(async () => {
+        try {
+          const atual = await member.guild.members.fetch(member.id).catch(() => null);
+          if (atual) await Rep.talvezIniciar(atual);
+        } catch (erro) {
+          console.error('[Recepção] erro na espera:', erro);
+        }
+      }, ESPERA_MINUTOS * 60 * 1000);
     } catch (erro) {
       console.error('[Recepção] erro ao iniciar:', erro);
     }
