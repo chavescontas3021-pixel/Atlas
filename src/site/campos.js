@@ -15,6 +15,7 @@ const Che = require('../chefe/nucleo');
 const Cas = require('../casamento/nucleo');
 const Des = require('../destaque/nucleo');
 const Msg = require('../mensagens/nucleo');
+const Bv = require('../boasvindas/nucleo');
 
 const TIPOS_TEXTO = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 const specs = [];
@@ -53,6 +54,16 @@ mensagens('Recepção', 'config.recepcao', Rec.PADROES, {
   passos: ['Passos', '{usuario} {nick}'],
   sucesso: ['Sucesso', '{usuario} {nick}'],
 });
+
+// ---------- Boas-vindas e saída (texto puro, sem embed) ----------
+const VARS_BV = 'Variáveis: {usuario} {nome} {servidor} {contagem} {id}';
+add({ grupo: 'Boas-vindas', caminho: 'config.boasvindas.entrada.ativo', rotulo: 'Mensagem de boas-vindas ligada', tipo: 'bool', padrao: false });
+add({ grupo: 'Boas-vindas', caminho: 'config.boasvindas.entrada.canal', rotulo: 'Canal das boas-vindas', tipo: 'canal', padrao: null });
+add({ grupo: 'Boas-vindas', caminho: 'config.boasvindas.entrada.texto', rotulo: 'Texto das boas-vindas (marca o membro com {usuario})', tipo: 'longo', max: 1500, padrao: Bv.PADROES.entrada, dica: VARS_BV });
+add({ grupo: 'Boas-vindas', caminho: 'config.boasvindas.saida.ativo', rotulo: 'Mensagem de saída ligada', tipo: 'bool', padrao: false });
+add({ grupo: 'Boas-vindas', caminho: 'config.boasvindas.saida.canal', rotulo: 'Canal das mensagens de saída', tipo: 'canal', padrao: null });
+add({ grupo: 'Boas-vindas', caminho: 'config.boasvindas.saida.texto', rotulo: 'Texto de saída (marca o membro com {usuario}, sem notificar)', tipo: 'longo', max: 1500, padrao: Bv.PADROES.saida, dica: VARS_BV });
+add({ grupo: 'Boas-vindas', caminho: 'config.boasvindas.canalLog', rotulo: 'Canal de log das entradas e saídas (vazio = sem log próprio)', tipo: 'canal', padrao: null });
 
 // ---------- Noturno ----------
 add({ grupo: 'Noturno', caminho: 'config.noturno.ativo', rotulo: 'Fechamento noturno ligado', tipo: 'bool', padrao: false });
@@ -197,7 +208,7 @@ const FUNDIR = {
   rpgadmin: 'rpg', chefeadmin: 'chefe', evento: 'eventos', lembrete: 'lembretes', presentepet: 'pet',
   petpresente: 'pet', bichinho: 'pet', profissao: 'rpg', divorcio: 'casal',
 };
-const IGNORADOS = new Set(['site', 'ready', 'interactionCreate', 'utils']);
+const IGNORADOS = new Set(['site', 'ready', 'interactionCreate', 'utils', 'boasvindas']);
 const ROTULOS = { ajuda: 'Ajuda', aniversario: 'Aniversário', aviso: 'Avisos', ban: 'Ban', cargo: 'Cargos', casal: 'Casais', casamento: 'Casamento', chefe: 'Chefes', comandos: 'Comandos', desbanir: 'Desbanir', destaque: 'Destaque', diversao: 'Diversão', eventos: 'Eventos', expulsar: 'Expulsar', extras: 'Extras', ficha: 'Ficha', inatividade: 'Inatividade', info: 'Info', lembretes: 'Lembretes', livraria: 'Livraria', logs: 'Logs', loja: 'Loja', missoes: 'Missões', moderacao: 'Moderação', noturno: 'Noturno', pet: 'Pets', ping: 'Ping', prefixo: 'Prefixo', recepcao: 'Recepção', regras: 'Regras', rpg: 'RPG', sorteio: 'Sorteios', stats: 'Estatísticas', ticket: 'Tickets', utilidade: 'Utilidade', vagas: 'Vagas' };
 const nomeGrupo = (g) => FUNDIR[g] || g;
 const ehTextoDeVerdade = (m) => !/^[a-z][A-Za-z0-9_.:-]*$/.test(m) && m.trim().length > 1;
