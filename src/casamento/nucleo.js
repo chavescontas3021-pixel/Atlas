@@ -4,6 +4,7 @@ const db = require('../db');
 
 const COR = 0xf5a3c7;
 const MAX_CONVIDADOS = 40;
+const MAX_PADRINHOS = 4; // MUDE AQUI: quantos padrinhos/madrinhas cada casal pode escolher (no total)
 const ATIVOS = ['agendado', 'andamento', 'interrompido', 'concluido'];
 
 // "pausa" entre as falas do Atlas (em milissegundos). Os testes colocam 0.
@@ -31,10 +32,10 @@ const casalDe = (uid) => {
   return id ? db.get(`casamento.casais.${id}`, null) : null;
 };
 
-function registrarCasal(a, b, canalId) {
+function registrarCasal(a, b, canalId, padrinhos) {
   const n = db.get('casamento.contador', 0) + 1;
   db.set('casamento.contador', n);
-  const casal = { id: `c${n}`, a, b, desde: Date.now(), canalId: canalId || null };
+  const casal = { id: `c${n}`, a, b, desde: Date.now(), canalId: canalId || null, padrinhos: padrinhos || [] };
   db.set(`casamento.casais.${casal.id}`, casal);
   db.set(`casamento.casalDe.${a}`, casal.id);
   db.set(`casamento.casalDe.${b}`, casal.id);
@@ -94,13 +95,14 @@ async function travarConvidados(canal, c, travar) {
 }
 
 const limiteConvidados = () => Math.max(1, Number(cfg('limite', MAX_CONVIDADOS)) || MAX_CONVIDADOS);
+const limitePadrinhos = () => Math.max(1, Number(cfg('limitePadrinhos', MAX_PADRINHOS)) || MAX_PADRINHOS);
 
 const preencher = (texto, vars) => String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
 const mencao = (id) => `<@${id}>`;
 
 module.exports = {
-  COR, MAX_CONVIDADOS, ATIVOS, ajustes, cfg,
+  COR, MAX_CONVIDADOS, MAX_PADRINHOS, ATIVOS, ajustes, cfg,
   cerimonias, cerimoniaDoCanal, salvarCerimonia, removerCerimonia, cerimoniaDe, ehNoivo,
   casais, casalDe, registrarCasal, preencher, mencao,
-  limparFantasmas, criarCanal, darAcesso, travarConvidados, limiteConvidados,
+  limparFantasmas, criarCanal, darAcesso, travarConvidados, limiteConvidados, limitePadrinhos,
 };
