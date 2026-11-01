@@ -25,6 +25,15 @@ function specs() {
     depois: 'config.recepcao.mensagens.boasVindas.texto',
   });
 
+  for (const tipo of ['entrada', 'saida']) {
+    lista.push({
+      grupo: 'Boas-vindas', caminho: `config.boasvindas.${tipo}.banner`, tipo: 'url', max: 500, padrao: null,
+      rotulo: tipo === 'entrada' ? 'Banner da mensagem de boas-vindas (link da imagem)' : 'Banner da mensagem de saída (link da imagem)',
+      dica: 'Link direto de uma imagem (https://...). Vazio = sem banner. Links de anexos do Discord expiram.',
+      depois: `config.boasvindas.${tipo}.texto`,
+    });
+  }
+
   for (const [tipo, info] of Object.entries(Par.TIPOS)) {
     const g = 'Parcerias';
     const base = `config.parceria.${tipo}`;
