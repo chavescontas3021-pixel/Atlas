@@ -41,6 +41,8 @@ for (const p of Rec.PASSOS) {
 }
 add({ grupo: 'Recepção', caminho: 'config.recepcao.cargos.semVaga', rotulo: 'Cargo "sem vaga"', tipo: 'cargo', padrao: null });
 add({ grupo: 'Recepção', caminho: 'config.recepcao.cargos.verificado', rotulo: 'Cargo "verificado"', tipo: 'cargo', padrao: null });
+add({ grupo: 'Recepção', caminho: 'config.recepcao.cargos.repParceria', rotulo: 'Cargo "rep de parceria" (só ele: pula a recepção e a inatividade)', tipo: 'cargo', padrao: null, dica: 'Se a pessoa também tiver o cargo "sem vaga", ela passa pela recepção normal.' });
+add({ grupo: 'Recepção', caminho: 'config.recepcao.cargos.repAlianca', rotulo: 'Cargo "rep de aliança" (só ele: pula a recepção e a inatividade)', tipo: 'cargo', padrao: null, dica: 'Se a pessoa também tiver o cargo "sem vaga", ela passa pela recepção normal.' });
 add({ grupo: 'Recepção', caminho: 'config.recepcao.cargos.staff', rotulo: 'Cargo da staff (vê os canais de recepção)', tipo: 'cargo', padrao: null });
 add({ grupo: 'Recepção', caminho: 'config.recepcao.categoria', rotulo: 'Categoria dos canais de recepção', tipo: 'categoria', padrao: null });
 add({ grupo: 'Recepção', caminho: 'config.recepcao.apagarSegundos', rotulo: 'Apagar canal X segundos após verificar (0 = não apagar)', tipo: 'numero', min: 0, max: 3600, padrao: Rec.PADROES.apagarSegundos });
