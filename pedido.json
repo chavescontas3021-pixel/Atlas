@@ -1,1 +1,1 @@
-{"id":"1793524326596","mudancas":{"config.recepcao.mensagens.boasVindas.texto":"_ _   𖥔﹒꒰ა 𝐎lá, {usuario}! 𓈒 ⊹ 𝐄u sou ๑ 𝐀tlas, e v๑u te acompanhar durante sua entrada na 𝐇ouse!﹒𓏲\n\n_ _   𖹭﹒𝐏ass๑ 𝟎𝟏 ﹒𝐑egistro ⊹\n\n_ _   ୨ৎ﹒𝐌e diga aqui n๑ chat ๑ n๑me d๑ personagem que deseja utilizar. 𝐕๑u verificar se a vaga está disp๑nível para v๑cê!﹒𓐐\n\n_ _   ꒰ა﹒𝐄stou aguardand๑ sua resposta﹒✿﹒𓈒"}}
+{"id":"1793526075577","mudancas":{},"acoes":[{"tipo":"ticket.criarPainel","nome":"Vip booster"}]}
