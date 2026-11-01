@@ -111,7 +111,6 @@
   }
 
   var RAMO = 'dados';
-  var ESPECIAL = '➕ Painéis de ticket';
   var estado = null, valores = {}, resetados = {}, grupoAtivo = null, ocupado = false;
 
   function repo() { return ($('#repo').value || '').trim(); }
@@ -160,9 +159,9 @@
     valores = {}; resetados = {};
     estado.campos.forEach(function (c) { valores[c.caminho] = JSON.parse(JSON.stringify(c.valor)); });
     var quando = estado.atualizadoEm ? new Date(estado.atualizadoEm).toLocaleString('pt-BR') : '';
-    $('#status').textContent = 'Servidor: ' + estado.servidor.nome + (quando ? ' · atualizado em ' + quando : '');
+    $('#status').textContent = 'Servidor: ' + estado.servidor.nome + (quando ? ' · atualizado em ' + quando : '') + ' · página v4';
     $('#det-conexao').open = false;
-    if (!grupoAtivo || (grupoAtivo !== ESPECIAL && !estado.campos.some(function (c) { return c.grupo === grupoAtivo; }))) grupoAtivo = estado.campos[0].grupo;
+    if (!grupoAtivo || !estado.campos.some(function (c) { return c.grupo === grupoAtivo; })) grupoAtivo = estado.campos[0].grupo;
     desenhar();
     return true;
   }
@@ -187,10 +186,6 @@
   function desenhar() {
     var grupos = [];
     estado.campos.forEach(function (c) { if (grupos.indexOf(c.grupo) < 0) grupos.push(c.grupo); });
-    // aba especial de painéis de ticket: logo depois das abas "Ticket..."
-    var ultimoTicket = -1;
-    grupos.forEach(function (g, i) { if (g.indexOf('Ticket') === 0) ultimoTicket = i; });
-    grupos.splice(ultimoTicket >= 0 ? ultimoTicket + 1 : grupos.length, 0, ESPECIAL);
     if (grupos.indexOf(grupoAtivo) < 0) grupoAtivo = grupos[0];
     var abas = $('#abas');
     abas.textContent = '';
@@ -199,8 +194,12 @@
     });
     var area = $('#campos');
     area.textContent = '';
-    if (grupoAtivo === ESPECIAL) desenharPaineis(area);
-    else estado.campos.filter(function (c) { return c.grupo === grupoAtivo; }).forEach(function (c) { area.appendChild(campo(c)); });
+    // Aba "Tickets": adicionar painel + lista dos painéis extras no topo
+    if (grupoAtivo === 'Tickets') desenharPaineis(area);
+    // Aba "Ticket · Nome": botões de postar/apagar daquele painel no topo
+    var painelDaAba = (estado.paineis || []).filter(function (p) { return grupoAtivo === 'Ticket · ' + String(p.nome || p.id).slice(0, 24); })[0];
+    if (painelDaAba) area.appendChild(cartaoPainel(painelDaAba, false));
+    estado.campos.filter(function (c) { return c.grupo === grupoAtivo; }).forEach(function (c) { area.appendChild(campo(c)); });
     atualizarBarra();
   }
 
@@ -227,50 +226,53 @@
     enviar({}, [a]);
   }
 
+  function cartaoPainel(p, mostrarEditar) {
+    var sel = h('select', {}, ...opcoesSelect(estado.canais, p.canal, '— escolha o canal —'));
+    var botoes = [
+      h('button', {
+        type: 'button', texto: p.canal ? 'Postar de novo' : 'Postar painel',
+        onclick: function () {
+          if (!sel.value) { aviso('Escolha o canal onde postar.', 'erro'); return; }
+          acao({ tipo: 'ticket.postarPainel', painelId: p.id, canalId: sel.value });
+        }
+      })
+    ];
+    if (mostrarEditar) {
+      botoes.push(h('button', {
+        class: 'sec', type: 'button', texto: 'Editar',
+        onclick: function () { grupoAtivo = 'Ticket · ' + String(p.nome || p.id).slice(0, 24); desenhar(); }
+      }));
+    }
+    botoes.push(h('button', {
+      class: 'sec', type: 'button', texto: 'Apagar',
+      onclick: function () { acao({ tipo: 'ticket.removerPainel', painelId: p.id }, 'Apagar o painel "' + p.nome + '"? As mensagens antigas dele param de funcionar.'); }
+    }));
+    return h('div', { class: 'card' },
+      h('label', { texto: '🎫 ' + p.nome }),
+      h('div', { class: 'dica', texto: p.qtdTipos + ' categoria(s) · ' + (p.canal ? 'postado em #' + nomeCanal(p.canal) : 'ainda não postado') }),
+      h('div', { style: 'margin-top:8px' }, sel),
+      h('div', { class: 'acoes-linha' }, ...botoes));
+  }
+
   function desenharPaineis(area) {
     var lista = estado.paineis || [];
     var limite = estado.limitePaineis || 10;
     var nomeIn = h('input', { type: 'text', maxlength: '40', placeholder: 'Ex.: Suporte, Benefícios, Denúncias' });
     area.appendChild(h('div', { class: 'card' },
-      h('label', { texto: 'Criar painel novo' }),
+      h('label', { texto: '➕ Adicionar painel' }),
       nomeIn,
-      h('div', { class: 'dica', texto: 'Cada painel tem categorias (botões), staff, categoria de canais e logs próprios. Você tem ' + lista.length + ' de ' + limite + ' painéis.' }),
+      h('div', { class: 'dica', texto: 'Cada painel tem categorias (botões), staff, categoria de canais e logs próprios. Você tem ' + lista.length + ' de ' + limite + ' painéis extras.' }),
       h('div', { class: 'acoes-linha' },
         h('button', {
-          type: 'button', texto: 'Criar painel', disabled: lista.length >= limite,
+          type: 'button', texto: 'Adicionar painel', disabled: lista.length >= limite,
           onclick: function () {
             var n = nomeIn.value.trim();
             if (!n) { aviso('Escreva o nome do painel.', 'erro'); return; }
             acao({ tipo: 'ticket.criarPainel', nome: n });
           }
         }))));
-    if (!lista.length) {
-      area.appendChild(h('div', { class: 'card dica', texto: 'Nenhum painel extra ainda. Crie o primeiro acima!' }));
-    }
-    lista.forEach(function (p) {
-      var sel = h('select', {}, ...opcoesSelect(estado.canais, p.canal, '— escolha o canal —'));
-      area.appendChild(h('div', { class: 'card' },
-        h('label', { texto: p.nome }),
-        h('div', { class: 'dica', texto: p.qtdTipos + ' categoria(s) · ' + (p.canal ? 'postado em #' + nomeCanal(p.canal) : 'ainda não postado') }),
-        h('div', { style: 'margin-top:8px' }, sel),
-        h('div', { class: 'acoes-linha' },
-          h('button', {
-            type: 'button', texto: p.canal ? 'Postar de novo' : 'Postar painel',
-            onclick: function () {
-              if (!sel.value) { aviso('Escolha o canal onde postar.', 'erro'); return; }
-              acao({ tipo: 'ticket.postarPainel', painelId: p.id, canalId: sel.value });
-            }
-          }),
-          h('button', {
-            class: 'sec', type: 'button', texto: 'Editar',
-            onclick: function () { grupoAtivo = 'Ticket · ' + String(p.nome || p.id).slice(0, 24); desenhar(); }
-          }),
-          h('button', {
-            class: 'sec', type: 'button', texto: 'Apagar',
-            onclick: function () { acao({ tipo: 'ticket.removerPainel', painelId: p.id }, 'Apagar o painel "' + p.nome + '"? As mensagens antigas dele param de funcionar.'); }
-          }))));
-    });
-    area.appendChild(h('div', { class: 'dica', texto: 'O painel original continua sendo configurado na aba "Tickets".' }));
+    lista.forEach(function (p) { area.appendChild(cartaoPainel(p, true)); });
+    area.appendChild(h('div', { class: 'dica', texto: 'Estes são os painéis extras. As configurações do painel original ficam logo abaixo.' }));
   }
 
   function campo(c) {
