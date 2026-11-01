@@ -7,8 +7,16 @@ const EPH = MessageFlags.Ephemeral;
 
 async function botao(interaction) {
   const [, acao, userId] = interaction.customId.split(':');
+
+  // Botão da staff: vale para qualquer pessoa da staff (a checagem é feita lá dentro)
+  if (acao === 'assumir') return F.alternarAtendimento(interaction, userId);
+
   if (interaction.user.id !== userId) {
     return interaction.reply({ content: 'Esse botão não é para você 💜', flags: EPH });
+  }
+  // Staff assumiu: o fluxo automático fica parado até ela devolver
+  if (F.estaAssumido(userId)) {
+    return interaction.reply({ content: F.MSG_ASSUMIDO, flags: EPH });
   }
   if (acao === 'verificar') {
     // Com autorização ligada, o pedido vai para a staff em vez de verificar na hora
@@ -19,7 +27,10 @@ async function botao(interaction) {
 }
 
 async function seletor(interaction) {
-  const tipo = interaction.customId.split(':')[1];
+  const [, tipo, userId] = interaction.customId.split(':');
+  if (interaction.user.id === userId && F.estaAssumido(userId)) {
+    return interaction.reply({ content: F.MSG_ASSUMIDO, flags: EPH });
+  }
   if (tipo === 'molde') return F.escolherMolde(interaction);
   if (tipo === 'emoji') return F.escolherEmoji(interaction);
 }
@@ -33,7 +44,9 @@ async function modal(interaction) {
 
   const titulo = interaction.fields.getTextInputValue('titulo');
   const texto = interaction.fields.getTextInputValue('texto');
-  db.set(`config.recepcao.mensagens.${tipo}`, { titulo, texto });
+  // Mantém o que já existe (ex.: o banner) e troca só título e texto
+  const atual = db.get(`config.recepcao.mensagens.${tipo}`, {}) || {};
+  db.set(`config.recepcao.mensagens.${tipo}`, { ...atual, titulo, texto });
 
   await interaction.reply({
     content: '✅ Mensagem salva! Você pode usar {usuario}, {servidor}, {personagem}, {nick} e {emoji} no texto.',
