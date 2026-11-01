@@ -8,27 +8,7 @@ const {
   GatewayIntentBits,
   Partials,
 } = require('discord.js');
-
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions,
-    // Usados pelos logs do servidor
-    GatewayIntentBits.GuildModeration,
-    GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildInvites,
-    GatewayIntentBits.GuildExpressions || GatewayIntentBits.GuildEmojisAndStickers,
-  ].filter(Boolean),
-  partials: [Partials.Channel, Partials.Message, Partials.Reaction],
-});
-
-client.commands = new Collection();
-
-// O Atlas tem muitos módulos ouvindo os mesmos eventos (é normal). Isso tira o aviso de "MaxListeners".
-client.setMaxListeners(0);
+const Standby = require('./standby/nucleo');
 
 // Lê todos os .js de uma pasta, incluindo subpastas
 function listarArquivos(dir) {
@@ -45,25 +25,53 @@ function listarArquivos(dir) {
   return resultado;
 }
 
-// Carrega comandos
-for (const arquivo of listarArquivos(path.join(__dirname, 'commands'))) {
-  const comando = require(arquivo);
-  if (comando.data && comando.execute) {
-    client.commands.set(comando.data.name, comando);
-  } else {
-    console.warn(`[AVISO] Comando inválido: ${arquivo}`);
-  }
-}
+// Cria o bot, carrega comandos e eventos e entra no Discord.
+// (Fica numa função para só rodar depois que o banco estiver pronto: veja o final do arquivo.)
+function iniciarBot() {
+  const client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMessageReactions,
+      // Usados pelos logs do servidor
+      GatewayIntentBits.GuildModeration,
+      GatewayIntentBits.GuildVoiceStates,
+      GatewayIntentBits.GuildInvites,
+      GatewayIntentBits.GuildExpressions || GatewayIntentBits.GuildEmojisAndStickers,
+    ].filter(Boolean),
+    partials: [Partials.Channel, Partials.Message, Partials.Reaction],
+  });
 
-// Carrega eventos (várias partes podem usar o mesmo evento)
-for (const arquivo of listarArquivos(path.join(__dirname, 'events'))) {
-  const evento = require(arquivo);
-  if (!evento.name || !evento.execute) continue;
-  if (evento.once) {
-    client.once(evento.name, (...args) => evento.execute(client, ...args));
-  } else {
-    client.on(evento.name, (...args) => evento.execute(client, ...args));
+  client.commands = new Collection();
+
+  // O Atlas tem muitos módulos ouvindo os mesmos eventos (é normal). Isso tira o aviso de "MaxListeners".
+  client.setMaxListeners(0);
+
+  // Carrega comandos
+  for (const arquivo of listarArquivos(path.join(__dirname, 'commands'))) {
+    const comando = require(arquivo);
+    if (comando.data && comando.execute) {
+      client.commands.set(comando.data.name, comando);
+    } else {
+      console.warn(`[AVISO] Comando inválido: ${arquivo}`);
+    }
   }
+
+  // Carrega eventos (várias partes podem usar o mesmo evento)
+  for (const arquivo of listarArquivos(path.join(__dirname, 'events'))) {
+    const evento = require(arquivo);
+    if (!evento.name || !evento.execute) continue;
+    if (evento.once) {
+      client.once(evento.name, (...args) => evento.execute(client, ...args));
+    } else {
+      client.on(evento.name, (...args) => evento.execute(client, ...args));
+    }
+  }
+
+  client.login(process.env.TOKEN);
+  return client;
 }
 
 process.on('unhandledRejection', (erro) => {
@@ -80,4 +88,16 @@ if (process.env.PORT) {
     .listen(process.env.PORT);
 }
 
-client.login(process.env.TOKEN);
+// Início. Com MODO=principal ou MODO=reserva no .env, espera a sua vez antes de ligar o bot
+// (assim o banco certo já está em data/db.json quando os módulos carregarem).
+// Sem MODO, funciona como sempre.
+(async () => {
+  try {
+    if (Standby.ativo()) await Standby.aguardarVez();
+    const client = iniciarBot();
+    if (Standby.ativo()) Standby.manter(client);
+  } catch (erro) {
+    console.error('[ERRO AO INICIAR]', erro.message || erro);
+    process.exit(erro && erro.configuracao ? 2 : 1);
+  }
+})();
