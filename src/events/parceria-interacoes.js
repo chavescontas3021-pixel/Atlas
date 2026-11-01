@@ -21,7 +21,7 @@ module.exports = {
       db.set(`config.parceria.${tipo}.texto`, texto);
 
       await interaction.reply({
-        content: '✅ Mensagem salva! Variáveis: {convite}, {membro}, {servidor} e {cargo}. Use `/parceria testar` para ver a prévia.',
+        content: `✅ Mensagem salva! Variáveis: ${N.VARIAVEIS}. Use \`/parceria testar\` para ver a prévia.`,
         flags: EPH,
       });
     } catch (erro) {
