@@ -1,1 +1,1 @@
-{"id":"1793526714384","mudancas":{},"acoes":[{"tipo":"ticket.postarPainel","painelId":"p1","canalId":"1563953722562969640"}]}
+{"id":"1793526945318","mudancas":{},"acoes":[{"tipo":"ticket.criarPainel","nome":"Agendar consulta"}]}
