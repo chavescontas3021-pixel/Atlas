@@ -49,6 +49,8 @@ function specs() {
     lista.push({ grupo: g, caminho: `${base}.semRepresentante`, rotulo: `${nome} — texto quando não há representante`, tipo: 'texto', max: 100, padrao: Par.SEM_REP, dica: 'Aparece no lugar de {representante} se o promotor não marcar ninguém junto do convite.' });
   }
 
+  lista.push(...require('./extras-recepcao').specs());
+
   for (const p of Tkt.listaPaineis()) {
     lista.push({
       grupo: `Ticket · ${String(p.nome || p.id).slice(0, 24)}`,
@@ -268,10 +270,14 @@ function montarEstado(guild, resultado) {
   const ehTexto = (c) => String(c.grupo).startsWith('Textos ·');
   const base = estado.campos.filter((c) => !ehTexto(c));
   const textos = estado.campos.filter(ehTexto);
+  const jaInseridos = {};
   for (const e of extras) {
     const i = e.depois ? base.findIndex((c) => c.caminho === e.depois) : -1;
-    if (i >= 0) base.splice(i + 1, 0, e.campo);
-    else base.push(e.campo);
+    if (i >= 0) {
+      const n = jaInseridos[e.depois] || 0;
+      base.splice(i + 1 + n, 0, e.campo);
+      jaInseridos[e.depois] = n + 1;
+    } else base.push(e.campo);
   }
   estado.campos = [...base, ...textos];
 
