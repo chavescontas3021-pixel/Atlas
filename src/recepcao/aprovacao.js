@@ -12,9 +12,7 @@ const EPH = MessageFlags.Ephemeral;
 const chave = (id) => `recepcao.sessoes.${id}`;
 const cfg = (k, p) => db.get(`config.recepcao.aprovacao.${k}`, p);
 
-const MSG_PADRAO =
-  '{cargo} {membro} chegou na house! 🎉\n' +
-  'Deem boas-vindas a **{nick}** (personagem: **{personagem}**)! 💜';
+const MSG_PADRAO = '{cargo} Deem boas-vindas para {membro}';
 
 const ativo = () => cfg('ativo', false) === true && !!cfg('canal');
 
