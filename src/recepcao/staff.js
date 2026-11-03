@@ -135,6 +135,8 @@ async function reiniciar(interaction, userId, sessao) {
 async function apagar(interaction, userId) {
   const canal = interaction.channel;
   db.remover(chave(userId));
+  // Lembra que a staff encerrou: sem isso a recepção voltava a abrir sozinha depois de um tempo
+  db.set(`recepcao.dispensados.${userId}`, Date.now());
   await interaction.update({ content: '🗑️ Apagando o canal...', embeds: [], components: [] });
   setTimeout(() => canal.delete(`Recepção apagada por ${interaction.user.username}`).catch(() => {}), 1500);
 }
