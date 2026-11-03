@@ -28,6 +28,7 @@ async function talvezIniciar(membro) {
   if (!db.get('config.recepcao.ativo', false)) return false;
   if (temCargo(membro, 'verificado')) return false;
   if (db.get(`recepcao.sessoes.${membro.id}`)) return false;
+  if (db.get(`recepcao.reps.${membro.id}`)) return false; // disse na recepção que é apenas representante
   if (soRep(membro)) return false;
   if (iniciando.has(membro.id)) return false;
   iniciando.add(membro.id);
