@@ -1,3 +1,4 @@
+const db = require('../db');
 const U = require('../recepcao/util');
 const F = require('../recepcao/fluxo');
 const Rep = require('../recepcao/rep');
@@ -14,6 +15,9 @@ module.exports = {
     if (member.user.bot) return;
     if (!U.cfg('ativo', false)) return;
     try {
+      // Entrou de novo: esquece que ele já tinha dito que era apenas representante
+      db.remover(`recepcao.reps.${member.id}`);
+
       // Sem cargos de rep configurados: funciona como antes
       if (!Rep.repConfigurado()) {
         await F.iniciarRecepcao(member);
