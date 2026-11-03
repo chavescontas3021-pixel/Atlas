@@ -10,6 +10,7 @@ const {
 } = require('discord.js');
 const db = require('../db');
 const U = require('./util');
+const T = require('./textos');
 
 const COR = 0xf5a3c7;
 const EPH = MessageFlags.Ephemeral;
@@ -25,8 +26,27 @@ function botaoAssumir(userId, assumido) {
     .setStyle(assumido ? ButtonStyle.Secondary : ButtonStyle.Danger);
 }
 
+// Botões da primeira mensagem: [Sou apenas representante] [Assumir/Devolver] [Staff]
 function linhaAssumir(userId, assumido) {
-  return new ActionRowBuilder().addComponents(botaoAssumir(userId, assumido));
+  const linha = new ActionRowBuilder();
+  if (T.repDisponivel()) {
+    linha.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`recepcao:rep:${userId}`)
+        .setLabel('Sou apenas representante')
+        .setEmoji('🤝')
+        .setStyle(ButtonStyle.Primary)
+    );
+  }
+  linha.addComponents(botaoAssumir(userId, assumido));
+  linha.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`recepcao:staff:${userId}`)
+      .setLabel('Staff')
+      .setEmoji('🛠️')
+      .setStyle(ButtonStyle.Secondary)
+  );
+  return linha;
 }
 
 // Staff = quem tem Gerenciar Servidor ou o cargo de staff da recepção
@@ -43,8 +63,8 @@ function estaAssumido(userId) {
   return !!(s && s.assumido);
 }
 
-const MSG_ASSUMIDO =
-  '🙋 A staff assumiu o seu atendimento. Aguarde, ela vai falar com você aqui no canal.';
+// Texto mostrado ao membro enquanto a staff está com o atendimento (editável no site)
+const msgAssumido = () => T.preencher(T.mensagem('assumido').texto, {});
 
 function bannerValido(url) {
   if (typeof url !== 'string') return null;
@@ -71,9 +91,10 @@ async function alternarAtendimento(interaction, userId) {
 
   await interaction.update({ components: [linhaAssumir(userId, assumir)] });
 
-  const aviso = assumir
-    ? `🙋 <@${interaction.user.id}> assumiu o atendimento de <@${userId}>. O Atlas vai ficar em silêncio até a staff devolver.`
-    : `🤖 O Atlas voltou a cuidar do atendimento. <@${userId}>, pode continuar de onde parou!`;
+  const aviso = T.preencher(T.mensagem(assumir ? 'assumiu' : 'devolveu').texto, {
+    staff: `<@${interaction.user.id}>`,
+    usuario: `<@${userId}>`,
+  });
   await interaction.channel
     .send({ content: aviso, allowedMentions: { users: [userId] } })
     .catch(() => {});
@@ -185,45 +206,129 @@ async function enviarEmojis(canal, userId) {
   });
 }
 
-// Quando o membro escreve o nome do personagem no chat
-async function receberPersonagem(message) {
-  const userId = message.author.id;
+// Parece um nome de personagem? Conversa comum (pergunta, link, frase longa) não conta.
+function pareceNome(bruto) {
+  const t = String(bruto || '').trim();
+  if (!t || t.length > 40) return false;
+  if (/[\n?]/.test(t)) return false;
+  if (/https?:\/\/|discord\.gg|<@|<#|@everyone|@here/i.test(t)) return false;
+  if (t.split(/\s+/).length > 5) return false;
+  return true;
+}
+
+// Confere a vaga do personagem e, estando livre, segue para a escolha do molde
+async function conferirPersonagem(canal, userId, nome) {
   if (emAndamento.has(userId)) return;
-
-  const nome = message.content.trim().replace(/\s+/g, ' ');
-  if (!nome || nome.length > 40) {
-    await message.reply('Me envie só o **nome do personagem** (até 40 caracteres).');
-    return;
-  }
-
   emAndamento.add(userId);
   try {
-    await message.channel.sendTyping().catch(() => {});
-    const r = await U.procurarVaga(message.guild, nome, userId);
+    await canal.sendTyping().catch(() => {});
+    const r = await U.procurarVaga(canal.guild, nome, userId);
 
     if (r.erro) {
-      await message.reply(`⚠️ ${r.erro} Chame a staff, por favor.`);
+      await canal.send(`⚠️ ${r.erro} Chame a staff, por favor.`);
       return;
     }
     if (r.ocupada) {
-      await message.reply(`😕 **${nome}** já está ocupado: ${r.ocupada.url}\nEscolha outro personagem e me envie o nome.`);
+      await canal.send(`😕 **${nome}** já está ocupado: ${r.ocupada.url}\nEscolha outro personagem e me envie o nome.`);
       return;
     }
 
     const sessao = db.get(chave(userId));
-    if (!sessao || sessao.etapa !== 'personagem') return;
-    db.set(chave(userId), { ...sessao, personagem: nome, etapa: 'molde' });
-    await enviarMoldes(message.channel, userId, nome);
+    if (!sessao || sessao.etapa !== 'personagem' || sessao.assumido) return;
+    const { proposta, ...resto } = sessao;
+    db.set(chave(userId), { ...resto, personagem: nome, etapa: 'molde' });
+    await enviarMoldes(canal, userId, nome);
   } finally {
     emAndamento.delete(userId);
   }
+}
+
+// Pergunta "é esse mesmo?" antes de aceitar o nome
+async function propor(message, nome) {
+  const userId = message.author.id;
+  const antes = db.get(chave(userId));
+  if (antes && antes.proposta && antes.proposta.msgId) {
+    const velha = await message.channel.messages.fetch(antes.proposta.msgId).catch(() => null);
+    if (velha) await velha.delete().catch(() => {});
+  }
+
+  const botoes = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`recepcao:perssim:${userId}`).setLabel('Sim, é esse').setEmoji('✅').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`recepcao:persnao:${userId}`).setLabel('Não, foi só uma mensagem').setEmoji('❌').setStyle(ButtonStyle.Secondary)
+  );
+  const enviada = await message.reply({
+    content: T.preencher(T.mensagem('confirmarPersonagem').texto, { personagem: nome, usuario: `<@${userId}>` }),
+    components: [botoes],
+    allowedMentions: { parse: [], repliedUser: false },
+  });
+  const atual = db.get(chave(userId));
+  if (atual) db.set(chave(userId), { ...atual, proposta: { nome, msgId: enviada.id } });
+}
+
+// Quando o membro escreve no chat durante a etapa do personagem
+async function receberPersonagem(message) {
+  const userId = message.author.id;
+  const sessao = db.get(chave(userId));
+  if (!sessao || sessao.etapa !== 'personagem') return;
+
+  const bruto = message.content.trim();
+  if (!pareceNome(bruto)) {
+    // Conversa comum: o Atlas fica quieto (só orienta uma vez)
+    if (bruto && !sessao.avisouNome) {
+      db.set(chave(userId), { ...sessao, avisouNome: true });
+      await message
+        .reply({
+          content: T.preencher(T.mensagem('dicaPersonagem').texto, { usuario: `<@${userId}>` }),
+          allowedMentions: { parse: [], repliedUser: false },
+        })
+        .catch(() => {});
+    }
+    return;
+  }
+
+  const nome = bruto.replace(/\s+/g, ' ');
+  if (!T.confirmarLigado()) return conferirPersonagem(message.channel, userId, nome);
+  return propor(message, nome);
+}
+
+// Botão "Sim, é esse"
+async function confirmarPersonagem(interaction) {
+  const userId = interaction.user.id;
+  const sessao = db.get(chave(userId));
+  if (!sessao || sessao.etapa !== 'personagem' || !sessao.proposta || sessao.proposta.msgId !== interaction.message.id) {
+    return interaction.update({ content: 'Essa pergunta já foi respondida.', components: [] }).catch(() => {});
+  }
+  const nome = sessao.proposta.nome;
+  await interaction.update({ content: `🔎 Conferindo a vaga de **${nome}**...`, components: [] });
+  try {
+    await conferirPersonagem(interaction.channel, userId, nome);
+  } finally {
+    await interaction.message.delete().catch(() => {});
+  }
+}
+
+// Botão "Não, foi só uma mensagem"
+async function cancelarPersonagem(interaction) {
+  const userId = interaction.user.id;
+  const sessao = db.get(chave(userId));
+  if (sessao && sessao.proposta && sessao.proposta.msgId === interaction.message.id) {
+    const { proposta, ...resto } = sessao;
+    db.set(chave(userId), resto);
+  }
+  await interaction.deferUpdate().catch(() => {});
+  await interaction.message.delete().catch(() => {});
 }
 
 // Quando o membro escreve um emoji no chat
 async function receberEmoji(message) {
   const texto = message.content.trim();
   if (!texto || /[\p{L}\p{N}]/u.test(texto) || Array.from(texto).length > 8) {
-    await message.reply('Me envie só um emoji ou símbolo (sem letras), tipo 🌸 ou ✦.');
+    // Conversa comum: o Atlas fica quieto (só orienta uma vez)
+    const sessao = db.get(chave(message.author.id));
+    if (texto && sessao && !sessao.avisouEmoji) {
+      db.set(chave(message.author.id), { ...sessao, avisouEmoji: true });
+      await message.reply({ content: T.mensagem('dicaEmoji').texto, allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
+    }
     return;
   }
   await message.react('✅').catch(() => {});
@@ -318,7 +423,7 @@ async function trocar(interaction) {
   if (!sessao) return interaction.reply({ content: 'Não achei sua recepção.', flags: EPH });
 
   // Zera só os dados do personagem; mantém canal, teste, mensagem inicial e "assumido"
-  const { personagem, molde, emoji, nick, pedido, ...mantem } = sessao;
+  const { personagem, molde, emoji, nick, pedido, proposta, ...mantem } = sessao;
   db.set(chave(interaction.user.id), { ...mantem, etapa: 'personagem' });
   await interaction.update({ components: [] });
   await interaction.channel.send('🔄 Tudo bem! Me envie o nome do **novo personagem**.');
@@ -393,5 +498,8 @@ module.exports = {
   verificar,
   alternarAtendimento,
   estaAssumido,
-  MSG_ASSUMIDO,
+  msgAssumido,
+  ehStaffRecepcao,
+  confirmarPersonagem,
+  cancelarPersonagem,
 };
