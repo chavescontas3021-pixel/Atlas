@@ -2,21 +2,25 @@ const { MessageFlags, PermissionFlagsBits } = require('discord.js');
 const db = require('../db');
 const F = require('../recepcao/fluxo');
 const A = require('../recepcao/aprovacao');
+const S = require('../recepcao/staff');
+const R = require('../recepcao/representante');
 
 const EPH = MessageFlags.Ephemeral;
 
 async function botao(interaction) {
   const [, acao, userId] = interaction.customId.split(':');
 
-  // Botão da staff: vale para qualquer pessoa da staff (a checagem é feita lá dentro)
+  // Botões da staff: valem para qualquer pessoa da staff (a checagem é feita lá dentro)
   if (acao === 'assumir') return F.alternarAtendimento(interaction, userId);
+  if (acao === 'staff') return S.abrirPainel(interaction, userId);
+  if (acao.startsWith('sf-') || acao.startsWith('sfc-')) return S.tratar(interaction, acao, userId);
 
   if (interaction.user.id !== userId) {
     return interaction.reply({ content: 'Esse botão não é para você 💜', flags: EPH });
   }
   // Staff assumiu: o fluxo automático fica parado até ela devolver
   if (F.estaAssumido(userId)) {
-    return interaction.reply({ content: F.MSG_ASSUMIDO, flags: EPH });
+    return interaction.reply({ content: F.msgAssumido(), flags: EPH });
   }
   if (acao === 'verificar') {
     // Com autorização ligada, o pedido vai para a staff em vez de verificar na hora
@@ -24,12 +28,17 @@ async function botao(interaction) {
     return F.verificar(interaction);
   }
   if (acao === 'trocar') return F.trocar(interaction);
+  if (acao === 'perssim') return F.confirmarPersonagem(interaction);
+  if (acao === 'persnao') return F.cancelarPersonagem(interaction);
+  if (acao === 'rep') return R.pedir(interaction, userId);
+  if (acao === 'repsim') return R.confirmar(interaction, userId);
+  if (acao === 'repnao') return R.cancelar(interaction);
 }
 
 async function seletor(interaction) {
   const [, tipo, userId] = interaction.customId.split(':');
   if (interaction.user.id === userId && F.estaAssumido(userId)) {
-    return interaction.reply({ content: F.MSG_ASSUMIDO, flags: EPH });
+    return interaction.reply({ content: F.msgAssumido(), flags: EPH });
   }
   if (tipo === 'molde') return F.escolherMolde(interaction);
   if (tipo === 'emoji') return F.escolherEmoji(interaction);
