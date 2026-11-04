@@ -7,6 +7,26 @@ const {
 const N = require('./nucleo');
 
 const ROTULO = { normal: 'Parceria', everyone: 'Aliança' };
+
+// ===== MUDE AQUI: texto da mensagem final (sem emojis) =====
+// Variáveis: {tipo} = Parceria/Aliança, {tipo_minusculo} = parceria/aliança, {canal},
+// {servidor_parceiro}, {promotor} (só o nome, sem marcar), {representante} (marcado), {pontos}, {rank}
+const MENSAGEM_FINAL = [
+  '{tipo} postada no canal #{canal}.',
+  '',
+  'Tipo: {tipo}',
+  'Servidor parceiro: {servidor_parceiro}',
+  'Promotor: {promotor}',
+  'Representante: {representante}',
+  'Pontos do promotor: {pontos} (rank #{rank})',
+  '',
+  'Muito obrigado pela {tipo_minusculo} com {servidor_parceiro}, {representante}. ' +
+    'Que seja o começo de uma caminhada muito boa para os dois servidores.',
+].join('\n');
+// =============================================================
+
+const preencher = (texto, vars) =>
+  String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
 const LIMITE_MSG = 2000; // máximo de uma mensagem do Discord
 
 const tipoValido = (tipo) => Object.prototype.hasOwnProperty.call(ROTULO, tipo);
@@ -211,21 +231,18 @@ async function enviar(client, interaction, tipo) {
     return '⚠️ O convite foi enviado, mas não consegui enviar a mensagem de ping. Avise a staff.';
   }
 
-  // Mensagem final na própria conversa (pública, sem emojis): informações + agradecimento
-  const nome = ROTULO[tipo].toLowerCase();
-  const content = [
-    `${ROTULO[tipo]} postada no canal #${canal.name}.`,
-    '',
-    `Tipo: ${ROTULO[tipo]}`,
-    `Servidor parceiro: ${servidorParceiro}`,
-    `Promotor: <@${userId}>`,
-    `Representante: <@${rep.id}>`,
-    `Pontos do promotor: ${pontos} (rank #${rank})`,
-    '',
-    `Muito obrigado pela ${nome} com ${servidorParceiro}, <@${userId}> e <@${rep.id}>. ` +
-      'Que seja o começo de uma caminhada muito boa para os dois servidores.',
-  ].join('\n');
-  return { content, allowedMentions: { parse: [], users: [userId, rep.id] } };
+  // Mensagem final na própria conversa (pública, sem emojis). O promotor aparece só pelo nome.
+  const content = preencher(MENSAGEM_FINAL, {
+    tipo: ROTULO[tipo],
+    tipo_minusculo: ROTULO[tipo].toLowerCase(),
+    canal: canal.name,
+    servidor_parceiro: servidorParceiro,
+    promotor: interaction.user.globalName || interaction.user.username,
+    representante: `<@${rep.id}>`,
+    pontos: String(pontos),
+    rank: String(rank),
+  }).slice(0, 2000);
+  return { content, allowedMentions: { parse: [], users: [rep.id] } };
 }
 
 module.exports = { ROTULO, tipoValido, checar, painel, formulario, enviar, dividir };
