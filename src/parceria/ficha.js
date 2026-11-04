@@ -10,17 +10,18 @@ const ROTULO = { normal: 'Parceria', everyone: 'Aliança' };
 
 // ===== MUDE AQUI: texto da mensagem final (sem emojis) =====
 // Variáveis: {tipo} = Parceria/Aliança, {tipo_minusculo} = parceria/aliança, {canal},
-// {servidor_parceiro}, {promotor} (só o nome, sem marcar), {representante} (marcado), {pontos}, {rank}
+// {servidor_parceiro}, {promotor} (só o nome, sem marcar), {promotor_marcado} (marcado),
+// {representante} (marcado), {pontos}, {rank}
 const MENSAGEM_FINAL = [
   '{tipo} postada no canal #{canal}.',
   '',
   'Tipo: {tipo}',
   'Servidor parceiro: {servidor_parceiro}',
-  'Promotor: {promotor}',
+  'Promotor: {promotor_marcado}',
   'Representante: {representante}',
   'Pontos do promotor: {pontos} (rank #{rank})',
   '',
-  'Muito obrigado pela {tipo_minusculo} com {servidor_parceiro}, {representante}. ' +
+  'Muito obrigado pela {tipo_minusculo}, {representante}. ' +
     'Que seja o começo de uma caminhada muito boa para os dois servidores.',
 ].join('\n');
 // =============================================================
@@ -231,18 +232,19 @@ async function enviar(client, interaction, tipo) {
     return '⚠️ O convite foi enviado, mas não consegui enviar a mensagem de ping. Avise a staff.';
   }
 
-  // Mensagem final na própria conversa (pública, sem emojis). O promotor aparece só pelo nome.
+  // Mensagem final na própria conversa (pública, sem emojis). Marca só quem aparece no texto.
   const content = preencher(MENSAGEM_FINAL, {
     tipo: ROTULO[tipo],
     tipo_minusculo: ROTULO[tipo].toLowerCase(),
     canal: canal.name,
     servidor_parceiro: servidorParceiro,
     promotor: interaction.user.globalName || interaction.user.username,
+    promotor_marcado: `<@${userId}>`,
     representante: `<@${rep.id}>`,
     pontos: String(pontos),
     rank: String(rank),
   }).slice(0, 2000);
-  return { content, allowedMentions: { parse: [], users: [rep.id] } };
+  return { content, allowedMentions: { parse: [], users: [rep.id, userId] } };
 }
 
 module.exports = { ROTULO, tipoValido, checar, painel, formulario, enviar, dividir };
