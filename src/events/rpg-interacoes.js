@@ -55,6 +55,78 @@ async function combate(interaction, partes) {
   return interaction.editReply({ embeds: [C.embedCombate(e, j)], components: C.botoes(userId), files: C.arquivos(e, j), attachments: [] });
 }
 
+// Mostra o turno do duelo. Se responder ao Discord falhar (rede, tempo), tenta editar a mensagem
+// do duelo e, por último, manda uma mensagem nova no canal. Assim o duelo nunca fica sem tela.
+async function mostrarTurno(d, interaction) {
+  const carga = {
+    content: `⚔️ <@${Duelo.vez(d).id}>, é a sua vez!`,
+    embeds: [Duelo.embedDuelo(d)],
+    components: Duelo.botoes(d),
+    files: Duelo.arquivos(d),
+    attachments: [],
+  };
+  try {
+    await interaction.editReply(carga);
+    d.msg = interaction.message;
+    return;
+  } catch (e) {
+    console.error('[Duelo] resposta do turno falhou:', e.message);
+  }
+  try {
+    await interaction.message.edit(carga);
+    d.msg = interaction.message;
+    return;
+  } catch (e) {
+    console.error('[Duelo] editar a mensagem do turno falhou:', e.message);
+  }
+  const { attachments, ...nova } = carga;
+  const enviada = interaction.channel ? await interaction.channel.send(nova).catch(() => null) : null;
+  if (enviada) d.msg = enviada;
+}
+
+// Fim do duelo: tira da memória e paga o prêmio PRIMEIRO (o duelo nunca fica preso),
+// depois mostra o resultado e MARCA o vencedor numa mensagem nova (para ele ser avisado).
+async function encerrarDuelo(d, vencedor, interaction) {
+  if (!Duelo.obter(d.id)) return; // já foi encerrado (ex.: tempo esgotado ao mesmo tempo)
+  const fim = Duelo.finalizar(d, vencedor);
+  const carga = {
+    content: '',
+    embeds: [Duelo.embedFim(d, fim)],
+    components: [],
+    files: Duelo.arquivos(d, fim.perdedor.id),
+    attachments: [],
+  };
+  const msg = (interaction && interaction.message) || d.msg;
+  let mostrou = false;
+  if (interaction) {
+    try {
+      await interaction.editReply(carga);
+      mostrou = true;
+    } catch (e) {
+      console.error('[Duelo] resposta final falhou:', e.message);
+    }
+  }
+  if (!mostrou && msg) {
+    try {
+      await msg.edit(carga);
+      mostrou = true;
+    } catch (e) {
+      console.error('[Duelo] editar a mensagem final falhou:', e.message);
+    }
+  }
+  const canal = (msg && msg.channel) || (interaction && interaction.channel);
+  if (canal) {
+    const aviso =
+      `🏆 <@${fim.vencedor.id}> venceu o duelo contra <@${fim.perdedor.id}>!` +
+      `${fim.valor ? ` (+${fim.valor} stars)` : ''}`;
+    await canal.send({ content: aviso, allowedMentions: { users: [fim.vencedor.id] } }).catch((e) => console.error('[Duelo] aviso do vencedor falhou:', e.message));
+    if (!mostrou) {
+      const { attachments, ...sozinha } = carga;
+      await canal.send(sozinha).catch(() => {});
+    }
+  }
+}
+
 async function duelo(interaction, partes) {
   const [, , acao, desafianteId, alvoId, apostaTxt] = partes;
   const aposta = parseInt(apostaTxt, 10) || 0;
@@ -82,18 +154,10 @@ async function duelo(interaction, partes) {
     const quem = Duelo.vez(duel);
     duel.log = [`⌛ <@${quem.id}> demorou demais e perdeu por W.O.!`];
     const venc = quem.id === duel.a.id ? duel.b : duel.a;
-    const r = Duelo.finalizar(duel, venc);
     duel.eventos = [];
-    if (duel.msg) await duel.msg.edit({ content: '', embeds: [Duelo.embedFim(duel, r)], components: [], files: Duelo.arquivos(duel, r.perdedor.id), attachments: [] }).catch(() => {});
+    await encerrarDuelo(duel, venc, null);
   });
-  await interaction.editReply({
-    content: `⚔️ <@${Duelo.vez(d).id}>, é a sua vez!`,
-    embeds: [Duelo.embedDuelo(d)],
-    components: Duelo.botoes(d),
-    files: Duelo.arquivos(d),
-    attachments: [],
-  });
-  d.msg = interaction.message;
+  await mostrarTurno(d, interaction);
 }
 
 // Botões do duelo em andamento (rpg:u:acao:id)
@@ -105,26 +169,33 @@ async function duelando(interaction, partes) {
   if (!Duelo.lado(d, interaction.user.id)) {
     return interaction.reply({ content: 'Esse duelo não é seu.', flags: EPH });
   }
+
+  // Autoreparo: um duelo aberto em que alguém já está sem vida ficou preso, então encerra agora
+  if (d.a.hp <= 0 || d.b.hp <= 0) {
+    await interaction.deferUpdate().catch(() => {});
+    return encerrarDuelo(d, d.a.hp <= 0 ? d.b : d.a, interaction);
+  }
+
   if (Duelo.vez(d).id !== interaction.user.id) {
     return interaction.reply({ content: 'Calma, ainda não é a sua vez! ⏳', flags: EPH });
   }
+  const atual = Duelo.vez(d);
+  if (acao === 'hab' && atual.cd > 0) {
+    return interaction.reply({ content: `Sua habilidade está em recarga (${atual.cd} turno(s)).`, flags: EPH });
+  }
+
+  // Confirma o clique ao Discord ANTES de mexer no duelo: se isso falhar, nada muda e dá para clicar de novo
+  try {
+    await interaction.deferUpdate(); // desenhar o GIF leva um instante
+  } catch (e) {
+    console.error('[Duelo] não consegui confirmar o clique:', e.message);
+    return undefined;
+  }
 
   const r = Duelo.agir(d, acao);
-  if (r.invalido) return interaction.reply({ content: r.invalido, flags: EPH });
-
-  await interaction.deferUpdate(); // desenhar o GIF leva um instante
-  if (r.fim) {
-    const fim = Duelo.finalizar(d, r.vencedor);
-    return interaction.editReply({ content: '', embeds: [Duelo.embedFim(d, fim)], components: [], files: Duelo.arquivos(d, fim.perdedor.id), attachments: [] });
-  }
-  d.msg = interaction.message;
-  return interaction.editReply({
-    content: `⚔️ <@${Duelo.vez(d).id}>, é a sua vez!`,
-    embeds: [Duelo.embedDuelo(d)],
-    components: Duelo.botoes(d),
-    files: Duelo.arquivos(d),
-    attachments: [],
-  });
+  if (r.invalido) return interaction.followUp({ content: r.invalido, flags: EPH });
+  if (r.fim) return encerrarDuelo(d, r.vencedor, interaction);
+  return mostrarTurno(d, interaction);
 }
 
 module.exports = {
