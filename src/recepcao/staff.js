@@ -1,5 +1,6 @@
 // Painel da staff dentro do canal da recepção (botão "Staff"):
-// mostrar moldes, chamar o membro, ver detalhes, reiniciar, remover o nome e apagar o canal.
+// mostrar moldes, chamar o membro, ver detalhes, reiniciar, remover o nome, apagar o canal
+// e verificar manualmente.
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags,
 } = require('discord.js');
@@ -31,6 +32,10 @@ function botoesPainel(userId) {
       botao('sf-reiniciar', userId, 'Reiniciar', '🔄'),
       botao('sf-nome', userId, 'Remover nome', '🏷️'),
       botao('sf-apagar', userId, 'Apagar canal', '🗑️', ButtonStyle.Danger)
+    ),
+    // Verificação manual: fluxo próprio (recepcao/manual.js), por isso o prefixo "recmanual"
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`recmanual:abrir:${userId}`).setLabel('Verificar manualmente').setEmoji('✅').setStyle(ButtonStyle.Success)
     ),
   ];
 }
@@ -166,4 +171,4 @@ async function tratar(interaction, acao, userId) {
   }
 }
 
-module.exports = { abrirPainel, tratar };
+module.exports = { abrirPainel, tratar, painelEmbed, botoesPainel };
