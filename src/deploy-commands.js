@@ -17,11 +17,13 @@ function listarArquivos(dir) {
   return resultado;
 }
 
-const comandos = [];
+// Comandos normais (só no servidor) e comandos globais (também funcionam no privado, ex.: /parceriaficha)
+const doServidor = [];
+const globais = [];
 for (const arquivo of listarArquivos(path.join(__dirname, 'commands'))) {
   const comando = require(arquivo);
   if (comando.data && comando.execute) {
-    comandos.push(comando.data.toJSON());
+    (comando.global ? globais : doServidor).push(comando.data.toJSON());
   }
 }
 
@@ -29,12 +31,20 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
 (async () => {
   try {
-    console.log(`Registrando ${comandos.length} comando(s)...`);
-    // Com GUILD_ID os comandos aparecem na hora, só no seu servidor
-    const rota = process.env.GUILD_ID
-      ? Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID)
-      : Routes.applicationCommands(process.env.CLIENT_ID);
-    await rest.put(rota, { body: comandos });
+    if (process.env.GUILD_ID) {
+      // Com GUILD_ID os comandos normais aparecem na hora, só no seu servidor
+      console.log(`Registrando ${doServidor.length} comando(s) no servidor...`);
+      await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), {
+        body: doServidor,
+      });
+      console.log(`Registrando ${globais.length} comando(s) global(is)...`);
+      await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: globais });
+    } else {
+      // Sem GUILD_ID tudo vira global; os normais ficam limitados ao servidor (contexts: [0])
+      const todos = [...globais, ...doServidor.map((c) => ({ ...c, contexts: [0] }))];
+      console.log(`Registrando ${todos.length} comando(s)...`);
+      await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: todos });
+    }
     console.log('Comandos registrados com sucesso!');
   } catch (erro) {
     console.error(erro);
