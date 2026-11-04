@@ -13,16 +13,9 @@ const ROTULO = { normal: 'Parceria', everyone: 'Aliança' };
 // {servidor_parceiro}, {promotor} (só o nome, sem marcar), {promotor_marcado} (marcado),
 // {representante} (marcado), {pontos}, {rank}
 const MENSAGEM_FINAL = [
-  '{tipo} postada no canal #{canal}.',
+  '{tipo} postada.',
   '',
-  'Tipo: {tipo}',
-  'Servidor parceiro: {servidor_parceiro}',
-  'Promotor: {promotor_marcado}',
-  'Representante: {representante}',
-  'Pontos do promotor: {pontos} (rank #{rank})',
-  '',
-  'Muito obrigado pela {tipo_minusculo}, {representante}. ' +
-    'Que seja o começo de uma caminhada muito boa para os dois servidores.',
+  'Muito obrigado pela {tipo_minusculo}, {representante}. '
 ].join('\n');
 // =============================================================
 
