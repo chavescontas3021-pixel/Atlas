@@ -1,7 +1,7 @@
 const { MessageFlags } = require('discord.js');
 const Ficha = require('../parceria/ficha');
 
-const sussurro = (i) => (i.inGuild() ? { flags: MessageFlags.Ephemeral } : {});
+const sussurro = () => ({ flags: MessageFlags.Ephemeral });
 
 module.exports = {
   name: 'interactionCreate',
@@ -12,7 +12,7 @@ module.exports = {
         const tipo = interaction.customId.split(':')[2];
         if (!Ficha.tipoValido(tipo)) return;
         const r = await Ficha.checar(client, interaction.user.id, tipo);
-        if (r.erro) return interaction.reply({ content: `❌ ${r.erro}`, ...sussurro(interaction) });
+        if (r.erro) return interaction.reply({ content: `❌ ${r.erro}`, ...sussurro() });
         return interaction.showModal(Ficha.formulario(tipo));
       }
 
@@ -20,13 +20,13 @@ module.exports = {
       if (interaction.isModalSubmit() && interaction.customId.startsWith('pficha:modal:')) {
         const tipo = interaction.customId.split(':')[2];
         if (!Ficha.tipoValido(tipo)) return;
-        await interaction.deferReply(sussurro(interaction));
+        await interaction.deferReply(sussurro());
         const resposta = await Ficha.enviar(client, interaction, tipo);
         return interaction.editReply({ content: resposta });
       }
     } catch (erro) {
       console.error('[Ficha] erro:', erro);
-      const msg = { content: 'Ops, deu erro na ficha. Tente de novo.', ...sussurro(interaction) };
+      const msg = { content: 'Ops, deu erro na ficha. Tente de novo.', ...sussurro() };
       if (interaction.replied || interaction.deferred) await interaction.followUp(msg).catch(() => {});
       else await interaction.reply(msg).catch(() => {});
     }
