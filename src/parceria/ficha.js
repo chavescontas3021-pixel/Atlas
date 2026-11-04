@@ -52,7 +52,7 @@ async function painel(client, userId) {
     if (r.erro) continue;
     botoes.push(
       new ButtonBuilder()
-        .setCustomId(`pficha:abrir:${tipo}`)
+        .setCustomId(`pficha:abrir:${tipo}:${userId}`)
         .setLabel(ROTULO[tipo])
         .setEmoji(N.TIPOS[tipo].emoji)
         .setStyle(ButtonStyle.Primary)
@@ -144,7 +144,7 @@ function dividir(texto, max = LIMITE_MSG) {
   return partes;
 }
 
-// Valida a ficha e publica. Devolve o texto de resposta para o promotor.
+// Valida a ficha e publica. Devolve um texto (erro) ou um objeto { content, allowedMentions } (sucesso).
 async function enviar(client, interaction, tipo) {
   const userId = interaction.user.id;
   const r = await checar(client, userId, tipo);
@@ -211,7 +211,21 @@ async function enviar(client, interaction, tipo) {
     return '⚠️ O convite foi enviado, mas não consegui enviar a mensagem de ping. Avise a staff.';
   }
 
-  return `✅ ${ROTULO[tipo]} enviada em #${canal.name}!\n🤝 Seus pontos: ${pontos} • rank #${rank}`;
+  // Mensagem final na própria conversa (pública, sem emojis): informações + agradecimento
+  const nome = ROTULO[tipo].toLowerCase();
+  const content = [
+    `${ROTULO[tipo]} postada no canal #${canal.name}.`,
+    '',
+    `Tipo: ${ROTULO[tipo]}`,
+    `Servidor parceiro: ${servidorParceiro}`,
+    `Promotor: <@${userId}>`,
+    `Representante: <@${rep.id}>`,
+    `Pontos do promotor: ${pontos} (rank #${rank})`,
+    '',
+    `Muito obrigado pela ${nome} com ${servidorParceiro}, <@${userId}> e <@${rep.id}>. ` +
+      'Que seja o começo de uma caminhada muito boa para os dois servidores.',
+  ].join('\n');
+  return { content, allowedMentions: { parse: [], users: [userId, rep.id] } };
 }
 
 module.exports = { ROTULO, tipoValido, checar, painel, formulario, enviar, dividir };
