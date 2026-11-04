@@ -1,4 +1,4 @@
-const { ApplicationIntegrationType, InteractionContextType, MessageFlags, SlashCommandBuilder } = require('discord.js');
+const { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } = require('discord.js');
 const Ficha = require('../parceria/ficha');
 
 module.exports = {
@@ -16,8 +16,7 @@ module.exports = {
     ),
 
   async execute(interaction, client) {
-    // Sempre só para quem usou (em DM com outra pessoa, ela não vê a ficha)
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction.deferReply(); // mensagem pública, todos na conversa veem
     const painel = await Ficha.painel(client, interaction.user.id);
     return interaction.editReply(painel);
   },
