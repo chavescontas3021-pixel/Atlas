@@ -50,6 +50,7 @@ function specs() {
   }
 
   lista.push(...require('./extras-recepcao').specs());
+  lista.push(...require('./extras-ajuda').specs());
   lista.push(...require('./extras-limpeza').specs());
 
   for (const p of Tkt.listaPaineis()) {
@@ -80,6 +81,11 @@ function validar(c, v, guild) {
       if (!t) return c.permiteVazio ? { valor: '' } : { remover: true };
       if (t.length > c.max) return { erro: `Máximo de ${c.max} caracteres.` };
       return { valor: t };
+    }
+    case 'numero': {
+      const n = Number(v);
+      if (vazio || !Number.isInteger(n) || n < c.min || n > c.max) return { erro: `Use um número inteiro de ${c.min} a ${c.max}.` };
+      return { valor: n };
     }
     case 'url': {
       if (vazio) return { remover: true };
