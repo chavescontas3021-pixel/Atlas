@@ -1,4 +1,5 @@
 const N = require('../parceria/nucleo');
+const C = require('../parceria/convites');
 
 module.exports = {
   name: 'messageCreate',
@@ -25,9 +26,10 @@ module.exports = {
     const rank = N.rankDe(promotorId);
 
     let enviou = false;
+    let primeiraEnviada = null;
     for (const tipo of tipos) {
       try {
-        await message.channel.send(
+        const enviada = await message.channel.send(
           N.montar(tipo, {
             membroId: promotorId,
             convite,
@@ -39,11 +41,28 @@ module.exports = {
           })
         );
         enviou = true;
+        if (!primeiraEnviada) primeiraEnviada = enviada;
       } catch (erro) {
         console.error(`[Parceria] não consegui enviar (${tipo}):`, erro.message);
         await message.react('⚠️').catch(() => {});
       }
     }
-    if (!enviou) N.somarPonto(promotorId, -1);
+    if (!enviou) {
+      N.somarPonto(promotorId, -1);
+      return;
+    }
+
+    // Guarda o convite para o vigia conferir depois (se falhar, a parceria não é afetada)
+    try {
+      C.registrar({
+        codigo: C.codigoDe(convite),
+        servidor: servidorParceiro,
+        promotorId,
+        canalId: message.channelId,
+        msgId: primeiraEnviada ? primeiraEnviada.id : message.id,
+      });
+    } catch (erro) {
+      console.error('[Convites] não consegui registrar:', erro.message);
+    }
   },
 };
