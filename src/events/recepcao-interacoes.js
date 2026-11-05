@@ -4,6 +4,7 @@ const F = require('../recepcao/fluxo');
 const A = require('../recepcao/aprovacao');
 const S = require('../recepcao/staff');
 const R = require('../recepcao/representante');
+const Ajuda = require('../recepcao/ajuda');
 
 const EPH = MessageFlags.Ephemeral;
 
@@ -14,6 +15,8 @@ async function botao(interaction) {
   if (acao === 'assumir') return F.alternarAtendimento(interaction, userId);
   if (acao === 'staff') return S.abrirPainel(interaction, userId);
   if (acao.startsWith('sf-') || acao.startsWith('sfc-')) return S.tratar(interaction, acao, userId);
+  // "Solicitar ajuda": vale mesmo se a staff já assumiu (aí marca só quem assumiu)
+  if (acao === 'ajuda') return Ajuda.pedir(interaction, userId);
 
   if (interaction.user.id !== userId) {
     return interaction.reply({ content: 'Esse botão não é para você 💜', flags: EPH });
