@@ -11,6 +11,7 @@ const {
 const db = require('../db');
 const U = require('./util');
 const T = require('./textos');
+const Ajuda = require('./ajuda');
 
 const COR = 0xf5a3c7;
 const EPH = MessageFlags.Ephemeral;
@@ -39,6 +40,7 @@ function linhaAssumir(userId, assumido) {
     );
   }
   linha.addComponents(botaoAssumir(userId, assumido));
+  if (Ajuda.ativo()) linha.addComponents(Ajuda.botao(userId));
   linha.addComponents(
     new ButtonBuilder()
       .setCustomId(`recepcao:staff:${userId}`)
