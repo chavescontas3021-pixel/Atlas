@@ -50,6 +50,7 @@ function specs() {
   }
 
   lista.push(...require('./extras-recepcao').specs());
+  lista.push(...require('./extras-limpeza').specs());
 
   for (const p of Tkt.listaPaineis()) {
     lista.push({
