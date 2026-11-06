@@ -177,14 +177,14 @@ async function assumir(interaction) {
 // ---------- Fechar ----------
 
 function podeFechar(member, t) {
-  return N.ehStaff(member, t) || member.id === t.userId;
+  return N.ehStaff(member, t);
 }
 
 async function abrirModalFechar(interaction) {
   const t = N.ticketDoCanal(interaction.channel.id);
   if (!t) return interaction.reply({ content: 'Este canal não é um ticket aberto.', flags: EPH });
   if (!podeFechar(interaction.member, t)) {
-    return interaction.reply({ content: 'Só quem abriu o ticket ou a staff pode fechar.', flags: EPH });
+    return interaction.reply({ content: 'Só a staff pode fechar tickets.', flags: EPH });
   }
   const modal = new ModalBuilder()
     .setCustomId('ticket:modalfechar')
@@ -197,7 +197,7 @@ async function receberFechar(interaction) {
   const t = N.ticketDoCanal(interaction.channel.id);
   if (!t) return interaction.reply({ content: 'Este canal não é um ticket aberto.', flags: EPH });
   if (!podeFechar(interaction.member, t)) {
-    return interaction.reply({ content: 'Só quem abriu o ticket ou a staff pode fechar.', flags: EPH });
+    return interaction.reply({ content: 'Só a staff pode fechar tickets.', flags: EPH });
   }
   const motivo = interaction.fields.getTextInputValue('motivo').trim();
   await interaction.reply('🔒 Fechando o ticket e gerando a transcrição...');
