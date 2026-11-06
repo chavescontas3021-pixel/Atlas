@@ -30,7 +30,7 @@ module.exports = {
     .addSubcommand((s) =>
       s
         .setName('fechar')
-        .setDescription('Fecha este ticket')
+        .setDescription('Fecha este ticket (só a staff)')
         .addStringOption((o) => o.setName('motivo').setDescription('Motivo (opcional)').setMaxLength(300))
     ),
 
@@ -43,8 +43,8 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'fechar') {
-      if (!N.ehStaff(interaction.member, t) && interaction.user.id !== t.userId) {
-        return responder(interaction, '❌ Só quem abriu o ticket ou a staff pode fechar.');
+      if (!N.ehStaff(interaction.member, t)) {
+        return responder(interaction, '❌ Só a staff pode fechar tickets.');
       }
       const motivo = interaction.options.getString('motivo') || '';
       await interaction.reply('🔒 Fechando o ticket e gerando a transcrição...');
