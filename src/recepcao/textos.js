@@ -5,6 +5,10 @@ const db = require('../db');
 
 const PADROES = {
   mensagens: {
+    // Primeira mensagem do canal da recepção: texto simples (sem embed e sem banner)
+    inicio: {
+      texto: 'Seja Bem vindo(a)! Diga-me **apenas** o nome e sobrenome do personagem para mim verificar se está disponível.',
+    },
     confirmarPersonagem: {
       texto: 'Você quer usar **{personagem}** como o nome do seu personagem?',
     },
