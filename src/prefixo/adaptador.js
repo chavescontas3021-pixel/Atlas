@@ -13,7 +13,8 @@ const MODAL_MS = 10 * 60 * 1000;
 let contModal = 0;
 const SIM = ['sim', 's', 'true', '1', 'ligar', 'ligado', 'ativar', 'ativado', 'on', 'yes'];
 const NAO = ['nao', 'n', 'false', '0', 'desligar', 'desligado', 'desativar', 'desativado', 'off', 'no'];
-const EFEMERA_APAGA_MS = 60 * 1000;
+const EFEMERA_APAGA_MS = 60 * 1000; // respostas simples
+const EFEMERA_INTERATIVA_APAGA_MS = 15 * 60 * 1000; // respostas com botões/menus (ex.: /formularios entregues)
 
 
 function tokenizar(texto) {
@@ -328,7 +329,10 @@ function criarInteracao(message, client, loc, valores) {
     return { o, efemera };
   };
   const agendarApagar = (msg, efemera) => {
-    if (efemera && msg) setTimeout(() => msg.delete().catch(() => {}), EFEMERA_APAGA_MS);
+    if (!efemera || !msg) return;
+    // Se a resposta tem botões/menus, a pessoa ainda vai usar: dá bem mais tempo antes de apagar
+    const interativa = Array.isArray(msg.components) && msg.components.length > 0;
+    setTimeout(() => msg.delete().catch(() => {}), interativa ? EFEMERA_INTERATIVA_APAGA_MS : EFEMERA_APAGA_MS);
   };
 
   const base = {
