@@ -1,12 +1,13 @@
 // Painel da staff dentro do canal da recepção (botão "Staff"):
-// mostrar moldes, chamar o membro, ver detalhes, reiniciar, remover o nome, apagar o canal
-// e verificar manualmente.
+// mostrar moldes, chamar o membro, ver detalhes, mostrar os passos, reiniciar, remover o nome,
+// apagar o canal e verificar manualmente.
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags,
 } = require('discord.js');
 const db = require('../db');
 const U = require('./util');
 const F = require('./fluxo');
+const P = require('./passos');
 
 const COR = 0xf5a3c7;
 const EPH = MessageFlags.Ephemeral;
@@ -26,7 +27,8 @@ function botoesPainel(userId) {
     new ActionRowBuilder().addComponents(
       botao('sf-moldes', userId, 'Mostrar moldes', '📋'),
       botao('sf-chamar', userId, 'Chamar membro', '🔔'),
-      botao('sf-info', userId, 'Detalhes', 'ℹ️')
+      botao('sf-info', userId, 'Detalhes', 'ℹ️'),
+      botao('sf-passos', userId, 'Passos', '📜')
     ),
     new ActionRowBuilder().addComponents(
       botao('sf-reiniciar', userId, 'Reiniciar', '🔄'),
@@ -73,6 +75,25 @@ async function mostrarMoldes(interaction, sessao) {
     .setFooter({ text: `Exemplo com "${nome}" e ${emoji}. O apelido final tem no máximo 32 caracteres.` });
   await interaction.channel.send({ embeds: [embed] });
   return interaction.reply({ content: '✅ Moldes enviados no canal.', flags: EPH });
+}
+
+// Manda a mensagem de passos no canal. Os botões (Verificar / Trocar personagem) só vêm junto quando o
+// membro já está na etapa dos passos, porque antes disso eles não funcionariam.
+async function mostrarPassos(interaction, userId, sessao) {
+  const carga = {
+    content: `<@${userId}>`,
+    embeds: [P.embedPassos(interaction.guild.name, userId, sessao)],
+    allowedMentions: { users: [userId] },
+  };
+  const comBotoes = sessao.etapa === 'passos';
+  if (comBotoes) carga.components = [P.botoesPassos(userId)];
+  await interaction.channel.send(carga);
+  return interaction.reply({
+    content: comBotoes
+      ? '✅ Mensagem de passos enviada no canal.'
+      : '✅ Mensagem de passos enviada no canal, sem os botões, porque o membro ainda não chegou nessa etapa.',
+    flags: EPH,
+  });
 }
 
 async function chamar(interaction, userId) {
@@ -161,6 +182,7 @@ async function tratar(interaction, acao, userId) {
     case 'sf-moldes': return mostrarMoldes(interaction, sessao);
     case 'sf-chamar': return chamar(interaction, userId);
     case 'sf-info': return detalhes(interaction, userId, sessao);
+    case 'sf-passos': return mostrarPassos(interaction, userId, sessao);
     case 'sf-nome': return pedirConfirmacao(interaction, 'nome', userId);
     case 'sf-reiniciar': return pedirConfirmacao(interaction, 'reiniciar', userId);
     case 'sf-apagar': return pedirConfirmacao(interaction, 'apagar', userId);
