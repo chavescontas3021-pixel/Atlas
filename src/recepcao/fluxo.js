@@ -12,6 +12,7 @@ const db = require('../db');
 const U = require('./util');
 const T = require('./textos');
 const Ajuda = require('./ajuda');
+const P = require('./passos');
 
 const COR = 0xf5a3c7;
 const EPH = MessageFlags.Ephemeral;
@@ -27,7 +28,7 @@ function botaoAssumir(userId, assumido) {
     .setStyle(assumido ? ButtonStyle.Secondary : ButtonStyle.Danger);
 }
 
-// Botões da primeira mensagem: [Sou apenas representante] [Assumir/Devolver] [Staff]
+// Botões da primeira mensagem: [Sou apenas representante] [Assumir/Devolver] [Solicitar ajuda] [Staff]
 function linhaAssumir(userId, assumido) {
   const linha = new ActionRowBuilder();
   if (T.repDisponivel()) {
@@ -67,13 +68,6 @@ function estaAssumido(userId) {
 
 // Texto mostrado ao membro enquanto a staff está com o atendimento (editável no site)
 const msgAssumido = () => T.preencher(T.mensagem('assumido').texto, {});
-
-function bannerValido(url) {
-  if (typeof url !== 'string') return null;
-  const t = url.trim();
-  if (!/^https?:\/\/\S+$/i.test(t) || t.length > 500) return null;
-  return t;
-}
 
 // Botão "Assumir atendimento" / "Devolver ao Atlas"
 async function alternarAtendimento(interaction, userId) {
@@ -160,19 +154,14 @@ async function iniciarRecepcao(member, { teste = false } = {}) {
   const canal = await criarCanal(member);
   db.set(chave(member.id), { canalId: canal.id, etapa: 'personagem', teste });
 
-  const msg = U.mensagem('boasVindas');
-  const vars = variaveis(member, null);
-  const embed = new EmbedBuilder()
-    .setColor(COR)
-    .setTitle(U.preencher(msg.titulo, vars))
-    .setDescription(U.preencher(msg.texto, vars));
-  const banner = bannerValido(msg.banner);
-  if (banner) embed.setImage(banner);
-
+  // Primeira mensagem: texto simples (sem embed e sem banner), com os botões da recepção.
+  // O membro é marcado no começo, a não ser que o texto já tenha {usuario}.
+  const modelo = T.mensagem('inicio').texto;
+  const texto = T.preencher(modelo, variaveis(member, null));
   const enviada = await canal.send({
-    content: `<@${member.id}>`,
-    embeds: [embed],
+    content: modelo.includes('{usuario}') ? texto : `<@${member.id}> ${texto}`,
     components: [linhaAssumir(member.id, false)],
+    allowedMentions: { users: [member.id] },
   });
   db.set(chave(member.id), { ...db.get(chave(member.id)), msgInicial: enviada.id });
   return canal;
@@ -357,30 +346,9 @@ async function aplicarNome(canal, member, emoji) {
   const nova = { ...sessao, emoji, nick, etapa: 'passos' };
   db.set(chave(member.id), nova);
 
-  const msg = U.mensagem('passos');
-  const vars = variaveis(member, nova);
-  const lista2 = U.PASSOS.map((p, i) => {
-    const id = U.cfg(`canais.${p.id}`);
-    return `**${i + 1}. ${p.nome}** — ${id ? `<#${id}>` : '*canal não configurado*'}\n${p.desc}`;
-  }).join('\n\n');
-
-  const embed = new EmbedBuilder()
-    .setColor(COR)
-    .setTitle(U.preencher(msg.titulo, vars))
-    .setDescription(`${U.preencher(msg.texto, vars)}\n\n${lista2}`);
-
-  const botoes = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`recepcao:verificar:${member.id}`)
-      .setLabel('Verificar')
-      .setEmoji('✅')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId(`recepcao:trocar:${member.id}`)
-      .setLabel('Trocar personagem')
-      .setEmoji('🔄')
-      .setStyle(ButtonStyle.Secondary)
-  );
+  // A mensagem de passos fica em recepcao/passos.js (a mesma do botão "Passos" da staff)
+  const embed = P.embedPassos(member.guild.name, member.id, nova);
+  const botoes = P.botoesPassos(member.id);
 
   await canal.send({ content: `<@${member.id}>${aviso}`, embeds: [embed], components: [botoes] });
 }
