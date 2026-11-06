@@ -23,6 +23,9 @@ function titulo(tipo, rotulo, vars) {
 
 function specs() {
   const lista = [
+    // ----- Primeira mensagem do canal -----
+    texto('inicio', 'Primeira mensagem do canal (texto simples, sem embed)', '{usuario} {servidor}'),
+
     // ----- Confirmação do personagem -----
     {
       grupo: G, caminho: 'config.recepcao.confirmarPersonagem', tipo: 'bool', padrao: true, depois: DEPOIS,
