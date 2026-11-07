@@ -19,6 +19,8 @@ const attrEscolhas = [
 const itemOpt = (o) => o.setName('item').setDescription('Item').setRequired(true).setAutocomplete(true);
 const qtdOpt = (o) => o.setName('quantidade').setDescription('Quantidade (padrão 1)').setMinValue(1).setMaxValue(99);
 
+const RpgCanal = require('../rpg/canal');
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('rpg')
@@ -52,10 +54,8 @@ module.exports = {
       .addIntegerOption((o) => o.setName('aposta').setDescription('Stars apostadas (padrão 0)').setMinValue(0).setMaxValue(100000))),
 
   async execute(interaction) {
-    const canal = db.get('config.rpg.canal', null);
-    if (canal && interaction.channelId !== canal) {
-      return interaction.reply({ content: `Use o RPG em <#${canal}>.`, flags: EPH });
-    }
+    const bloqueado = RpgCanal.bloqueio(interaction);
+    if (bloqueado) return interaction.reply({ content: bloqueado, flags: EPH });
 
     const sub = interaction.options.getSubcommand();
     const id = interaction.user.id;
