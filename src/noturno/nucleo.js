@@ -1,27 +1,30 @@
 const { ChannelType, EmbedBuilder } = require('discord.js');
 const db = require('../db');
 
+const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar'); // não passa pelo editor de mensagens
+
 const PADROES = {
   fechar: '00:00',
   abrir: '06:00',
   aviso: 10,
   fuso: 'America/Sao_Paulo',
   mensagens: {
+    // soTexto: todas vão como mensagem de texto (sem embed), com banner opcional (config.noturno.mensagens.<tipo>.banner)
     avisoFechar: {
-      titulo: '🌙 Hora de dormir',
-      texto: 'Faltam **{minutos} minutos** para os chats fecharem (**{fechar}**). Terminem suas cenas! 💤',
+      soTexto: true,
+      texto: '🌙 **Hora de dormir!** Faltam **{minutos} minutos** para os chats fecharem (**{fechar}**). Terminem suas cenas! 💤',
     },
     fechou: {
-      titulo: '🔒 Chats fechados',
-      texto: 'Boa noite, house! Os chats voltam às **{abrir}**. 🌙',
+      soTexto: true,
+      texto: '🔒 **Chats fechados.** Boa noite, house! Os chats voltam às **{abrir}**. 🌙',
     },
     avisoAbrir: {
-      titulo: '☀️ Já já amanhece',
-      texto: 'Faltam **{minutos} minutos** para os chats abrirem (**{abrir}**).',
+      soTexto: true,
+      texto: '☀️ **Já já amanhece!** Faltam **{minutos} minutos** para os chats abrirem (**{abrir}**).',
     },
     abriu: {
-      titulo: '🔓 Chats abertos',
-      texto: 'Bom dia, house! Os chats foram abertos. ☀️',
+      soTexto: true,
+      texto: '🔓 **Chats abertos.** Bom dia, house! ☀️',
     },
   },
 };
@@ -48,6 +51,17 @@ const fuso = () => cfg('fuso', PADROES.fuso);
 function mensagem(tipo) {
   return { ...PADROES.mensagens[tipo], ...(cfg(`mensagens.${tipo}`) || {}) };
 }
+
+const ehSoTexto = (tipo) => !!PADROES.mensagens[tipo].soTexto;
+
+// Banner (imagem grande) opcional: link direto de uma imagem
+function bannerValido(url) {
+  if (typeof url !== 'string') return null;
+  const t = url.trim();
+  return /^https?:\/\/\S+$/i.test(t) && t.length <= 500 ? t : null;
+}
+
+const banner = (tipo) => bannerValido(cfg(`mensagens.${tipo}.banner`));
 
 function preencher(texto, vars) {
   return String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
@@ -191,16 +205,33 @@ async function anunciar(guild, tipo) {
     fechar: horaFechar(),
     abrir: horaAbrir(),
   };
+
+  const marcar = tipo === 'avisoFechar' || tipo === 'avisoAbrir';
+  const cargoId = cfg('cargoDorminhoca');
+  const ping = marcar && cargoId ? `<@&${cargoId}>` : null;
+
+  // Aviso de fechar e "chats fechados": só texto, com banner opcional logo abaixo
+  if (ehSoTexto(tipo)) {
+    const corpo = preencher(msg.texto, vars);
+    const opcoes = {
+      content: (ping ? `${ping}\n${corpo}` : corpo).slice(0, 2000),
+      allowedMentions: ping ? { roles: [cargoId] } : { parse: [] },
+      [IGNORAR_TRADUCAO]: true,
+    };
+    const img = banner(tipo);
+    if (img) opcoes.embeds = [new EmbedBuilder().setColor(COR).setImage(img)];
+    await canal.send(opcoes);
+    return;
+  }
+
   const embed = new EmbedBuilder()
     .setColor(COR)
     .setTitle(preencher(msg.titulo, vars))
     .setDescription(preencher(msg.texto, vars));
 
-  const marcar = tipo === 'avisoFechar' || tipo === 'avisoAbrir';
-  const cargoId = cfg('cargoDorminhoca');
   const opcoes = { embeds: [embed], allowedMentions: { roles: [] } };
-  if (marcar && cargoId) {
-    opcoes.content = `<@&${cargoId}>`;
+  if (ping) {
+    opcoes.content = ping;
     opcoes.allowedMentions = { roles: [cargoId] };
   }
   await canal.send(opcoes);
@@ -273,6 +304,9 @@ module.exports = {
   horaAbrir,
   minutosAviso,
   mensagem,
+  ehSoTexto,
+  bannerValido,
+  banner,
   preencher,
   normalizarHora,
   paraMin,
