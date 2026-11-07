@@ -343,12 +343,11 @@ module.exports = {
       const url = N.bannerValido(link);
       if (!url) return responder(interaction, '❌ Link inválido. Use um link que comece com `https://` e leve direto à imagem.');
       db.set(`config.noturno.mensagens.${tipo}.banner`, url);
-      const prev = new EmbedBuilder().setColor(0x5b6ee1).setTitle('Prévia do banner').setImage(url);
       return interaction.reply({
         content:
-          '✅ Banner salvo! Se a prévia não aparecer, o link não é de uma imagem direta.\n' +
+          '✅ Banner salvo! Ele vai anexado como imagem na mensagem (a prévia está aí embaixo; se não aparecer, o link não é de uma imagem direta).\n' +
           '⚠️ Links de anexos do Discord expiram. Prefira hospedar em outro lugar (ex.: Imgur).',
-        embeds: [prev],
+        files: [N.arquivoBanner(url)],
         flags: EPH,
       });
     }
@@ -368,4 +367,4 @@ module.exports = {
       );
     }
   },
-};
+};                          
