@@ -6,6 +6,8 @@ const A = require('../personagem/arte');
 const { PermissionFlagsBits } = require('discord.js');
 const EPH = MessageFlags.Ephemeral;
 
+const RpgCanal = require('../rpg/canal');
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('personagem')
@@ -21,6 +23,10 @@ module.exports = {
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+    if (sub !== 'especial') {
+      const bloqueado = RpgCanal.bloqueio(interaction);
+      if (bloqueado) return interaction.reply({ content: bloqueado, flags: EPH });
+    }
     const uid = interaction.user.id;
 
     if (sub === 'especial') {
