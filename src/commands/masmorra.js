@@ -8,6 +8,8 @@ const C = require('../rpg/combate');
 const EPH = MessageFlags.Ephemeral;
 const escolhas = D.ORDEM.map((k) => ({ name: `${D.MASMORRAS[k].emoji} ${D.MASMORRAS[k].dificuldade} · ${D.MASMORRAS[k].andares} andares`, value: k }));
 
+const RpgCanal = require('../rpg/canal');
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('masmorra')
@@ -19,10 +21,8 @@ module.exports = {
     .addSubcommand((s) => s.setName('sair').setDescription('Sai da masmorra levando o saque (sem o bônus do Boss)')),
 
   async execute(interaction) {
-    const canal = db.get('config.rpg.canal', null);
-    if (canal && interaction.channelId !== canal) {
-      return interaction.reply({ content: `Use o RPG em <#${canal}>.`, flags: EPH });
-    }
+    const bloqueado = RpgCanal.bloqueio(interaction);
+    if (bloqueado) return interaction.reply({ content: bloqueado, flags: EPH });
     const id = interaction.user.id;
     const sub = interaction.options.getSubcommand();
     const j = N.obter(id);
@@ -72,4 +72,4 @@ module.exports = {
     p.content = `${d.emoji} **${j.personagem || interaction.user.username}** entra em **${d.nome}**!\n*${d.desc}*`;
     return interaction.editReply(p);
   },
-};
+};                         
