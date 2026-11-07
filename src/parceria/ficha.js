@@ -1,10 +1,11 @@
 // Ficha de parceria: o promotor preenche (no privado com o Atlas ou no servidor)
 // e o Atlas publica o convite no canal do tipo escolhido, sem embed.
 const {
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, PermissionFlagsBits,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, PermissionFlagsBits,
   TextInputBuilder, TextInputStyle,
 } = require('discord.js');
 const N = require('./nucleo');
+const C = require('./convites');
 
 const ROTULO = { normal: 'Parceria', everyone: 'Aliança' };
 
@@ -22,6 +23,19 @@ const MENSAGEM_FINAL = [
 const preencher = (texto, vars) =>
   String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
 const LIMITE_MSG = 2000; // máximo de uma mensagem do Discord
+
+// ===== Visual (cores e cartões) =====
+const COR = { marca: 0xf5a3c7, ok: 0x7bd88f, erro: 0xed4245, aviso: 0xf5c26b };
+const RODAPE = 'Atlas • Ficha de parceria';
+
+// Cartão simples de aviso: { embeds: [...] }
+const cartao = (cor, titulo, texto) => ({
+  embeds: [new EmbedBuilder().setColor(cor).setTitle(titulo).setDescription(texto).setFooter({ text: RODAPE })],
+  allowedMentions: { parse: [] },
+});
+const erro = (texto) => cartao(COR.erro, 'Não foi possível continuar', texto);
+const aviso = (texto) => cartao(COR.aviso, 'Atenção', texto);
+
 
 const tipoValido = (tipo) => Object.prototype.hasOwnProperty.call(ROTULO, tipo);
 
@@ -56,9 +70,10 @@ async function checar(client, userId, tipo) {
   return { guild, membro, canal };
 }
 
-// Mensagem com os botões (só aparece o botão do tipo que a pessoa pode enviar)
+// Painel com os botões (só aparece o botão do tipo que a pessoa pode enviar)
 async function painel(client, userId) {
   const botoes = [];
+  const opcoes = [];
   let foraDoServidor = false;
   for (const tipo of Object.keys(ROTULO)) {
     const r = await checar(client, userId, tipo);
@@ -69,17 +84,33 @@ async function painel(client, userId) {
         .setCustomId(`pficha:abrir:${tipo}:${userId}`)
         .setLabel(ROTULO[tipo])
         .setEmoji(N.TIPOS[tipo].emoji)
-        .setStyle(ButtonStyle.Primary)
+        .setStyle(ButtonStyle.Secondary)
     );
+    opcoes.push({
+      name: `${N.TIPOS[tipo].emoji} ${ROTULO[tipo]}`,
+      value: tipo === 'everyone' ? 'Avisa todo o servidor (@everyone).' : 'Avisa o cargo de parcerias.',
+      inline: true,
+    });
   }
-  if (foraDoServidor) return { content: '❌ Você precisa estar no servidor para usar a ficha.' };
-  if (!botoes.length) {
-    return { content: '❌ Nenhuma ficha disponível para você agora (desligada ou sem acesso ao canal).' };
+  if (foraDoServidor) return erro('Você precisa estar no servidor para usar a ficha.');
+  if (!botoes.length) return erro('Nenhuma ficha disponível para você agora (desligada ou sem acesso ao canal).');
+
+  const usuario = await client.users.fetch(userId).catch(() => null);
+  const embed = new EmbedBuilder()
+    .setColor(COR.marca)
+    .setTitle('Ficha de parceria')
+    .setDescription(
+      'Divulgue um servidor parceiro em poucos passos.\n\n' +
+        '**1.** Escolha o tipo abaixo\n' +
+        '**2.** Informe o representante e cole o convite\n' +
+        '**3.** O Atlas publica tudo no canal certo'
+    )
+    .addFields(opcoes)
+    .setFooter({ text: RODAPE });
+  if (usuario) {
+    embed.setAuthor({ name: usuario.globalName || usuario.username, iconURL: usuario.displayAvatarURL() });
   }
-  return {
-    content: '📝 **Ficha de parceria**\nEscolha o tipo:',
-    components: [new ActionRowBuilder().addComponents(...botoes)],
-  };
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(...botoes)] };
 }
 
 // Formulário: dois campos (representante e convite)
@@ -162,24 +193,24 @@ function dividir(texto, max = LIMITE_MSG) {
 async function enviar(client, interaction, tipo) {
   const userId = interaction.user.id;
   const r = await checar(client, userId, tipo);
-  if (r.erro) return `❌ ${r.erro}`;
+  if (r.erro) return erro(r.erro);
   const { guild, canal } = r;
 
   const texto = interaction.fields.getTextInputValue('convite').trim();
   const entradaRep = interaction.fields.getTextInputValue('representante');
 
   const link = N.acharConvite(texto);
-  if (!link) return '❌ Não achei um link de convite de servidor no texto. Confira se o link está no texto.';
+  if (!link) return erro('Não achei um link de convite de servidor no texto. Confira se o link está no texto.');
 
   const rep = await acharMembro(guild, entradaRep);
   if (!rep) {
-    return '❌ Não achei esse representante no servidor. Use o ID dele ou o nome de usuário exato. Ele precisa estar no servidor.';
+    return erro('Não achei esse representante no servidor. Use o ID dele ou o nome de usuário exato. Ele precisa estar no servidor.');
   }
-  if (rep.user.bot) return '❌ O representante não pode ser um bot.';
-  if (rep.id === userId) return '❌ O representante precisa ser outra pessoa, não você.';
+  if (rep.user.bot) return erro('O representante não pode ser um bot.');
+  if (rep.id === userId) return erro('O representante precisa ser outra pessoa, não você.');
 
   const servidorParceiro = await N.servidorDoConvite(client, link);
-  if (!servidorParceiro) return '❌ Esse convite não está funcionando (expirado ou quebrado). Confira o link.';
+  if (!servidorParceiro) return erro('Esse convite não está funcionando (expirado ou quebrado). Confira o link.');
 
   // O ponto entra antes para a mensagem já mostrar o total novo; se nada for enviado, desfaz
   const pontos = N.somarPonto(userId);
@@ -192,19 +223,34 @@ async function enviar(client, interaction, tipo) {
   else partes.unshift(cab);
 
   let enviadas = 0;
+  let primeiraMsg = null; // a mensagem com o convite (o vigia usa para linkar a parceria)
   try {
     for (const parte of partes) {
       // Só o representante pode ser marcado: @everyone ou cargos escritos no texto não notificam
-      await canal.send({ content: parte, allowedMentions: { parse: [], users: [rep.id] } });
+      const m = await canal.send({ content: parte, allowedMentions: { parse: [], users: [rep.id] } });
+      if (!primeiraMsg) primeiraMsg = m;
       enviadas += 1;
     }
   } catch (erro) {
     console.error(`[Ficha] não consegui enviar o convite (${tipo}):`, erro.message);
     if (!enviadas) {
       N.somarPonto(userId, -1);
-      return '❌ Não consegui enviar o convite no canal. Avise a staff.';
+      return erro('Não consegui enviar o convite no canal. Avise a staff.');
     }
-    return '⚠️ Só uma parte do convite foi enviada. Avise a staff.';
+    return aviso('Só uma parte do convite foi enviada. Avise a staff.');
+  }
+
+  // Guarda o convite para o vigia conferir depois (se falhar, a parceria não é afetada)
+  try {
+    C.registrar({
+      codigo: C.codigoDe(link),
+      servidor: servidorParceiro,
+      promotorId: userId,
+      canalId: canal.id,
+      msgId: primeiraMsg ? primeiraMsg.id : null,
+    });
+  } catch (erro) {
+    console.error('[Convites] não consegui registrar (ficha):', erro.message);
   }
 
   // Mensagem de ping (cargo ou @everyone), já configurada em /parceria
@@ -222,11 +268,11 @@ async function enviar(client, interaction, tipo) {
     );
   } catch (erro) {
     console.error(`[Ficha] não consegui enviar o ping (${tipo}):`, erro.message);
-    return '⚠️ O convite foi enviado, mas não consegui enviar a mensagem de ping. Avise a staff.';
+    return aviso('O convite foi enviado, mas não consegui enviar a mensagem de ping. Avise a staff.');
   }
 
-  // Mensagem final na própria conversa (pública, sem emojis). Marca só quem aparece no texto.
-  const content = preencher(MENSAGEM_FINAL, {
+  // Cartão final na própria conversa. O texto vem de MENSAGEM_FINAL (lá em cima).
+  const descricao = preencher(MENSAGEM_FINAL, {
     tipo: ROTULO[tipo],
     tipo_minusculo: ROTULO[tipo].toLowerCase(),
     canal: canal.name,
@@ -236,8 +282,21 @@ async function enviar(client, interaction, tipo) {
     representante: `<@${rep.id}>`,
     pontos: String(pontos),
     rank: String(rank),
-  }).slice(0, 2000);
-  return { content, allowedMentions: { parse: [], users: [rep.id, userId] } };
+  }).trim().slice(0, 4000);
+  const embed = new EmbedBuilder()
+    .setColor(COR.ok)
+    .setTitle(`${ROTULO[tipo]} publicada`)
+    .setDescription(descricao)
+    .addFields(
+      { name: 'Servidor', value: servidorParceiro, inline: true },
+      { name: 'Canal', value: `<#${canal.id}>`, inline: true },
+      { name: 'Representante', value: `<@${rep.id}>`, inline: true },
+      { name: 'Seus pontos', value: String(pontos), inline: true },
+      { name: 'Seu rank', value: `#${rank}`, inline: true }
+    )
+    .setThumbnail(interaction.user.displayAvatarURL())
+    .setFooter({ text: RODAPE });
+  return { embeds: [embed], allowedMentions: { parse: [] } };
 }
 
-module.exports = { ROTULO, tipoValido, checar, painel, formulario, enviar, dividir };
+module.exports = { erro, ROTULO, tipoValido, checar, painel, formulario, enviar, dividir };
