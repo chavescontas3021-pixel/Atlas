@@ -31,6 +31,8 @@ function dadosDe(d, prof) {
   return d.niveis[prof];
 }
 
+const RpgCanal = require('../rpg/canal');
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('profissao')
@@ -45,6 +47,8 @@ module.exports = {
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+    const bloqueado = RpgCanal.bloqueio(interaction);
+    if (bloqueado) return interaction.reply({ content: bloqueado, flags: EPH });
     const uid = interaction.user.id;
     const responder = (content) => interaction.reply({ content, flags: EPH });
     const d = obter(uid);
