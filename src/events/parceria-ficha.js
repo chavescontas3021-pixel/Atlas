@@ -17,7 +17,7 @@ module.exports = {
           });
         }
         const r = await Ficha.checar(client, interaction.user.id, tipo);
-        if (r.erro) return interaction.reply({ content: `❌ ${r.erro}` });
+        if (r.erro) return interaction.reply(Ficha.erro(r.erro));
         return interaction.showModal(Ficha.formulario(tipo));
       }
 
