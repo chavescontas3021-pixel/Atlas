@@ -2,6 +2,7 @@
 // A mensagem vira uma "interação de mentirinha" e roda o mesmo código do comando.
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const db = require('../db');
+const Acesso = require('../utils/acesso');
 
 const T = { SUB: 1, GRUPO: 2, STRING: 3, INT: 4, BOOL: 5, USER: 6, CHANNEL: 7, ROLE: 8, MENTIONABLE: 9, NUMBER: 10, ATTACH: 11 };
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -431,6 +432,9 @@ async function executar(client, message) {
   if (perm != null && !message.member.permissions.has(BigInt(perm))) {
     return responder('❌ Você não tem permissão para usar esse comando.');
   }
+
+  // Só a staff usa os comandos (exceto os liberados em utils/acesso.js)
+  if (!Acesso.podeUsar(loc.json.name, message.member)) return responder(Acesso.MSG_NEGADO);
 
   if (loc.subs.length && !loc.sub) return responder(uso(prefixo, loc));
 
