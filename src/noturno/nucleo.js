@@ -1,4 +1,4 @@
-const { ChannelType, EmbedBuilder } = require('discord.js');
+const { AttachmentBuilder, ChannelType, EmbedBuilder } = require('discord.js');
 const db = require('../db');
 
 const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar'); // não passa pelo editor de mensagens
@@ -9,7 +9,7 @@ const PADROES = {
   aviso: 10,
   fuso: 'America/Sao_Paulo',
   mensagens: {
-    // soTexto: todas vão como mensagem de texto (sem embed), com banner opcional (config.noturno.mensagens.<tipo>.banner)
+    // soTexto: todas vão como mensagem de texto (sem embed), com banner opcional anexado como imagem (config.noturno.mensagens.<tipo>.banner)
     avisoFechar: {
       soTexto: true,
       texto: '🌙 **Hora de dormir!** Faltam **{minutos} minutos** para os chats fecharem (**{fechar}**). Terminem suas cenas! 💤',
@@ -62,6 +62,18 @@ function bannerValido(url) {
 }
 
 const banner = (tipo) => bannerValido(cfg(`mensagens.${tipo}.banner`));
+
+// O banner vai como imagem anexada à mensagem (não como embed)
+function arquivoBanner(url) {
+  let nome = 'banner.png';
+  try {
+    const ext = new URL(url).pathname.match(/\.(png|jpe?g|gif|webp)$/i);
+    if (ext) nome = `banner${ext[0].toLowerCase()}`;
+  } catch (e) {
+    // link estranho: fica com o nome padrão
+  }
+  return new AttachmentBuilder(url, { name: nome });
+}
 
 function preencher(texto, vars) {
   return String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
@@ -219,8 +231,16 @@ async function anunciar(guild, tipo) {
       [IGNORAR_TRADUCAO]: true,
     };
     const img = banner(tipo);
-    if (img) opcoes.embeds = [new EmbedBuilder().setColor(COR).setImage(img)];
-    await canal.send(opcoes);
+    if (img) opcoes.files = [arquivoBanner(img)];
+    try {
+      await canal.send(opcoes);
+    } catch (erro) {
+      if (!img) throw erro;
+      // Se a imagem não puder ser baixada/enviada, manda ao menos o texto
+      console.error('[Noturno] banner falhou, enviando só o texto:', erro.message);
+      delete opcoes.files;
+      await canal.send(opcoes);
+    }
     return;
   }
 
@@ -307,6 +327,7 @@ module.exports = {
   ehSoTexto,
   bannerValido,
   banner,
+  arquivoBanner,
   preencher,
   normalizarHora,
   paraMin,
