@@ -33,7 +33,8 @@ function mensagens(grupo, base, padroes, info) {
 // ---------- Geral ----------
 add({ grupo: 'Geral', caminho: 'config.prefixo', rotulo: 'Prefixo dos comandos de texto (ex.: !cargo)', tipo: 'texto', max: 3, padrao: '!' });
 add({ grupo: 'Geral', caminho: 'config.mensagens.ativo', rotulo: 'Usar as mensagens editadas com /mensagens (desligado = textos originais)', tipo: 'bool', padrao: true });
-add({ grupo: 'Geral', caminho: 'config.rpg.canal', rotulo: 'Canal do RPG (vazio = todos os canais)', tipo: 'canal', padrao: null });
+add({ grupo: 'Geral', caminho: 'config.rpg.categoria', rotulo: 'Categoria do RPG (os comandos de RPG só funcionam nos chats dela)', tipo: 'categoria', padrao: null, dica: 'Vazio = sem limite de categoria. Funciona junto com o chat abaixo.' });
+add({ grupo: 'Geral', caminho: 'config.rpg.canal', rotulo: 'Chat extra do RPG (vazio = nenhum; sem categoria nem chat, o RPG funciona em todos os canais)', tipo: 'canal', padrao: null });
 
 // ---------- Recepção ----------
 add({ grupo: 'Recepção', caminho: 'config.recepcao.ativo', rotulo: 'Recepção ligada', tipo: 'bool', padrao: false });
