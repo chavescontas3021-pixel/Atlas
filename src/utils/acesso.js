@@ -5,7 +5,7 @@
 const { PermissionFlagsBits } = require('discord.js');
 
 // Comandos que qualquer membro pode usar. Ajuste essa lista como quiser.
-const LIBERADOS = new Set(['formulario', 'ticket', 'ping', 'comandos']);
+const LIBERADOS = new Set(['formulario', 'parceriaficha', 'ticket', 'ping', 'comandos']);
 
 const cargosStaff = () =>
   (process.env.STAFF_ROLE_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
