@@ -74,6 +74,8 @@ function embedPet(p, dono) {
 // Arquivo da imagem animada (só para espécies que têm)
 const arquivosPet = (p) => (ESPECIES[p.especie] && ESPECIES[p.especie].animado ? [Bichos.anexoDe(p.especie).anexo()] : []);
 
+const RpgCanal = require('../rpg/canal');
+
 module.exports = {
   ESPECIES,
   embedPet,
@@ -98,6 +100,8 @@ module.exports = {
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+    const bloqueado = RpgCanal.bloqueio(interaction);
+    if (bloqueado) return interaction.reply({ content: bloqueado, flags: EPH });
     const uid = interaction.user.id;
     const responder = (content) => interaction.reply({ content, flags: EPH });
 
@@ -185,4 +189,4 @@ module.exports = {
     }
   },
 };
-// fim do arquivo
+// fim do arquivo                   
