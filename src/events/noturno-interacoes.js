@@ -1,5 +1,6 @@
 const { MessageFlags, PermissionFlagsBits } = require('discord.js');
 const db = require('../db');
+const N = require('../noturno/nucleo');
 
 const TIPOS = ['avisoFechar', 'fechou', 'avisoAbrir', 'abriu'];
 
@@ -15,9 +16,12 @@ module.exports = {
       const tipo = interaction.customId.split(':')[2];
       if (!TIPOS.includes(tipo)) return;
 
-      const titulo = interaction.fields.getTextInputValue('titulo');
       const texto = interaction.fields.getTextInputValue('texto');
-      db.set(`config.noturno.mensagens.${tipo}`, { titulo, texto });
+      // Mantém o que já existe (ex.: o banner) e troca só o que foi editado
+      const atual = db.get(`config.noturno.mensagens.${tipo}`) || {};
+      const novo = { ...atual, texto };
+      if (!N.ehSoTexto(tipo)) novo.titulo = interaction.fields.getTextInputValue('titulo');
+      db.set(`config.noturno.mensagens.${tipo}`, novo);
 
       await interaction.reply({
         content: '✅ Mensagem salva! No texto você pode usar {minutos}, {fechar} e {abrir}.',
