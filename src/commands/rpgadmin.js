@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { ChannelType, SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const db = require('../db');
 const { ITENS } = require('../rpg/dados');
 const N = require('../rpg/nucleo');
@@ -24,6 +24,8 @@ module.exports = {
       .addUserOption((o) => o.setName('membro').setDescription('Membro').setRequired(true)))
     .addSubcommand((s) => s.setName('canal').setDescription('Limita o RPG a um canal (sem canal = libera geral)')
       .addChannelOption((o) => o.setName('canal').setDescription('Canal do RPG')))
+    .addSubcommand((s) => s.setName('categoria').setDescription('Limita o RPG a uma categoria inteira (sem categoria = remove)')
+      .addChannelOption((o) => o.setName('categoria').setDescription('Categoria do RPG').addChannelTypes(ChannelType.GuildCategory)))
     .addSubcommand((s) => s.setName('status').setDescription('Mostra a configuração do RPG')),
 
   async execute(interaction) {
@@ -36,10 +38,26 @@ module.exports = {
       return interaction.reply({ content: c ? `✅ RPG limitado a <#${c.id}>.` : '✅ RPG liberado em todos os canais.', flags: EPH });
     }
 
+    if (sub === 'categoria') {
+      const c = interaction.options.getChannel('categoria');
+      if (c) db.set('config.rpg.categoria', c.id);
+      else db.remover('config.rpg.categoria');
+      return interaction.reply({
+        content: c
+          ? `✅ O RPG agora só funciona nos chats da categoria <#${c.id}>. Nos outros canais os comandos de RPG ficam bloqueados.`
+          : '✅ Categoria do RPG removida.',
+        flags: EPH,
+      });
+    }
+
     if (sub === 'status') {
       const canal = db.get('config.rpg.canal', null);
+      const categoria = db.get('config.rpg.categoria', null);
       const total = Object.keys(N.todos()).length;
-      return interaction.reply({ content: `🎮 Canal: ${canal ? `<#${canal}>` : 'todos'}\n👥 Jogadores: **${total}**`, flags: EPH });
+      const onde = canal || categoria
+        ? [categoria ? `categoria <#${categoria}>` : null, canal ? `chat <#${canal}>` : null].filter(Boolean).join(' + ')
+        : 'todos os canais';
+      return interaction.reply({ content: `🎮 Onde funciona: ${onde}\n👥 Jogadores: **${total}**`, flags: EPH });
     }
 
     const alvo = interaction.options.getUser('membro');
