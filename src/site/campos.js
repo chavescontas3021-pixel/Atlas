@@ -25,7 +25,7 @@ function mensagens(grupo, base, padroes, info) {
   for (const [tipo, p] of Object.entries(padroes.mensagens)) {
     const [rotulo, vars] = info[tipo] || [tipo, ''];
     const dica = vars ? `Variáveis: ${vars}` : 'Sem variáveis.';
-    add({ grupo, caminho: `${base}.mensagens.${tipo}.titulo`, rotulo: `${rotulo} — título`, tipo: 'texto', max: 200, padrao: p.titulo, dica });
+    if (!p.soTexto) add({ grupo, caminho: `${base}.mensagens.${tipo}.titulo`, rotulo: `${rotulo} — título`, tipo: 'texto', max: 200, padrao: p.titulo, dica });
     add({ grupo, caminho: `${base}.mensagens.${tipo}.texto`, rotulo: `${rotulo} — texto`, tipo: 'longo', max: 2000, padrao: p.texto, dica });
   }
 }
