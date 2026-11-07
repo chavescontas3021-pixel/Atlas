@@ -43,6 +43,14 @@ function status(interaction) {
           `Fecha às **${fecharH}** (aviso às ${N.deMin(N.paraMin(fecharH) - aviso)})\n` +
           `Abre às **${abrirH}** (aviso às ${N.deMin(N.paraMin(abrirH) - aviso)})`,
       },
+      {
+        name: 'Banners',
+        value:
+          `Aviso antes de fechar: ${N.banner('avisoFechar') ? 'sim' : 'não'}\n` +
+          `Chats fechados: ${N.banner('fechou') ? 'sim' : 'não'}\n` +
+          `Aviso antes de abrir: ${N.banner('avisoAbrir') ? 'sim' : 'não'}\n` +
+          `Chats abertos: ${N.banner('abriu') ? 'sim' : 'não'}`,
+      },
       { name: 'Canal de avisos', value: avisoCanal ? `<#${avisoCanal}>` : 'não definido' },
       { name: 'Cargo "house dorminhoca"', value: dorminhoca ? `<@&${dorminhoca}>` : 'não definido' },
       { name: 'Categorias bloqueadas', value: cut(cats) },
@@ -168,6 +176,24 @@ module.exports = {
             )
         )
     )
+    .addSubcommand((s) =>
+      s
+        .setName('banner')
+        .setDescription('Banner (imagem) de uma das mensagens')
+        .addStringOption((o) =>
+          o
+            .setName('tipo')
+            .setDescription('Qual mensagem')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Aviso antes de fechar', value: 'avisoFechar' },
+              { name: 'Chats fechados', value: 'fechou' },
+              { name: 'Aviso antes de abrir', value: 'avisoAbrir' },
+              { name: 'Chats abertos', value: 'abriu' }
+            )
+        )
+        .addStringOption((o) => o.setName('link').setDescription('Link direto da imagem (vazio = remover)').setRequired(false))
+    )
     .addSubcommand((s) => s.setName('fechar').setDescription('Fecha os chats agora (manual)'))
     .addSubcommand((s) => s.setName('abrir').setDescription('Abre os chats agora (manual)'))
     .addSubcommandGroup((g) =>
@@ -278,10 +304,20 @@ module.exports = {
     if (sub === 'mensagem') {
       const tipo = interaction.options.getString('tipo');
       const atual = N.mensagem(tipo);
-      const modal = new ModalBuilder()
-        .setCustomId(`noturno:modal:${tipo}`)
-        .setTitle('Editar mensagem')
-        .addComponents(
+      const campoTexto = new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('texto')
+          .setLabel('Texto da mensagem')
+          .setStyle(TextInputStyle.Paragraph)
+          .setMaxLength(2000)
+          .setRequired(true)
+          .setValue(atual.texto.slice(0, 2000))
+      );
+      const modal = new ModalBuilder().setCustomId(`noturno:modal:${tipo}`).setTitle('Editar mensagem');
+      if (N.ehSoTexto(tipo)) {
+        modal.addComponents(campoTexto);
+      } else {
+        modal.addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
               .setCustomId('titulo')
@@ -291,17 +327,30 @@ module.exports = {
               .setRequired(true)
               .setValue(atual.titulo.slice(0, 200))
           ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId('texto')
-              .setLabel('Texto da mensagem')
-              .setStyle(TextInputStyle.Paragraph)
-              .setMaxLength(2000)
-              .setRequired(true)
-              .setValue(atual.texto.slice(0, 2000))
-          )
+          campoTexto
         );
+      }
       return interaction.showModal(modal);
+    }
+
+    if (sub === 'banner') {
+      const tipo = interaction.options.getString('tipo');
+      const link = interaction.options.getString('link');
+      if (!link) {
+        db.remover(`config.noturno.mensagens.${tipo}.banner`);
+        return responder(interaction, '🗑️ Banner removido.');
+      }
+      const url = N.bannerValido(link);
+      if (!url) return responder(interaction, '❌ Link inválido. Use um link que comece com `https://` e leve direto à imagem.');
+      db.set(`config.noturno.mensagens.${tipo}.banner`, url);
+      const prev = new EmbedBuilder().setColor(0x5b6ee1).setTitle('Prévia do banner').setImage(url);
+      return interaction.reply({
+        content:
+          '✅ Banner salvo! Se a prévia não aparecer, o link não é de uma imagem direta.\n' +
+          '⚠️ Links de anexos do Discord expiram. Prefira hospedar em outro lugar (ex.: Imgur).',
+        embeds: [prev],
+        flags: EPH,
+      });
     }
 
     if (sub === 'fechar' || sub === 'abrir') {
