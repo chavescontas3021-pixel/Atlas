@@ -3,6 +3,8 @@ const N = require('../loja/nucleo');
 
 const EPH = MessageFlags.Ephemeral;
 
+const RpgCanal = require('../rpg/canal');
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('loja')
@@ -14,6 +16,8 @@ module.exports = {
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+    const bloqueado = RpgCanal.bloqueio(interaction);
+    if (bloqueado) return interaction.reply({ content: bloqueado, flags: EPH });
     const uid = interaction.user.id;
 
     if (sub === 'ver') return interaction.reply({ embeds: [N.embedLoja()] });
