@@ -34,6 +34,15 @@ function specs() {
     });
   }
 
+  for (const [tipo, nome] of [['avisoFechar', 'Aviso antes de fechar'], ['fechou', 'Chats fechados'], ['avisoAbrir', 'Aviso antes de abrir'], ['abriu', 'Chats abertos']]) {
+    lista.push({
+      grupo: 'Noturno', caminho: `config.noturno.mensagens.${tipo}.banner`, tipo: 'url', max: 500, padrao: null,
+      rotulo: `${nome} — banner (link da imagem)`,
+      dica: 'Link direto de uma imagem (https://...). Vazio = sem banner. Links de anexos do Discord expiram.',
+      depois: `config.noturno.mensagens.${tipo}.texto`,
+    });
+  }
+
   for (const [tipo, info] of Object.entries(Par.TIPOS)) {
     const g = 'Parcerias';
     const base = `config.parceria.${tipo}`;
