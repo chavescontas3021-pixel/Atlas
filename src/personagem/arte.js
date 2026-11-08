@@ -395,4 +395,115 @@ function fundo(frame) {
     g[y][x] = fase < 2 ? '#6e66a6' : fase < 6 ? '#cfc9ee' : '#ffffff';
     if (fase >= 6 && x > 0 && x < SW - 1 && y > 0) { g[y][x - 1] = '#8f86c4'; g[y][x + 1] = '#8f86c4'; g[y - 1][x] = '#8f86c4'; g[y + 1][x] = '#8f86c4'; }
   });
-  // lua com brilho sua
+  // lua com brilho suave
+  const lx = 31;
+  const ly = 8;
+  for (let y = -10; y <= 10; y++) {
+    for (let x = -10; x <= 10; x++) {
+      const px = lx + x;
+      const py = ly + y;
+      if (px < 0 || px >= SW || py < 0 || py >= SH) continue;
+      const d = Math.hypot(x, y);
+      if (d <= 4.3) {
+        const luz = (x - y) * 0.7;
+        g[py][px] = luz < -3.4 ? '#9a92c0' : luz < -1.7 ? '#b9b2d6' : '#eae6f4';
+      } else if (d <= 9) {
+        const v = (1 - (d - 4.3) / 4.7) * 3 + (B2[py & 1][px & 1] - 0.5) * 0.9;
+        const lv = Math.floor(v);
+        if (lv >= 1) g[py][px] = BRILHO_LUA[Math.min(lv, 3) - 1];
+      }
+    }
+  }
+  for (const [x, y] of [[-1, -1], [1, 1], [-2, 1], [2, -2]]) g[ly + y][lx + x] = '#c6bedb';
+  // três camadas de montanhas, cada uma com uma borda de luz no topo
+  const camadas = [
+    { base: 20, a: 2.6, b: 1.6, f1: 0.45, f2: 1.1, p: 0, cor: '#241a4a', topo: '#3b2f6e' },
+    { base: 24, a: 1.8, b: 1.2, f1: 0.7, f2: 1.7, p: 2, cor: '#1a1236', topo: '#2c2358' },
+  ];
+  for (const c of camadas) {
+    for (let x = 0; x < SW; x++) {
+      const h = c.base + Math.round(c.a * Math.sin(x * c.f1 + c.p) + c.b * Math.sin(x * c.f2 + c.p / 2 + 1));
+      for (let y = h; y < 31; y++) g[y][x] = y === h ? c.topo : c.cor;
+    }
+  }
+  // castelo distante, com janelas que tremeluzem
+  const cor = '#0a0614';
+  for (const [x, y, w, h] of [[2, 17, 3, 9], [6, 19, 2, 7], [9, 15, 3, 11], [4, 22, 5, 5]]) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) g[j][i] = cor;
+  for (const [x, y] of [[2, 16], [4, 16], [6, 18], [7, 18], [9, 14], [11, 14]]) g[y][x] = cor;
+  g[16][10] = frame % 4 < 2 ? '#f2c15a' : '#a8812e';
+  g[20][3] = frame % 8 < 5 ? '#f2c15a' : '#a8812e';
+  // chão de pedra
+  for (let y = 31; y < SH; y++) for (let x = 0; x < SW; x++) g[y][x] = y === 31 ? '#463a66' : y === 32 ? '#2f2648' : '#1c1628';
+  for (let x = 0; x < SW; x++) {
+    if ((x * 7 + 3) % 11 === 0) g[33][x] = '#2e2644';
+    if ((x * 5 + 1) % 9 === 0) g[34][x] = '#241d36';
+    if ((x * 3 + 2) % 13 === 0) g[32][x] = '#3a2f58';
+  }
+  // neblina que se arrasta (o padrão se repete a cada 8 quadros)
+  for (let y = 28; y <= 31; y++) for (let x = 0; x < SW; x++) if ((x + y * 2 + frame) % 8 < 2) g[y][x] = y < 30 ? '#352b60' : '#40366a';
+  // luz da lua no chão, para os pés não sumirem
+  for (let x = OX + 2; x <= OX + 22; x++) {
+    const d = Math.abs(x - (OX + 12)) / 10;
+    if (d < 1) { g[33][x] = d < 0.6 ? '#34295a' : '#2a2148'; if (d < 0.4) g[32][x] = '#3d3168'; }
+  }
+  // brilho fraco atrás do personagem, para destacar a silhueta
+  for (let y = 0; y < 31; y++) {
+    for (let x = 0; x < SW; x++) {
+      const d = Math.hypot((x - (OX + 12)) / 12, (y - 18) / 17);
+      if (d < 0.55) g[y][x] = '#30255c';
+      else if (d < 0.8 && (x + y) % 2 === 0) g[y][x] = '#2b2150';
+    }
+  }
+  // sombra do personagem
+  for (let x = OX + 7; x <= OX + 17; x++) g[35][x] = '#0c0813';
+  for (let x = OX + 9; x <= OX + 15; x++) g[34][x] = '#0c0813';
+  // vaga-lumes
+  VAGALUMES.forEach(([x, y, k]) => {
+    const a = (frame / 8) * Math.PI * 2 + k;
+    const px = x + Math.round(Math.sin(a) * 1.6);
+    const py = y + Math.round(Math.cos(a) * 1.1);
+    if (py >= 0 && py < SH && px >= 0 && px < SW) g[py][px] = (frame + k) % 4 === 0 ? '#7a8a3a' : '#d8f06a';
+  });
+  return g;
+}
+
+// Quadros da animação curta (usados também pelas batalhas)
+const QUADROS = [
+  { dy: 0, bal: 0, piscar: false, chama: 0 },
+  { dy: 1, bal: 1, piscar: false, chama: 1 },
+  { dy: 0, bal: 0, piscar: true, chama: 0 },
+  { dy: 1, bal: 1, piscar: false, chama: 1 },
+];
+// Animação da cena: 8 quadros (respiração lenta, capa e cabelo ao vento, piscada)
+const QUADROS_CENA = [
+  { dy: 0, bal: 0, piscar: false, chama: 0 },
+  { dy: 0, bal: 1, piscar: false, chama: 1 },
+  { dy: 1, bal: 1, piscar: false, chama: 0 },
+  { dy: 1, bal: 2, piscar: false, chama: 1 },
+  { dy: 1, bal: 1, piscar: false, chama: 0 },
+  { dy: 0, bal: 1, piscar: false, chama: 1 },
+  { dy: 0, bal: 0, piscar: true, chama: 0 },
+  { dy: 0, bal: 0, piscar: false, chama: 1 },
+];
+
+function gradeCena(app, i, extra) {
+  const cores = coresDe(app);
+  const q = QUADROS_CENA[i % QUADROS_CENA.length];
+  const g = fundo(i);
+  const p = (extra && extra.personagem) ? extra.personagem(app, q) : desenharPersonagem(app, q);
+  for (let y = 0; y < p.length; y++) {
+    for (let x = 0; x < p[0].length; x++) {
+      const c = p[y][x];
+      if (c !== '.' && cores[c]) g[y][OX + x] = cores[c];
+    }
+  }
+  return g;
+}
+
+function gifDe(app, extra) {
+  const a = normalizar(app);
+  return montar(QUADROS_CENA.map((_, i) => gradeCena(a, i, extra)), { escala: ESCALA, atraso: 38 });
+}
+
+module.exports = { CW, CH, SW, SH, OX, CATALOGO, PARTES, PADRAO, PELES, OLHOS, CABELOS, TECIDOS, normalizar, aleatoria, coresDe, desenharPersonagem, gradeCena, gifDe, fundo, QUADROS, QUADROS_CENA, novo, ret, pt, carimbo, escuro, claro, tom };
+// fim do arquivo
