@@ -2,7 +2,7 @@ const { EmbedBuilder, MessageFlags, SlashCommandBuilder } = require('discord.js'
 const db = require('../db');
 const R = require('../rpg/nucleo');
 const S = require('../extras/stars');
-const Bichos = require('../extras/bichos');
+const PetArte = require('../extras/petarte');
 
 const EPH = MessageFlags.Ephemeral;
 const COR = 0xf5a3c7;
@@ -26,6 +26,9 @@ const ESPECIES = {
   wyvern: { emoji: '🐲', nome: 'Wyvern das Trevas', preco: 5000, desc: 'Mítico: +80% de stars, +55% de XP, passeia a cada 30 min e traz XP e fragmentos do vazio.', pocao: 0.45, stars: 1.8, xp: 1.55, cd: 30, jxp: 90, raro: { item: 'fragmento_vazio', chance: 0.2 } },
   quimera: { emoji: '👑', nome: 'Quimera Ancestral', preco: 7000, desc: 'Mítico supremo: dobra as stars, +70% de XP, passeia a cada 25 min e traz muito XP e fragmentos do vazio.', pocao: 0.5, stars: 2.0, xp: 1.7, cd: 25, jxp: 140, raro: { item: 'fragmento_vazio', chance: 0.3 } },
 };
+
+// Toda espécie que tem pixel art (em extras/petarte.js ou no bichos.js) mostra a imagem animada
+for (const id of Object.keys(ESPECIES)) if (PetArte.tem(id) || ESPECIES[id].animado) ESPECIES[id].animado = true;
 
 // Espécies exclusivas (presentes da staff) não aparecem na lista nem podem ser compradas
 const COMPRAVEIS = Object.entries(ESPECIES).filter(([, e]) => !e.exclusivo);
@@ -67,14 +70,12 @@ function embedPet(p, dono) {
       { name: 'Passeio', value: cd ? `⏳ em ${fmtMs(cd)}` : '✅ disponível', inline: true },
       { name: 'Passeios feitos', value: `${p.passeios || 0}`, inline: true },
     );
-  if (e.animado) emb.setImage(Bichos.anexoDe(p.especie).url);
+  if (e.animado) emb.setImage(PetArte.anexoDe(p.especie, p.nivel).url);
   return emb;
 }
 
 // Arquivo da imagem animada (só para espécies que têm)
-const arquivosPet = (p) => (ESPECIES[p.especie] && ESPECIES[p.especie].animado ? [Bichos.anexoDe(p.especie).anexo()] : []);
-
-const RpgCanal = require('../rpg/canal');
+const arquivosPet = (p) => (ESPECIES[p.especie] && ESPECIES[p.especie].animado ? [PetArte.anexoDe(p.especie, p.nivel).anexo()] : []);
 
 module.exports = {
   ESPECIES,
@@ -100,14 +101,15 @@ module.exports = {
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
-    const bloqueado = RpgCanal.bloqueio(interaction);
-    if (bloqueado) return interaction.reply({ content: bloqueado, flags: EPH });
     const uid = interaction.user.id;
     const responder = (content) => interaction.reply({ content, flags: EPH });
 
     if (sub === 'lista') {
       const txt = COMPRAVEIS.map(([, e]) => `${e.emoji} **${e.nome}** — ⭐ ${e.preco}\n${e.desc}`).join('\n\n');
-      return interaction.reply({ embeds: [new EmbedBuilder().setColor(COR).setTitle('🐾 Bichinhos para adotar').setDescription(txt).setFooter({ text: 'Use /pet adotar' })], flags: EPH });
+      const vitrine = COMPRAVEIS.map(([id]) => id).filter((id) => PetArte.tem(id));
+      const emb = new EmbedBuilder().setColor(COR).setTitle('🐾 Bichinhos para adotar').setDescription(txt).setFooter({ text: 'Use /pet adotar' });
+      if (vitrine.length) emb.setImage('attachment://pets.gif');
+      return interaction.reply({ embeds: [emb], files: vitrine.length ? [PetArte.vitrine(vitrine)] : [], flags: EPH });
     }
 
     if (sub === 'ver') {
@@ -126,7 +128,7 @@ module.exports = {
       if (r.erro) return responder(`❌ ${r.erro}`);
       const p = { especie: id, nome: interaction.options.getString('nome').trim(), nivel: 1, xp: 0, alimentadoAte: Date.now() + 6 * HORA, cdPasseio: 0, passeios: 0, adotadoEm: Date.now() };
       db.set(caminho(uid), p);
-      return interaction.reply({ content: `🎉 Você adotou ${e.emoji} **${p.nome}**! Ele já veio alimentado por 6 horas.`, embeds: [embedPet(p, interaction.user.username)] });
+      return interaction.reply({ content: `🎉 Você adotou ${e.emoji} **${p.nome}**! Ele já veio alimentado por 6 horas.`, embeds: [embedPet(p, interaction.user.username)], files: arquivosPet(p) });
     }
 
     const p = obter(uid);
@@ -189,4 +191,4 @@ module.exports = {
     }
   },
 };
-// fim do arquivo                   
+// fim do arquivo
