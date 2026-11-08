@@ -11,8 +11,14 @@ const Pers = require('../personagem/nucleo');
 const Placar = require('../ranking/nucleo');
 
 const COR = 0xf5a3c7;
-const CD_ATAQUE = 20 * 1000;
-const CD_FORTE = 5 * 60 * 1000;
+// Tempo de espera entre ataques ao chefe, em segundos. Padrão: 8 s no ataque e 2 min no golpe forte.
+// Para mudar sem mexer no código: db config.chefe.cdAtaque / config.chefe.cdForte (em segundos).
+const segundos = (chave, padrao) => {
+  const n = Number(db.get(`config.chefe.${chave}`, padrao));
+  return Number.isFinite(n) && n >= 0 ? n : padrao;
+};
+const cdAtaque = () => segundos('cdAtaque', 8) * 1000;
+const cdForte = () => segundos('cdForte', 120) * 1000;
 
 const PADROES = {
   mensagens: {
@@ -169,7 +175,7 @@ async function atacar(client, uid, forte) {
   a.hp = Math.max(0, a.hp - r.dano);
   a.dano[uid] = (a.dano[uid] || 0) + r.dano;
   a.golpes[uid] = (a.golpes[uid] || 0) + 1;
-  a[chaveCd][uid] = agora + (forte ? CD_FORTE : CD_ATAQUE);
+  a[chaveCd][uid] = agora + (forte ? cdForte() : cdAtaque());
   if (a.hp === 0) a.ultimoUid = uid;
   a.recentes = (a.recentes || []).filter((x) => x !== uid).concat(uid).slice(-Cena.MAX_HEROIS);
   a.ultimo = a.ultimo || {};
@@ -276,7 +282,7 @@ async function tick(client, agora = Date.now()) {
 }
 
 module.exports = {
-  PADROES, CD_ATAQUE, CD_FORTE, mensagem, fmt, ativo, agenda, proximoId, rank,
+  PADROES, cdAtaque, cdForte, mensagem, fmt, ativo, agenda, proximoId, rank,
   embedChefe, botoes, textoPlacar, invocar, atacar, finalizar, cancelar, tick,
 };
 // fim do arquivo
