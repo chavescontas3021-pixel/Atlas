@@ -17,7 +17,7 @@ module.exports = {
     .setDescription('Eventos de chefe')
     .addSubcommand((s) => s.setName('status').setDescription('Mostra o chefe atual'))
     .addSubcommand((s) => s.setName('atacar').setDescription('Ataca o chefe')
-      .addBooleanOption((o) => o.setName('forte').setDescription('Golpe forte (recarga de 5 min)')))
+      .addBooleanOption((o) => o.setName('forte').setDescription('Golpe forte (mais dano, recarga maior)')))
     .addSubcommand((s) => s.setName('placar').setDescription('Ranking de dano do chefe atual'))
     .addSubcommand((s) => s.setName('historico').setDescription('Últimos chefes')),
 
