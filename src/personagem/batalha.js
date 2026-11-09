@@ -5,6 +5,8 @@ const { montar } = require('../extras/pixelgif');
 const A = require('./arte');
 const { ESPECIAIS } = require('./especiais');
 const M = require('./monstros');
+const Cen = require('./cenarios');
+require('./monstros-masmorra'); // registra os monstros e cenários das masmorras
 
 const W = 84;
 const H = 56;
@@ -201,7 +203,9 @@ function sombra(g, cx, w) {
 }
 
 function quadro(cfg, o) {
-  const g = fundo(o.t);
+  // Monstros das masmorras lutam no cenário da própria masmorra
+  const tema = cfg.dir.tipo === 'monstro' ? Cen.temaDe(cfg.dir.nome) : null;
+  const g = (tema && Cen.fundo(tema, o.t)) || fundo(o.t);
   const sprs = { e: gradeAtor(cfg.esq, o.t), d: gradeAtor(cfg.dir, o.t) };
   if (cfg.dir.tipo === 'heroi') sprs.d = espelhar(sprs.d);
   const bob = (o.t % 2 === 0 ? 0 : 1);
@@ -235,6 +239,20 @@ function quadro(cfg, o) {
 }
 
 const ATRASOS = [9, 7, 11, 18];
+
+// O GIF aceita no máximo 256 cores. Se uma cena passar disso (herói colorido + cenário detalhado + efeitos),
+// arredonda as cores aos poucos até caber, em vez de dar erro.
+function montarSeguro(quadros, atraso) {
+  const tentar = (qs) => montar(qs, { escala: ESCALA, atraso });
+  const demais = (e) => /Cores demais/.test(e.message);
+  try { return tentar(quadros); } catch (e) { if (!demais(e)) throw e; }
+  for (const passo of [8, 12, 16, 24, 32, 48]) {
+    const memo = {};
+    const arred = (c) => memo[c] || (memo[c] = `#${toRgb(c).map((v) => Math.min(255, Math.round(v / passo) * passo).toString(16).padStart(2, '0')).join('')}`);
+    try { return tentar(quadros.map((g) => g.map((l) => l.map(arred)))); } catch (e) { if (!demais(e)) throw e; }
+  }
+  throw new Error('Cores demais para um GIF, mesmo depois de reduzir.');
+}
 
 function gif(cfg) {
   const eventos = cfg.eventos || [];
@@ -275,7 +293,7 @@ function gif(cfg) {
   } else if (atrasos.length) {
     atrasos[atrasos.length - 1] = 45;
   }
-  return montar(quadros, { escala: ESCALA, atraso: atrasos });
+  return montarSeguro(quadros, atrasos);
 }
 
 const anexo = (cfg) => new AttachmentBuilder(gif(cfg), { name: ARQUIVO });
