@@ -6,7 +6,9 @@ const A = require('./arte');
 const { ESPECIAIS } = require('./especiais');
 const M = require('./monstros');
 const Cen = require('./cenarios');
-require('./monstros-masmorra'); // registra os monstros e cenários das masmorras
+const Efx = require('./efeitos');
+const MM = require('./monstros-masmorra'); // registra os monstros e cenários das masmorras
+const CHEFES = new Set(MM.CHEFES.map((c) => c[0]));
 
 const W = 84;
 const H = 56;
@@ -205,7 +207,7 @@ function sombra(g, cx, w) {
 function quadro(cfg, o) {
   // Monstros das masmorras lutam no cenário da própria masmorra
   const tema = cfg.dir.tipo === 'monstro' ? Cen.temaDe(cfg.dir.nome) : null;
-  const g = (tema && Cen.fundo(tema, o.t)) || fundo(o.t);
+  let g = (tema && Cen.fundo(tema, o.t)) || fundo(o.t);
   const sprs = { e: gradeAtor(cfg.esq, o.t), d: gradeAtor(cfg.dir, o.t) };
   if (cfg.dir.tipo === 'heroi') sprs.d = espelhar(sprs.d);
   const bob = (o.t % 2 === 0 ? 0 : 1);
@@ -227,12 +229,27 @@ function quadro(cfg, o) {
     const de = info[o.ev.por === 'a' ? 'e' : 'd'];
     const para = info[o.ev.por === 'a' ? 'd' : 'e'];
     const s = o.ev.por === 'a' ? 1 : -1;
-    efeito(g, o.ev, o.i, de, para, s);
+    // Monstros usam o ataque do seu tipo (garra, fogo, veneno...); o golpe devastador do Boss tem efeito próprio
+    const atk = o.ev.por === 'b' && cfg.dir.tipo === 'monstro' ? Efx.ataqueDe(cfg.dir.nome, o.ev) : null;
+    Efx.efeito(g, o.ev, o.i, de, para, s, atk);
+    if (o.ev.aviso && cfg.dir.tipo === 'monstro' && o.i >= 2) {
+      Efx.avisoBoss(g, o.i, info.d);
+      if (o.i === 3) numero(g, info.d.x, Math.max(8, info.d.topo - 8), '!', '#ff4040');
+    }
+    g = Efx.tremor(g, o.ev, o.i); // a tela treme no impacto (as barras de vida ficam paradas)
     if (o.i >= 2 && !o.ev.esq && o.ev.tipo !== 'def') {
       const rise = o.i === 2 ? 0 : 3;
       if (o.ev.tipo === 'poc') numero(g, de.x, Math.max(8, de.topo - 7 - rise), `+${o.ev.cura || 0}`, '#6dff7a');
       else if (o.ev.dano != null) numero(g, para.x, Math.max(8, para.topo - 7 - rise - (o.ev.crit ? 1 : 0)), `${o.ev.dano}${o.ev.crit ? '!' : ''}`, o.ev.crit ? '#ffdd33' : (o.ev.por === 'a' ? '#ffffff' : '#ff6a6a'));
     }
+  }
+  if (o.fimK != null) {
+    const lad = cfg.perdedor === 'a' ? 'e' : 'd';
+    const ator = cfg[lad === 'e' ? 'esq' : 'dir'];
+    const boss = ator.tipo === 'monstro' && CHEFES.has(ator.nome);
+    Efx.fim(g, o.fimK, info[lad], boss);
+    Efx.vitoria(g, o.fimK, info[lad === 'e' ? 'd' : 'e']);
+    g = Efx.tremorFim(g, o.fimK, boss);
   }
   barras(g, o.hp, cfg.hpMax);
   return g;
@@ -288,7 +305,7 @@ function gif(cfg) {
       const est = base();
       est[lad].dissolve = p; est[lad].parado = true;
       est[lad].flash = ['#ffffff', Math.max(0, 0.7 - k * 0.2)];
-      empilha({ est, ev: null, i: 0 }, k === 3 ? 220 : 14);
+      empilha({ est, ev: null, i: 0, fimK: k }, k === 3 ? 220 : 14);
     });
   } else if (atrasos.length) {
     atrasos[atrasos.length - 1] = 45;
@@ -298,5 +315,5 @@ function gif(cfg) {
 
 const anexo = (cfg) => new AttachmentBuilder(gif(cfg), { name: ARQUIVO });
 
-module.exports = { ARQUIVO, W, H, gif, anexo, gradeHeroi, efeito, numero, mistura, tintar, dissolver, px, ret, elip, lin, anel, K };
+module.exports = { ARQUIVO, W, H, gif, quadro, anexo, gradeHeroi, efeito, numero, mistura, tintar, dissolver, px, ret, elip, lin, anel, K };
 // fim do arquivo
