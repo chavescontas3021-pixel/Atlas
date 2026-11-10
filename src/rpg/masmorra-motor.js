@@ -106,16 +106,18 @@ function agir(e, j, tipo) {
   if (forte) e.carga = false;
   if (Math.random() * 100 < N.esquiva(j)) {
     linhas.push(`💨 Você desviou do ataque de ${m.nome}!`);
-    reg({ por: 'b', tipo: 'atq', visual: 'corte', esq: true });
+    reg({ por: 'b', tipo: 'atq', visual: 'corte', esq: true, forte });
   } else {
     const r = golpe(Math.round((m.atk * rolar(80, 120)) / 100), 5, N.defesa(j), { mult: forte ? 1.7 : 1 });
     j.hp -= r.dano;
     linhas.push(`${m.emoji} ${m.nome} ${forte ? 'desferiu um **GOLPE DEVASTADOR**' : 'causou'} **${r.dano}** de dano${r.crit ? ' (**CRÍTICO!**)' : ''}.`);
-    reg({ por: 'b', tipo: 'atq', visual: 'corte', dano: r.dano, crit: r.crit });
+    reg({ por: 'b', tipo: 'atq', visual: 'corte', dano: r.dano, crit: r.crit, forte });
   }
   // O Boss avisa um turno antes do golpe forte (a cada 4 turnos)
   if (m.boss && e.turno % 4 === 3 && m.hp > 0 && j.hp > 0) {
     e.carga = true;
+    const ultimo = e.eventos[e.eventos.length - 1];
+    if (ultimo) ultimo.aviso = true; // a cena mostra o Boss se preparando
     linhas.push(`⚠️ **${m.nome} ruge e prepara um golpe devastador!**`);
   }
   if (e.cdHab > 0) e.cdHab--;
