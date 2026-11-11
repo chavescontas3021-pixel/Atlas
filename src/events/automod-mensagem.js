@@ -67,18 +67,23 @@ module.exports = {
         ],
       });
 
-      if (vigiado) {
-        await B.alertar(msg.guild, msg.author.id, '🚨 Falou algo proibido', `Categoria: **${achou.categoria}**`, [
-          ['Canal', `<#${msg.channel.id}>`, true],
-          ['Mensagem', L.corta(L.vazio(msg.content || anexos.join(', ')), 900)],
-        ]);
-      }
+      // Conexão com a blacklist: guarda a ocorrência (4 em 24h = observação) e alerta se for vigiado
+      await B.registrarOcorrencia(msg.guild, msg.author.id, { categoria: achou.categoria, grave: achou.advertir });
+      await B.alertar(msg.guild, msg.author.id, '🚨 Falou algo proibido', `Categoria: **${achou.categoria}**`, [
+        ['Canal', `<#${msg.channel.id}>`, true],
+        ['Mensagem', L.corta(L.vazio(msg.content || anexos.join(', ')), 900)],
+      ]);
 
       if (repetido) return;
 
       let texto;
       if (advertir) {
         const r = await N.darAviso(msg.guild, client.user, membro, `Automod: ${achou.categoria}`, null);
+        if (r.banido && r.banido.ok) {
+          await B.observarEAvisar(msg.guild, membro.id, 'Banido pelo automod (se voltar ao servidor, o Atlas avisa)', 30);
+        } else if (r.total >= 2) {
+          await B.observarEAvisar(msg.guild, membro.id, `Chegou a ${r.total}/${r.limite} advertências`, 14);
+        }
         if (r.total >= r.limite) {
           texto = r.banido && r.banido.ok
             ? `🔨 ${membro}, sua mensagem foi bloqueada e você chegou a **${r.total}/${r.limite}** advertências: foi **banido(a)**.`
