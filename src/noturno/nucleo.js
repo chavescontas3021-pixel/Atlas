@@ -1,4 +1,4 @@
-const { AttachmentBuilder, ChannelType, EmbedBuilder } = require('discord.js');
+const { ChannelType, EmbedBuilder } = require('discord.js');
 const db = require('../db');
 
 const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar'); // não passa pelo editor de mensagens
@@ -9,7 +9,7 @@ const PADROES = {
   aviso: 10,
   fuso: 'America/Sao_Paulo',
   mensagens: {
-    // soTexto: todas vão como mensagem de texto (sem embed), com banner opcional anexado como imagem (config.noturno.mensagens.<tipo>.banner)
+    // soTexto: todas vão como mensagem de texto, com banner opcional aparecendo como imagem logo abaixo (config.noturno.mensagens.<tipo>.banner)
     avisoFechar: {
       soTexto: true,
       texto: '🌙 **Hora de dormir!** Faltam **{minutos} minutos** para os chats fecharem (**{fechar}**). Terminem suas cenas! 💤',
@@ -32,6 +32,7 @@ const PADROES = {
 // Permissões que o bloqueio tira (e depois devolve como estavam)
 const PERMS = ['SendMessages', 'SendMessagesInThreads', 'CreatePublicThreads', 'CreatePrivateThreads', 'AddReactions'];
 const TIPOS_CANAL = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
+const TIPOS_VOZ = [ChannelType.GuildVoice, ChannelType.GuildStageVoice];
 const COR = 0x5b6ee1;
 
 function cfg(chave, padrao) {
@@ -63,16 +64,9 @@ function bannerValido(url) {
 
 const banner = (tipo) => bannerValido(cfg(`mensagens.${tipo}.banner`));
 
-// O banner vai como imagem anexada à mensagem (não como embed)
-function arquivoBanner(url) {
-  let nome = 'banner.png';
-  try {
-    const ext = new URL(url).pathname.match(/\.(png|jpe?g|gif|webp)$/i);
-    if (ext) nome = `banner${ext[0].toLowerCase()}`;
-  } catch (e) {
-    // link estranho: fica com o nome padrão
-  }
-  return new AttachmentBuilder(url, { name: nome });
+// O banner aparece como imagem grande logo abaixo do texto (embed só com a imagem)
+function embedBanner(url) {
+  return new EmbedBuilder().setColor(COR).setImage(url);
 }
 
 function preencher(texto, vars) {
@@ -137,6 +131,35 @@ function canaisAlvo(guild) {
   return [...resultado.values()];
 }
 
+// Calls (voz/palco) atingidas pelo fechamento: soltas na lista ou dentro das categorias
+function ehCanalVoz(canal) {
+  if (!canal || !TIPOS_VOZ.includes(canal.type)) return false;
+  return cfgLista('canais').includes(canal.id) || (!!canal.parentId && cfgLista('categorias').includes(canal.parentId));
+}
+
+function canaisVoz(guild) {
+  return [...guild.channels.cache.values()].filter(ehCanalVoz);
+}
+
+// Desconecta quem está nas calls bloqueadas (bots ficam)
+async function expulsarDaVoz(guild, motivo = 'Fechamento noturno') {
+  let expulsos = 0;
+  let falhas = 0;
+  for (const canal of canaisVoz(guild)) {
+    for (const membro of [...canal.members.values()]) {
+      if (membro.user.bot) continue;
+      try {
+        await membro.voice.disconnect(motivo);
+        expulsos++;
+      } catch (erro) {
+        falhas++;
+        console.error(`[Noturno] falha ao tirar ${membro.user.tag} da call ${canal.name}:`, erro.message);
+      }
+    }
+  }
+  return { expulsos, falhas };
+}
+
 // Bloqueia o envio de mensagens, guardando como estava antes
 async function fechar(guild, motivo = 'Fechamento noturno') {
   const alvos = canaisAlvo(guild);
@@ -172,7 +195,8 @@ async function fechar(guild, motivo = 'Fechamento noturno') {
   }
 
   db.set('noturno.trancado', true);
-  return { ok, falhas, canais: alvos.length };
+  const voz = await expulsarDaVoz(guild, motivo);
+  return { ok, falhas, canais: alvos.length, voz: canaisVoz(guild).length, expulsos: voz.expulsos, falhasVoz: voz.falhas };
 }
 
 // Devolve as permissões como estavam antes do bloqueio
@@ -231,14 +255,14 @@ async function anunciar(guild, tipo) {
       [IGNORAR_TRADUCAO]: true,
     };
     const img = banner(tipo);
-    if (img) opcoes.files = [arquivoBanner(img)];
+    if (img) opcoes.embeds = [embedBanner(img)];
     try {
       await canal.send(opcoes);
     } catch (erro) {
       if (!img) throw erro;
-      // Se a imagem não puder ser baixada/enviada, manda ao menos o texto
+      // Se a imagem não puder ser enviada, manda ao menos o texto
       console.error('[Noturno] banner falhou, enviando só o texto:', erro.message);
-      delete opcoes.files;
+      delete opcoes.embeds;
       await canal.send(opcoes);
     }
     return;
@@ -306,6 +330,7 @@ async function reconciliar(guild) {
   const deve = deveFechar(paraMin(t.hora), paraMin(horaFechar()), paraMin(horaAbrir()));
   const trancado = db.get('noturno.trancado', false);
   if (deve && !trancado) await fechar(guild, 'Fechamento noturno (recuperação)');
+  if (deve && trancado) await expulsarDaVoz(guild, 'Fechamento noturno (recuperação)');
   if (!deve && trancado) await abrir(guild, 'Abertura da manhã (recuperação)');
 }
 
@@ -327,7 +352,10 @@ module.exports = {
   ehSoTexto,
   bannerValido,
   banner,
-  arquivoBanner,
+  embedBanner,
+  canaisVoz,
+  expulsarDaVoz,
+  ehCanalVoz,
   preencher,
   normalizarHora,
   paraMin,
