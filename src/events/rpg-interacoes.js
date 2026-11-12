@@ -3,6 +3,7 @@ const { ITENS, LOJA } = require('../rpg/dados');
 const N = require('../rpg/nucleo');
 const C = require('../rpg/combate');
 const Duelo = require('../rpg/duelo');
+const Venda = require('../rpg/venda');
 
 const EPH = MessageFlags.Ephemeral;
 
@@ -160,6 +161,32 @@ async function duelo(interaction, partes) {
   await mostrarTurno(d, interaction);
 }
 
+// Botões do /rpg vendertudo (rpg:vt:modo:userId)
+async function vendaEmMassa(interaction, partes) {
+  const modo = partes[2];
+  const userId = partes[3];
+  if (interaction.user.id !== userId) {
+    return interaction.reply({ content: 'Esse menu não é seu.', flags: EPH });
+  }
+  if (modo === 'no') {
+    return interaction.update({ content: '👍 Venda cancelada.', embeds: [], components: [] });
+  }
+  if (!['tudo', 'mat'].includes(modo)) return undefined;
+  const j = N.obter(userId);
+  if (!j) return interaction.update({ content: 'Personagem não encontrado.', embeds: [], components: [] });
+  const r = Venda.vender(j, modo);
+  if (!r.itens.length) {
+    return interaction.update({ content: 'Você não tem mais nada para vender.', embeds: [], components: [] });
+  }
+  N.salvar(userId, j);
+  const qtd = r.itens.reduce((s, x) => s + x.q, 0);
+  return interaction.update({
+    content: `⭐ Você vendeu **${qtd}** item(ns) por **${r.total}** stars! Agora você tem ⭐ ${j.moedas}.`,
+    embeds: [],
+    components: [],
+  });
+}
+
 // Botões do duelo em andamento (rpg:u:acao:id)
 async function duelando(interaction, partes) {
   const acao = partes[2];
@@ -211,6 +238,7 @@ module.exports = {
         if (partes[1] === 'c') return await combate(interaction, partes);
         if (partes[1] === 'd') return await duelo(interaction, partes);
         if (partes[1] === 'u') return await duelando(interaction, partes);
+        if (partes[1] === 'vt') return await vendaEmMassa(interaction, partes);
       }
     } catch (err) {
       console.error('[RPG]', err);
