@@ -6,6 +6,7 @@ const { CLASSES, ITENS, LOJA } = require('../rpg/dados');
 const N = require('../rpg/nucleo');
 const C = require('../rpg/combate');
 const Pers = require('../personagem/nucleo');
+const Venda = require('../rpg/venda');
 
 const EPH = MessageFlags.Ephemeral;
 const classesEscolhas = Object.entries(CLASSES).map(([v, c]) => ({ name: `${c.emoji} ${c.nome}`, value: v }));
@@ -40,6 +41,7 @@ module.exports = {
       .addStringOption(itemOpt).addIntegerOption(qtdOpt))
     .addSubcommand((s) => s.setName('vender').setDescription('Vende um item (50% do preço)')
       .addStringOption(itemOpt).addIntegerOption(qtdOpt))
+    .addSubcommand((s) => s.setName('vendertudo').setDescription('Vende tudo do inventário de uma vez (50% do preço)'))
     .addSubcommand((s) => s.setName('inventario').setDescription('Mostra seu inventário'))
     .addSubcommand((s) => s.setName('usar').setDescription('Usa um item de cura')
       .addStringOption(itemOpt))
@@ -187,6 +189,12 @@ module.exports = {
       j.moedas += total;
       N.salvar(id, j);
       return interaction.reply({ content: `⭐ Você vendeu ${q}× ${N.nomeItem(item)} por ${total} stars.`, flags: EPH });
+    }
+
+    if (sub === 'vendertudo') {
+      const c = Venda.confirmacao(j, id);
+      if (c.vazio) return interaction.reply({ content: 'Você não tem nada para vender.', flags: EPH });
+      return interaction.reply({ embeds: [c.embed], components: [c.linha], flags: EPH });
     }
 
     if (sub === 'usar') {
