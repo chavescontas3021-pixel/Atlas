@@ -135,11 +135,12 @@ async function criarCanal(member) {
 }
 
 // Começa a recepção de um membro (usado ao entrar e no /recepcao testar)
-async function iniciarRecepcao(member, { teste = false } = {}) {
+async function iniciarRecepcao(member, { teste = false, darCargo = false } = {}) {
   const guild = member.guild;
 
+  // O cargo "sem vaga" vem do onboarding; o Atlas só o entrega se pedirem (darCargo)
   const semVaga = U.cfg('cargos.semVaga');
-  if (!teste && semVaga && guild.roles.cache.has(semVaga)) {
+  if (darCargo && !teste && semVaga && guild.roles.cache.has(semVaga)) {
     await member.roles
       .add(semVaga, 'Recepção do Atlas')
       .catch((e) => console.error('[Recepção] cargo sem vaga:', e.message));
