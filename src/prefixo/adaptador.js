@@ -433,8 +433,9 @@ async function executar(client, message) {
     return responder('❌ Você não tem permissão para usar esse comando.');
   }
 
-  // Só a staff usa os comandos (exceto os liberados em utils/acesso.js)
-  if (!Acesso.podeUsar(loc.json.name, message.member)) return responder(Acesso.MSG_NEGADO);
+  // Comandos públicos (sem permissão exigida no "/") valem para todos; o resto é só da staff
+  const publico = perm == null;
+  if (!Acesso.podeUsar(loc.json.name, message.member, publico)) return responder(Acesso.MSG_NEGADO);
 
   if (loc.subs.length && !loc.sub) return responder(uso(prefixo, loc));
 
