@@ -1,5 +1,6 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../db');
+const Acesso = require('../utils/acesso');
 
 const COR = { aviso: 0xf1c40f, ban: 0xe74c3c, kick: 0xe67e22, ok: 0x2ecc71 };
 
@@ -146,7 +147,47 @@ async function desbanir(guild, executor, id, motivo) {
   }
 }
 
-async function darAviso(guild, executor, membro, motivo, numeroRegra) {
+// ---------- Advertência no canal de divergências ----------
+// Canal onde a advertência vira mensagem pública + tópico (/moderacao canaladvertencia)
+const canalAdvertencia = () => cfg('canalAdvertencia', null);
+
+// Staff do tópico: quem pode avisar membros (Moderar Membros) ou é staff do Atlas
+const ehStaffTopico = (membro) =>
+  !!membro && (Acesso.ehStaff(membro) || (membro.permissions && membro.permissions.has(PermissionFlagsBits.ModerateMembers)));
+
+// Mensagem no canal: marca o membro, mostra o motivo e manda questionar no tópico logo abaixo
+async function anunciarNoCanal(canal, membro, motivo, regraTexto, total, lim) {
+  const linhas = [
+    `⚠️ <@${membro.id}>, você recebeu uma **advertência**.`,
+    '',
+    `**Motivo:** ${motivo}`,
+  ];
+  if (regraTexto) linhas.push(`**Regra:** ${regraTexto}`);
+  linhas.push(`**Advertências:** ${total}/${lim}`, '', 'Se você tiver algo a questionar, mande mensagem no **tópico abaixo**. 👇');
+  return canal.send({
+    content: linhas.join('\n').slice(0, 2000),
+    allowedMentions: { users: [membro.id] },
+  });
+}
+
+// Tópico logo abaixo da mensagem: só o membro e a staff escrevem (o resto é apagado pelo Atlas)
+async function criarTopico(msg, executor, membro) {
+  const nome = `Advertência • ${membro.user.username}`.slice(0, 100);
+  const motivo = `Advertência de ${membro.user.tag} por ${executor.tag}`.slice(0, 500);
+  let topico;
+  try {
+    topico = await msg.startThread({ name: nome, autoArchiveDuration: 10080, reason: motivo });
+  } catch (e) {
+    topico = await msg.startThread({ name: nome, reason: motivo });
+  }
+  db.set(`moderacao.topicos.${topico.id}`, { membro: membro.id, por: executor.id, em: Date.now() });
+  await topico.members.add(membro.id).catch(() => {});
+  await topico.members.add(executor.id).catch(() => {});
+  return topico;
+}
+
+// opcoes.canal: se vier, a advertência sai nesse canal (sem DM) e ganha um tópico
+async function darAviso(guild, executor, membro, motivo, numeroRegra, opcoes = {}) {
   const todas = regras();
   const regraTexto = numeroRegra && todas[numeroRegra - 1] ? `${numeroRegra}. ${todas[numeroRegra - 1]}` : null;
 
@@ -163,7 +204,20 @@ async function darAviso(guild, executor, membro, motivo, numeroRegra) {
     avisos: String(total),
     limite: String(lim),
   };
-  const dm = await enviarDM(membro.user, 'dmAviso', vars);
+  let dm = false;
+  let noCanal = null;
+  if (opcoes.canal) {
+    try {
+      noCanal = { msg: await anunciarNoCanal(opcoes.canal, membro, motivo, regraTexto, total, lim) };
+    } catch (e) {
+      // Não deu para postar no canal: avisa por DM para o membro não ficar sem saber
+      console.error('[Moderação] advertência no canal:', e.message);
+      noCanal = { erro: e.message };
+      dm = await enviarDM(membro.user, 'dmAviso', vars);
+    }
+  } else {
+    dm = await enviarDM(membro.user, 'dmAviso', vars);
+  }
 
   const extras = [{ name: 'Avisos', value: `${total}/${lim}`, inline: true }];
   if (regraTexto) extras.push({ name: 'Regra', value: regraTexto.slice(0, 1024), inline: true });
@@ -185,7 +239,16 @@ async function darAviso(guild, executor, membro, motivo, numeroRegra) {
       banido = await banir(guild, executor, membro.user, membro, motivoBan, 0);
     }
   }
-  return { total, limite: lim, dm, banido };
+  // Tópico só faz sentido se o membro continua no servidor
+  if (noCanal && noCanal.msg && !(banido && banido.ok)) {
+    try {
+      noCanal.topico = await criarTopico(noCanal.msg, executor, membro);
+    } catch (e) {
+      console.error('[Moderação] tópico da advertência:', e.message);
+      noCanal.erroTopico = e.message;
+    }
+  }
+  return { total, limite: lim, dm, banido, noCanal };
 }
 
 module.exports = {
@@ -204,4 +267,6 @@ module.exports = {
   expulsar,
   desbanir,
   darAviso,
+  canalAdvertencia,
+  ehStaffTopico,
 };
