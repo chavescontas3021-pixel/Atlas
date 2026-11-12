@@ -1,6 +1,7 @@
 // Arte do personagem em pixel art (dark fantasy): peças em camadas, cores à escolha e cena animada.
 // Tudo é desenhado por código, sem imagens: cada peça pinta uma grade de letras que depois vira GIF.
 const { montar } = require('../extras/pixelgif');
+const Eq = require('./equipamento');
 
 const CW = 24; // largura do personagem
 const CH = 36; // altura do personagem
@@ -68,6 +69,13 @@ function normalizar(app) {
   }
   a.botas.cor = dentro(app.botas && app.botas.cor, TECIDOS);
   if (app.especial && typeof app.especial === 'string') a.especial = app.especial;
+  // Equipamento e nível do RPG (só para desenhar; vêm de fora, não fazem parte do que a pessoa escolhe no editor)
+  a.mostrarEquip = app.mostrarEquip !== false;
+  if (app.equip && typeof app.equip === 'object') {
+    a.equip = { arma: Eq.ARMAS[app.equip.arma] ? app.equip.arma : null, armadura: Eq.ARMADURAS[app.equip.armadura] ? app.equip.armadura : null };
+  }
+  if (Number.isFinite(app.nivel)) a.nivel = Math.max(1, Math.min(999, Math.floor(app.nivel)));
+  if (typeof app.classe === 'string' && Eq.AURAS[app.classe]) a.classe = app.classe;
   return a;
 }
 
@@ -122,10 +130,11 @@ function coresDe(app) {
     o: '#e8e0d0', O: '#b3a78f', // osso
     f: '#ffd24a', F: '#ff7a1c', // chama
     '*': '#ffffff',
+    ...Eq.coresEquip(app), // cores da arma e da armadura que a pessoa usa
     ...(app.__cores || {}),
   };
   // Variantes automáticas: "@x" = contorno colorido ao lado da peça x; "^x" = borda iluminada pela lua
-  const SEM_BORDA = new Set(['k', '*', 'i', 'f', 'F', 'e']);
+  const SEM_BORDA = new Set(['k', '*', 'i', 'f', 'F', 'e', 'n', 'N', 'z', 'v']);
   const SEM_LUZ = new Set(['s', 'S']); // a pele não leva borda de luz (fica estranha)
   for (const L of Object.keys(m)) {
     if (SEM_BORDA.has(L)) continue;
@@ -203,7 +212,7 @@ function corpo(g, y0, compr, flare) {
   }
 }
 
-function tronco(g, estilo, dy) {
+function tronco(g, estilo, dy, pal = { pl: 'l', Pl: 'L' }) {
   const y0 = 13 + dy;
   const compr = estilo === 'casaco' ? 13 : estilo === 'tunica' ? 11 : 9;
   corpo(g, y0, compr, estilo !== 'armadura');
@@ -225,13 +234,13 @@ function tronco(g, estilo, dy) {
     ret(g, 7, y0 + compr - 1, 10, 1, 'T');
     ret(g, 8, y0 + 6, 8, 1, 'w'); pt(g, 11, y0 + 6, 'g'); pt(g, 12, y0 + 6, 'i'); // cinto
     if (estilo === 'armadura') {
-      ret(g, 8, y0 + 1, 8, 5, 'l'); ret(g, 8, y0 + 1, 8, 1, 'L'); ret(g, 11, y0 + 1, 2, 5, 'L');
-      pt(g, 14, y0 + 2, '*'); pt(g, 14, y0 + 3, '*'); pt(g, 9, y0 + 5, 'L');
-      ret(g, 4, y0 - 1, 4, 3, 'l'); ret(g, 16, y0 - 1, 4, 3, 'l'); // ombreiras
-      ret(g, 4, y0 + 1, 4, 1, 'L'); ret(g, 16, y0 + 1, 4, 1, 'L'); pt(g, 18, y0 - 1, '*'); pt(g, 19, y0, '*');
-      ret(g, 5, y0 + 4, 2, 2, 'L'); ret(g, 17, y0 + 4, 2, 2, 'L'); pt(g, 18, y0 + 4, 'l'); // braçadeiras
+      ret(g, 8, y0 + 1, 8, 5, pal.pl); ret(g, 8, y0 + 1, 8, 1, pal.Pl); ret(g, 11, y0 + 1, 2, 5, pal.Pl);
+      pt(g, 14, y0 + 2, '*'); pt(g, 14, y0 + 3, '*'); pt(g, 9, y0 + 5, pal.Pl);
+      ret(g, 4, y0 - 1, 4, 3, pal.pl); ret(g, 16, y0 - 1, 4, 3, pal.pl); // ombreiras
+      ret(g, 4, y0 + 1, 4, 1, pal.Pl); ret(g, 16, y0 + 1, 4, 1, pal.Pl); pt(g, 18, y0 - 1, '*'); pt(g, 19, y0, '*');
+      ret(g, 5, y0 + 4, 2, 2, pal.Pl); ret(g, 17, y0 + 4, 2, 2, pal.Pl); pt(g, 18, y0 + 4, pal.pl); // braçadeiras
       pt(g, 8, y0 + 6, 'g'); pt(g, 15, y0 + 6, 'g'); // rebites do cinto
-      ret(g, 8, y0 + 7, 3, 2, 'L'); ret(g, 13, y0 + 7, 3, 2, 'l'); // couraça da saia
+      ret(g, 8, y0 + 7, 3, 2, pal.Pl); ret(g, 13, y0 + 7, 3, 2, pal.pl); // couraça da saia
     } else {
       ret(g, 10, y0, 4, 1, 'T'); // gola em V
       pt(g, 11, y0, 'S'); pt(g, 12, y0, 'S');
@@ -310,7 +319,7 @@ function cabeca(g, estilo, dy) {
   }
 }
 
-function arma(g, estilo, dy, fl) {
+function armaCosmetica(g, estilo, dy, fl) {
   if (estilo === 'espada') {
     ret(g, 20, 4, 1, 15, 'l'); ret(g, 21, 5, 1, 14, 'L'); pt(g, 20, 3, 'l'); pt(g, 20, 2, '*'); pt(g, 20, 5, '*'); pt(g, 20, 6, '*'); pt(g, 20, 10, '*');
     ret(g, 18, 19 + dy, 5, 1, 'g'); pt(g, 18, 19 + dy, 'G'); pt(g, 22, 19 + dy, 'i');
@@ -336,7 +345,7 @@ function arma(g, estilo, dy, fl) {
   }
 }
 
-const BRILHANTES = new Set(['.', 'k', '*', 'i', 'f', 'F', 'e']);
+const BRILHANTES = new Set(['.', 'k', '*', 'i', 'f', 'F', 'e', 'n', 'N', 'z', 'v']);
 const SEM_LUZ = new Set(['s', 'S']);
 
 // Monta o personagem inteiro numa grade de letras.
@@ -347,11 +356,16 @@ function desenharPersonagem(app, f = {}) {
   capa(g, app.capa.estilo, dy, f.bal || 0);
   pernas(g, app.calca.estilo);
   botas(g);
-  tronco(g, app.roupa.estilo, dy);
+  // Equipamento do RPG: a armadura troca o corpo e a arma troca o que está na mão
+  const eq = Eq.ativo(app);
+  const arm = eq.armadura ? Eq.ARMADURAS[eq.armadura] : null;
+  tronco(g, arm ? arm.estilo : app.roupa.estilo, dy, arm ? { pl: 'm', Pl: 'M' } : undefined);
+  if (arm) arm.detalhe(g, dy, f);
   cabecaBase(g, dy, app.olhos, !!f.piscar);
   cabelo(g, app.cabelo.estilo, dy, f.bal || 0);
   cabeca(g, app.cabeca.estilo, dy);
-  arma(g, app.mao.estilo, dy, f.chama || 0);
+  if (eq.arma) Eq.ARMAS[eq.arma].desenhar(g, dy, f);
+  else armaCosmetica(g, app.mao.estilo, dy, f.chama || 0);
 
   const base = g.map((l) => l.slice());
   const cheio = (x, y) => y >= 0 && y < CH && x >= 0 && x < CW && base[y][x] !== '.';
@@ -469,27 +483,28 @@ function fundo(frame) {
 
 // Quadros da animação curta (usados também pelas batalhas)
 const QUADROS = [
-  { dy: 0, bal: 0, piscar: false, chama: 0 },
-  { dy: 1, bal: 1, piscar: false, chama: 1 },
-  { dy: 0, bal: 0, piscar: true, chama: 0 },
-  { dy: 1, bal: 1, piscar: false, chama: 1 },
+  { dy: 0, bal: 0, piscar: false, chama: 0, fase: 0 },
+  { dy: 1, bal: 1, piscar: false, chama: 1, fase: 1 },
+  { dy: 0, bal: 0, piscar: true, chama: 0, fase: 2 },
+  { dy: 1, bal: 1, piscar: false, chama: 1, fase: 3 },
 ];
 // Animação da cena: 8 quadros (respiração lenta, capa e cabelo ao vento, piscada)
 const QUADROS_CENA = [
-  { dy: 0, bal: 0, piscar: false, chama: 0 },
-  { dy: 0, bal: 1, piscar: false, chama: 1 },
-  { dy: 1, bal: 1, piscar: false, chama: 0 },
-  { dy: 1, bal: 2, piscar: false, chama: 1 },
-  { dy: 1, bal: 1, piscar: false, chama: 0 },
-  { dy: 0, bal: 1, piscar: false, chama: 1 },
-  { dy: 0, bal: 0, piscar: true, chama: 0 },
-  { dy: 0, bal: 0, piscar: false, chama: 1 },
+  { dy: 0, bal: 0, piscar: false, chama: 0, fase: 0 },
+  { dy: 0, bal: 1, piscar: false, chama: 1, fase: 1 },
+  { dy: 1, bal: 1, piscar: false, chama: 0, fase: 2 },
+  { dy: 1, bal: 2, piscar: false, chama: 1, fase: 3 },
+  { dy: 1, bal: 1, piscar: false, chama: 0, fase: 4 },
+  { dy: 0, bal: 1, piscar: false, chama: 1, fase: 5 },
+  { dy: 0, bal: 0, piscar: true, chama: 0, fase: 6 },
+  { dy: 0, bal: 0, piscar: false, chama: 1, fase: 7 },
 ];
 
 function gradeCena(app, i, extra) {
   const cores = coresDe(app);
   const q = QUADROS_CENA[i % QUADROS_CENA.length];
   const g = fundo(i);
+  Eq.aura(g, OX + 12, 18, app, i, { rx: 13, ry: 19 }); // aura do nível, atrás do personagem
   const p = (extra && extra.personagem) ? extra.personagem(app, q) : desenharPersonagem(app, q);
   for (let y = 0; y < p.length; y++) {
     for (let x = 0; x < p[0].length; x++) {
@@ -505,5 +520,8 @@ function gifDe(app, extra) {
   return montar(QUADROS_CENA.map((_, i) => gradeCena(a, i, extra)), { escala: ESCALA, atraso: 38 });
 }
 
-module.exports = { CW, CH, SW, SH, OX, CATALOGO, PARTES, PADRAO, PELES, OLHOS, CABELOS, TECIDOS, normalizar, aleatoria, coresDe, desenharPersonagem, gradeCena, gifDe, fundo, QUADROS, QUADROS_CENA, novo, ret, pt, carimbo, escuro, claro, tom };
+// Aura para outras cenas (a batalha desenha atrás do herói)
+const desenharAura = (g, cx, cy, app, f, o) => Eq.aura(g, cx, cy, normalizar(app), f, o);
+
+module.exports = { desenharAura, CW, CH, SW, SH, OX, CATALOGO, PARTES, PADRAO, PELES, OLHOS, CABELOS, TECIDOS, normalizar, aleatoria, coresDe, desenharPersonagem, gradeCena, gifDe, fundo, QUADROS, QUADROS_CENA, novo, ret, pt, carimbo, escuro, claro, tom };
 // fim do arquivo
