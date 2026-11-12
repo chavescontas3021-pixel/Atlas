@@ -83,8 +83,8 @@ async function chat(interaction, sub) {
     return responder(
       interaction,
       ehCategoria
-        ? `✅ Todos os chats da categoria ${alvo} serão bloqueados.`
-        : `✅ O chat ${alvo} será bloqueado.`
+        ? `✅ Todos os chats da categoria ${alvo} serão bloqueados e as calls serão esvaziadas.`
+        : `✅ ${alvo} será bloqueado (chat) ou esvaziado (call) à noite.`
     );
   }
   if (sub === 'remover') {
@@ -209,7 +209,7 @@ module.exports = {
                 .setName('canal')
                 .setDescription('Chat ou categoria')
                 .setRequired(true)
-                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildCategory)
+                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildStageVoice, ChannelType.GuildCategory)
             )
         )
         .addSubcommand((s) =>
@@ -221,7 +221,7 @@ module.exports = {
                 .setName('canal')
                 .setDescription('Chat ou categoria')
                 .setRequired(true)
-                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildCategory)
+                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildStageVoice, ChannelType.GuildCategory)
             )
         )
         .addSubcommand((s) => s.setName('listar').setDescription('Lista o que é bloqueado'))
@@ -345,9 +345,9 @@ module.exports = {
       db.set(`config.noturno.mensagens.${tipo}.banner`, url);
       return interaction.reply({
         content:
-          '✅ Banner salvo! Ele vai anexado como imagem na mensagem (a prévia está aí embaixo; se não aparecer, o link não é de uma imagem direta).\n' +
+          '✅ Banner salvo! Ele aparece como imagem logo abaixo do texto (a prévia está aí embaixo; se não aparecer, o link não é de uma imagem direta).\n' +
           '⚠️ Links de anexos do Discord expiram. Prefira hospedar em outro lugar (ex.: Imgur).',
-        files: [N.arquivoBanner(url)],
+        embeds: [N.embedBanner(url)],
         flags: EPH,
       });
     }
@@ -358,13 +358,14 @@ module.exports = {
         sub === 'fechar'
           ? await N.fechar(interaction.guild, 'Fechamento manual')
           : await N.abrir(interaction.guild, 'Abertura manual');
-      if (r.canais === 0) {
+      if (r.canais === 0 && !r.voz) {
         return interaction.editReply('ℹ️ Nenhum chat configurado. Use `/noturno chat adicionar`.');
       }
       return interaction.editReply(
         `${sub === 'fechar' ? '🔒 Fechado' : '🔓 Aberto'}: ${r.canais} chat(s), ${r.ok} permissões alteradas` +
-          (r.falhas ? `, **${r.falhas} falharam** (veja \`pm2 logs atlas\`).` : '.')
+          (r.falhas ? `, **${r.falhas} falharam** (veja \`pm2 logs atlas\`).` : '.') +
+          (sub === 'fechar' && r.voz ? `\n🔇 Calls: ${r.expulsos} pessoa(s) desconectada(s)` + (r.falhasVoz ? `, **${r.falhasVoz} falharam** (o Atlas precisa da permissão *Mover Membros*).` : '.') : '')
       );
     }
   },
-};                          
+};
