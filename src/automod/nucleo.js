@@ -131,6 +131,9 @@ function detectar(texto) {
   const bruto = String(texto || '');
   if (!bruto.trim()) return null;
 
+  const simbolo = (PAL.simbolos || []).find((e) => bruto.includes(e));
+  if (simbolo) return { categoria: 'símbolo de ódio', termo: simbolo, advertir: true };
+
   const dom = linkAdulto(bruto);
   if (dom) return { categoria: 'link de conteúdo adulto', termo: dom, advertir: true };
 
