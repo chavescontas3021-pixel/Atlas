@@ -58,11 +58,25 @@ module.exports = {
       }
 
       await interaction.deferReply({ flags: EPH });
-      const r = await N.darAviso(interaction.guild, interaction.user, membro, motivo, regra);
+      // No canal de divergências a advertência sai no próprio canal (sem DM) e ganha um tópico
+      const idCanal = N.canalAdvertencia();
+      const noCanalCerto = !!idCanal && interaction.channelId === idCanal;
+      const r = await N.darAviso(interaction.guild, interaction.user, membro, motivo, regra, {
+        canal: noCanalCerto ? interaction.channel : null,
+      });
 
-      let texto = `✅ Aviso dado a ${membro} (**${r.total}/${r.limite}**). DM: ${
-        r.dm ? 'enviada' : 'não foi possível (DM fechada)'
-      }.`;
+      let texto;
+      if (noCanalCerto && r.noCanal && r.noCanal.msg) {
+        texto = `✅ Advertência dada a ${membro} (**${r.total}/${r.limite}**), registrada no canal.`;
+        if (r.noCanal.topico) texto += ` Tópico: ${r.noCanal.topico}`;
+        else if (r.noCanal.erroTopico) texto += `\n⚠️ Não consegui criar o tópico: ${r.noCanal.erroTopico}.`;
+      } else if (noCanalCerto) {
+        texto = `⚠️ Advertência registrada (**${r.total}/${r.limite}**), mas não consegui postar no canal (${r.noCanal ? r.noCanal.erro : 'erro'}). DM: ${r.dm ? 'enviada' : 'não foi possível (DM fechada)'}.`;
+      } else {
+        texto = `✅ Aviso dado a ${membro} (**${r.total}/${r.limite}**). DM: ${
+          r.dm ? 'enviada' : 'não foi possível (DM fechada)'
+        }.`;
+      }
       if (r.banido) {
         texto += r.banido.ok
           ? '\n🔨 Limite de avisos atingido: o membro foi **banido automaticamente**.'
