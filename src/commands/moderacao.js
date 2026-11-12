@@ -35,6 +35,18 @@ module.exports = {
     )
     .addSubcommand((s) =>
       s
+        .setName('canaladvertencia')
+        .setDescription('Canal de divergências: advertências dadas lá saem no canal, com tópico (vazio = desligar)')
+        .addChannelOption((o) =>
+          o
+            .setName('canal')
+            .setDescription('O canal de divergências')
+            .setRequired(false)
+            .addChannelTypes(ChannelType.GuildText)
+        )
+    )
+    .addSubcommand((s) =>
+      s
         .setName('limite')
         .setDescription('Quantos avisos levam ao banimento (padrão: 3)')
         .addIntegerOption((o) =>
@@ -69,6 +81,7 @@ module.exports = {
         .setTitle('🛡️ Moderação do Atlas')
         .addFields(
           { name: 'Canal de log', value: log ? `<#${log}>` : 'não definido' },
+          { name: 'Canal de advertências (divergências)', value: N.canalAdvertencia() ? `<#${N.canalAdvertencia()}>` : 'não definido' },
           { name: 'Limite de avisos', value: `${N.limite()} (ao atingir, banimento automático)` },
           { name: 'Regras cadastradas', value: String(N.regras().length) }
         );
@@ -79,6 +92,20 @@ module.exports = {
       const canal = interaction.options.getChannel('canal');
       db.set('config.moderacao.canalLog', canal.id);
       return responder(interaction, `✅ Canal de log: ${canal}`);
+    }
+
+    if (sub === 'canaladvertencia') {
+      const canal = interaction.options.getChannel('canal');
+      if (!canal) {
+        db.remover('config.moderacao.canalAdvertencia');
+        return responder(interaction, '🗑️ Sistema de advertência por canal desligado (voltam as DMs normais).');
+      }
+      db.set('config.moderacao.canalAdvertencia', canal.id);
+      return responder(
+        interaction,
+        `✅ Advertências dadas em ${canal} saem no canal, marcando o membro, e ganham um tópico.\n` +
+          'Em outros canais o `/aviso dar` continua mandando DM.'
+      );
     }
 
     if (sub === 'limite') {
