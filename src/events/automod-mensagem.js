@@ -78,7 +78,13 @@ module.exports = {
 
       let texto;
       if (advertir) {
-        const r = await N.darAviso(msg.guild, client.user, membro, `Automod: ${achou.categoria}`, null);
+        // Com o canal de divergências configurado, a advertência sai lá (sem DM) e ganha um tópico
+        const idDiv = N.canalAdvertencia();
+        const canalDiv = idDiv ? msg.guild.channels.cache.get(idDiv) : null;
+        const r = await N.darAviso(msg.guild, client.user, membro, `Automod: ${achou.categoria}`, null, {
+          canal: canalDiv && canalDiv.isTextBased() ? canalDiv : null,
+        });
+        const verCanal = r.noCanal && r.noCanal.msg && canalDiv ? `\n📋 Os detalhes e o tópico para questionar estão em ${canalDiv}.` : '';
         if (r.banido && r.banido.ok) {
           await B.observarEAvisar(msg.guild, membro.id, 'Banido pelo automod (se voltar ao servidor, o Atlas avisa)', 30);
         } else if (r.total >= 2) {
@@ -87,13 +93,13 @@ module.exports = {
         if (r.total >= r.limite) {
           texto = r.banido && r.banido.ok
             ? `🔨 ${membro}, sua mensagem foi bloqueada e você chegou a **${r.total}/${r.limite}** advertências: foi **banido(a)**.`
-            : `🚫 ${membro}, sua mensagem foi bloqueada e você chegou ao limite de advertências (**${r.total}/${r.limite}**). A staff foi avisada.`;
+            : `🚫 ${membro}, sua mensagem foi bloqueada e você chegou ao limite de advertências (**${r.total}/${r.limite}**). A staff foi avisada.${verCanal}`;
         } else {
           const faltam = r.limite - r.total;
           texto =
             `🚫 ${membro}, sua mensagem foi bloqueada por conter conteúdo proibido (**${achou.categoria}**).\n` +
             `⚠️ Você recebeu uma **advertência** (**${r.total}/${r.limite}**). ` +
-            `Com mais **${faltam}** advertência${faltam > 1 ? 's' : ''}, você será **banido(a)**.`;
+            `Com mais **${faltam}** advertência${faltam > 1 ? 's' : ''}, você será **banido(a)**.${verCanal}`;
         }
       } else {
         texto =
