@@ -5,7 +5,7 @@ const Rep = require('../recepcao/rep');
 
 // ===== MUDE AQUI =====
 // Com os cargos de rep configurados, o Atlas espera o membro escolher os cargos no onboarding.
-// Se passar esse tempo e nada decidir, ele começa a recepção normal (menos para quem é só rep).
+// Se passar esse tempo, ele confere de novo: só abre a recepção para quem tem o cargo "sem vaga".
 const ESPERA_MINUTOS = 15;
 // =====================
 
@@ -19,8 +19,8 @@ module.exports = {
       db.remover(`recepcao.reps.${member.id}`);
       db.remover(`recepcao.dispensados.${member.id}`);
 
-      // Sem cargos de rep configurados: funciona como antes
-      if (!Rep.repConfigurado()) {
+      // Sem cargo "sem vaga" e sem cargos de rep configurados: funciona como antes (abre para todos)
+      if (!Rep.cargoId('semVaga') && !Rep.repConfigurado()) {
         await F.iniciarRecepcao(member);
         return;
       }
