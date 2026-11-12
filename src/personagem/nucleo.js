@@ -4,6 +4,7 @@ const {
 } = require('discord.js');
 const db = require('../db');
 const A = require('./arte');
+const Eq = require('./equipamento');
 const { ESPECIAIS } = require('./especiais');
 
 const COR = 0x6d3aa6;
@@ -13,7 +14,7 @@ const caminho = (uid) => `personagem.aparencia.${uid}`;
 const obter = (uid) => db.get(caminho(uid), null);
 const tem = (uid) => !!obter(uid);
 const aparencia = (uid) => A.normalizar(obter(uid));
-const salvar = (uid, app) => db.set(caminho(uid), A.normalizar(app));
+const salvar = (uid, app) => db.set(caminho(uid), A.normalizar(Eq.limpar(app))); // equipamento e nível não são salvos aqui
 
 // Personagens especiais (ex.: o Rei de Pele Branca): a staff libera para alguém, a pessoa liga e desliga no editor
 const caminhoDesb = (uid) => `personagem.desbloqueios.${uid}`;
@@ -40,11 +41,24 @@ function gif(app) {
 }
 
 const anexo = (app) => new AttachmentBuilder(gif(app), { name: ARQUIVO });
-const visual = (uid) => { const a = aparencia(uid); if (a.especial && !desbloqueios(uid).includes(a.especial)) a.especial = ''; return a; };
+// O visual para desenhar: a aparência escolhida + o equipamento e o nível que a pessoa tem no RPG
+const visual = (uid) => { const a = aparencia(uid); if (a.especial && !desbloqueios(uid).includes(a.especial)) a.especial = ''; return Eq.enriquecer(uid, a); };
 const arquivos = (uid) => (tem(uid) ? [anexo(visual(uid))] : []);
 function comImagem(embed, uid) {
   if (tem(uid)) embed.setImage(`attachment://${ARQUIVO}`);
   return embed;
+}
+
+// Linha sobre o equipamento e a aura que aparecem no desenho
+const NOMES_AURA = ['', 'Brilho', 'Faíscas', 'Chamas', 'Lendária'];
+function equipamentoTexto(app) {
+  if (app.mostrarEquip === false) return '🙈 Equipamento e aura ocultos (aparece o visual montado).';
+  const eq = Eq.ativo(app);
+  const aura = Eq.nivelAura(app);
+  const partes = [];
+  if (eq.arma || eq.armadura) partes.push(`🎒 Em uso: **${eq.arma ? Eq.ARMAS[eq.arma].nome : '—'}** · **${eq.armadura ? Eq.ARMADURAS[eq.armadura].nome : '—'}** (substituem a roupa e a mão do visual)`);
+  if (aura) partes.push(`✨ Aura **${NOMES_AURA[aura]}** do nível ${app.nivel}`);
+  return partes.join('\n');
 }
 
 // Resumo em texto do visual atual
@@ -59,7 +73,8 @@ function resumo(app) {
     `👖 Calça: **${nomeEstilo('calca')}** (${A.TECIDOS[app.calca.cor].nome}) · 🥾 Botas: **${A.TECIDOS[app.botas.cor].nome}**`,
     `🦇 Capa: **${nomeEstilo('capa')}**${app.capa.estilo === 'nenhuma' ? '' : ` (${A.TECIDOS[app.capa.cor].nome})`}`,
     `👑 Cabeça: **${nomeEstilo('cabeca')}** · ⚔️ Mão: **${nomeEstilo('mao')}**`,
-  ].join('\n');
+    equipamentoTexto(app),
+  ].filter(Boolean).join('\n');
 }
 
 // Valor atual (índice de cor) de uma parte
@@ -100,6 +115,7 @@ function painel(uid, parte = 'cabelo', aviso) {
   const botoes = [
     new ButtonBuilder().setCustomId(`pers:rand:${uid}:${parte}`).setLabel('Aleatório').setEmoji('🎲').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`pers:reset:${uid}:${parte}`).setLabel('Padrão').setEmoji('↩️').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`pers:equip:${uid}:${parte}`).setLabel(app.mostrarEquip === false ? 'Mostrar equipamento' : 'Ocultar equipamento').setEmoji('⚔️').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`pers:fim:${uid}`).setLabel('Pronto').setEmoji('✅').setStyle(ButtonStyle.Success),
   ];
   linhas.push(new ActionRowBuilder().addComponents(...botoes));
