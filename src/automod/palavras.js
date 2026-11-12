@@ -108,3 +108,10 @@ module.exports = {
   emojis: ['🔞'],
   emojiCombos: [['🍆', '💦'], ['🍆', '🍑'], ['🍑', '💦'], ['🍆', '👅'], ['🍑', '👅'], ['👉', '👌']],
 };
+
+// Lista ampliada (ódio, extremismo, ameaças, golpes, autolesão...): veja palavras-extra.js
+const EXTRA = require('./palavras-extra');
+for (const [categoria, termos] of Object.entries(EXTRA.graves)) {
+  module.exports.graves[categoria] = [...(module.exports.graves[categoria] || []), ...termos];
+}
+module.exports.simbolos = EXTRA.simbolos || [];
