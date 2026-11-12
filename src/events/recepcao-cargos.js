@@ -10,7 +10,7 @@ module.exports = {
   async execute(client, antes, depois) {
     try {
       if (!depois || depois.user.bot || antes.partial) return;
-      if (!Rep.repConfigurado()) return;
+      if (!Rep.repConfigurado() && !Rep.cargoId('semVaga')) return;
 
       // 1) Pegou o cargo "sem vaga" (quer vaga): passa pela recepção
       const semVaga = Rep.cargoId('semVaga');
