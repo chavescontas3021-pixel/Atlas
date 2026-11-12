@@ -218,6 +218,14 @@ function quadro(cfg, o) {
     if (est.dissolve) spr = dissolver(spr, est.dissolve);
     est.sprite = spr;
   }
+  // Aura do nível, atrás de cada herói
+  for (const l of ['e', 'd']) {
+    const ator = cfg[l === 'e' ? 'esq' : 'dir'];
+    if (ator.tipo === 'heroi' && ator.app) {
+      const sp = sprs[l];
+      A.desenharAura(g, CX[l] + o.est[l].dx, CHAO - sp.length / 2 + 1, ator.app, o.t, { rx: sp[0].length * 0.62, ry: sp.length * 0.62 });
+    }
+  }
   const info = {};
   for (const l of ['e', 'd']) {
     const est = o.est[l];
