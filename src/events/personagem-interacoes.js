@@ -40,12 +40,17 @@ module.exports = {
           P.salvar(uid, app);
           return await interaction.update(P.painel(uid, 'cabelo', app.especial ? `${P.ESPECIAIS[parte].emoji} Personagem único ligado!` : 'Voltou ao visual montado.'));
         }
+        if (acao === 'equip') {
+          app.mostrarEquip = app.mostrarEquip === false; // liga/desliga o equipamento e a aura no desenho
+          P.salvar(uid, app);
+          return await interaction.update(P.painel(uid, parte && A.CATALOGO[parte] ? parte : 'cabelo', app.mostrarEquip ? '⚔️ Equipamento e aura aparecendo no desenho.' : '🙈 Equipamento e aura ocultos.'));
+        }
         if (acao === 'rand') {
-          P.salvar(uid, { ...A.aleatoria(), especial: app.especial });
+          P.salvar(uid, { ...A.aleatoria(), especial: app.especial, mostrarEquip: app.mostrarEquip });
           return await interaction.update(P.painel(uid, parte && A.CATALOGO[parte] ? parte : 'cabelo', '🎲 Visual sorteado! Ajuste o que quiser.'));
         }
         if (acao === 'reset') {
-          P.salvar(uid, { ...A.PADRAO, especial: '' });
+          P.salvar(uid, { ...A.PADRAO, especial: '', mostrarEquip: app.mostrarEquip });
           return await interaction.update(P.painel(uid, parte && A.CATALOGO[parte] ? parte : 'cabelo', '↩️ Voltou ao visual padrão.'));
         }
         if (acao === 'fim') {
