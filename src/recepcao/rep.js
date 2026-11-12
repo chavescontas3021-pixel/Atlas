@@ -31,6 +31,8 @@ async function talvezIniciar(membro) {
   if (db.get(`recepcao.reps.${membro.id}`)) return false; // disse na recepção que é apenas representante
   if (db.get(`recepcao.dispensados.${membro.id}`)) return false; // a staff encerrou/apagou a recepção dele
   if (soRep(membro)) return false;
+  // Só abre para quem pegou o cargo "sem vaga" no onboarding (se o cargo estiver configurado)
+  if (cargoId('semVaga') && !temCargo(membro, 'semVaga')) return false;
   if (iniciando.has(membro.id)) return false;
   iniciando.add(membro.id);
   try {
