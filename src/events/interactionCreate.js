@@ -1,4 +1,4 @@
-const { MessageFlags } = require('discord.js');
+const UI = require('../ui/componentes');
 
 module.exports = {
   name: 'interactionCreate',
@@ -12,10 +12,7 @@ module.exports = {
       await comando.execute(interaction, client);
     } catch (erro) {
       console.error(`[ERRO no comando ${interaction.commandName}]`, erro);
-      const msg = {
-        content: 'Ops, deu erro ao executar esse comando.',
-        flags: MessageFlags.Ephemeral,
-      };
+      const msg = UI.erro('Algo deu errado ao executar esse comando. Tente de novo em instantes.');
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(msg).catch(() => {});
       } else {
