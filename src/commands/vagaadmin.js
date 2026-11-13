@@ -32,6 +32,8 @@ module.exports = {
       .addRoleOption((o) => o.setName('cargo').setDescription('Deixe vazio para desligar')))
     .addSubcommand((s) => s.setName('limite').setDescription('Quantas vagas cada pessoa pode ocupar')
       .addIntegerOption((o) => o.setName('quantidade').setDescription('1 a 10').setRequired(true).setMinValue(1).setMaxValue(10)))
+    .addSubcommand((s) => s.setName('auditoria').setDescription('Procura personagens cadastrados em duplicidade')
+      .addBooleanOption((o) => o.setName('corrigir').setDescription('Arruma o que for seguro (padrão: só mostrar)')))
     .addSubcommand((s) => s.setName('mensagem').setDescription('Edita o texto do painel')),
 
   async execute(interaction) {
@@ -50,10 +52,33 @@ module.exports = {
       return interaction.reply({ embeds: [embed], flags: EPH });
     }
 
+    if (sub === 'auditoria') {
+      const corrigir = !!interaction.options.getBoolean('corrigir');
+      await interaction.deferReply({ flags: EPH });
+      const rel = N.auditar({ corrigir });
+      if (corrigir && rel.removidas.length) await N.atualizarPainel(guild);
+      const nome = (v) => `**${v.nome}**${v.grupo ? ` (${v.grupo})` : ''}`;
+      const linhas = [];
+      if (!rel.grupos) linhas.push('✅ Nenhum personagem duplicado.');
+      if (rel.removidas.length) {
+        linhas.push(`${corrigir ? '🧹 Removidas' : '🔎 Seriam removidas'} (${rel.removidas.length}) por serem cópias:`);
+        for (const r of rel.removidas.slice(0, 15)) linhas.push(`• ${nome(r.removida)} #${r.removida.id} → fica #${r.manter.id}${r.manter.ocupanteId ? ` (<@${r.manter.ocupanteId}>)` : ''}`);
+        if (rel.removidas.length > 15) linhas.push(`… e mais ${rel.removidas.length - 15}.`);
+      }
+      if (rel.conflitos.length) {
+        linhas.push(`⚠️ **Conflitos** (pessoas diferentes no mesmo personagem; decida e use \`/vagaadmin liberar\`):`);
+        for (const c of rel.conflitos.slice(0, 10)) linhas.push(`• ${nome(c[0])}: ${c.map((v) => `<@${v.ocupanteId}> (#${v.id})`).join(' e ')}`);
+      }
+      if (!corrigir && rel.removidas.length) linhas.push('\nRode de novo com `corrigir: True` para aplicar.');
+      return interaction.editReply({ content: linhas.join('\n').slice(0, 1900), allowedMentions: { parse: [] } });
+    }
+
     if (sub === 'criar') {
       const nome = interaction.options.getString('nome').trim();
-      if (N.acharVaga(nome)) return responder(interaction, '❌ Já existe uma vaga com esse nome.');
-      const v = { id: N.proximoId(), nome, grupo: (interaction.options.getString('grupo') || '').trim(), ocupanteId: null, desde: null };
+      const grupo = (interaction.options.getString('grupo') || '').trim();
+      const existente = N.acharTodos({ ext: N.chaveManual(nome, grupo), nome, grupo })[0];
+      if (existente) return responder(interaction, `❌ Esse personagem já está cadastrado (id ${existente.id}${existente.ocupanteId ? `, ocupado por <@${existente.ocupanteId}>` : ''}).`);
+      const v = { id: N.proximoId(), nome, grupo, ext: N.chaveManual(nome, grupo), ocupanteId: null, desde: null };
       N.salvar(v);
       await N.atualizarPainel(guild);
       return responder(interaction, `✅ Vaga **${v.nome}** criada (id ${v.id}).`);
@@ -118,7 +143,8 @@ module.exports = {
     if (sub === 'ocupar') {
       const membro = interaction.options.getUser('membro');
       if (vaga.ocupanteId) return interaction.editReply('❌ Essa vaga já está ocupada. Libere antes.');
-      await N.ocupar(guild, vaga, membro.id);
+      const r = await N.ocupar(guild, vaga, membro.id);
+      if (!r.ok) return interaction.editReply(`❌ **${r.vaga.nome}** já está ocupado por <@${r.por}> (vaga ${r.vaga.id}). Libere essa antes ou rode \`/vagaadmin auditoria\`.`);
       return interaction.editReply(`✅ ${membro} agora ocupa a vaga **${vaga.nome}**.`);
     }
 
