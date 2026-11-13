@@ -1,8 +1,10 @@
-const { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 const N = require('../moderacao/nucleo');
+const UI = require('../ui/componentes');
+const { S } = require('../ui/tema');
 
-const EPH = MessageFlags.Ephemeral;
 const SEM_PING = { parse: [] };
+const APAGAR = { 0: 'não apagar', 3600: 'última hora', 86400: 'último dia', 604800: 'últimos 7 dias' };
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -32,20 +34,41 @@ module.exports = {
 
     if (membro) {
       const erro = N.checarHierarquia(interaction.member, membro);
-      if (erro) return interaction.reply({ content: `❌ ${erro}`, flags: EPH });
-      if (!membro.bannable) {
-        return interaction.reply({ content: '❌ Não consigo banir: o cargo dele está acima do meu.', flags: EPH });
-      }
+      if (erro) return interaction.reply(UI.erro(erro));
+      if (!membro.bannable) return interaction.reply(UI.erro('Não consigo banir: o cargo dele está acima do meu.'));
     } else if (user.id === interaction.user.id) {
-      return interaction.reply({ content: '❌ Você não pode fazer isso consigo mesmo.', flags: EPH });
+      return interaction.reply(UI.erro('Você não pode fazer isso consigo mesmo.'));
     }
 
-    await interaction.deferReply({ flags: EPH });
+    const confirmou = await UI.confirmar(interaction, {
+      perigo: true,
+      sim: 'Banir',
+      painel: UI.painel({
+        trilha: ['Moderação', 'Banimento'],
+        titulo: `Banir ${user.username}?`,
+        descricao: `${user}${membro ? '' : `  ${S.sep}  não está no servidor`}`,
+        campos: [
+          { nome: 'Motivo', valor: motivo },
+          { nome: 'Apagar mensagens', valor: APAGAR[apagar] || 'não apagar', lado: true },
+        ],
+        rodape: 'A pessoa recebe uma DM com o motivo',
+        perigo: true,
+      }),
+    });
+    if (!confirmou) return;
+
     const r = await N.banir(interaction.guild, interaction.user, user, membro, motivo, apagar);
-    if (!r.ok) return interaction.editReply(`❌ Não consegui banir: ${r.erro}`);
+    if (!r.ok) return interaction.editReply(UI.edicao(UI.erro(`Não consegui banir: ${r.erro}`)));
 
     return interaction.editReply({
-      content: `🔨 ${user} foi banido(a).${membro ? ` DM: ${r.dm ? 'enviada' : 'não foi possível'}.` : ''}`,
+      embeds: [UI.painel({
+        trilha: ['Moderação', 'Banimento'],
+        titulo: `${user.username} foi banido(a)`,
+        descricao: membro ? `DM ${S.sep} ${r.dm ? 'enviada' : 'não foi possível enviar'}` : undefined,
+        campos: [{ nome: 'Motivo', valor: motivo }],
+        perigo: true,
+      })],
+      components: [],
       allowedMentions: SEM_PING,
     });
   },
