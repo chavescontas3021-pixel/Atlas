@@ -1,7 +1,6 @@
-const { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 const N = require('../moderacao/nucleo');
-
-const EPH = MessageFlags.Ephemeral;
+const UI = require('../ui/componentes');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -16,13 +15,17 @@ module.exports = {
     const id = interaction.options.getString('id').trim();
     const motivo = interaction.options.getString('motivo') || 'Sem motivo informado';
 
-    if (!/^\d{15,22}$/.test(id)) {
-      return interaction.reply({ content: '❌ O ID precisa ser só números.', flags: EPH });
-    }
+    if (!/^\d{15,22}$/.test(id)) return interaction.reply(UI.erro('O ID precisa ter só números.'));
 
-    await interaction.deferReply({ flags: EPH });
+    await interaction.deferReply({ flags: UI.EPH });
     const r = await N.desbanir(interaction.guild, interaction.user, id, motivo);
-    if (!r.ok) return interaction.editReply('❌ Não consegui desbanir. Confira se esse ID está mesmo banido.');
-    return interaction.editReply(`✅ **${r.user.username}** foi desbanido(a).`);
+    if (!r.ok) return interaction.editReply(UI.edicao(UI.erro('Não consegui desbanir. Confira se esse ID está mesmo banido.')));
+    return interaction.editReply({
+      embeds: [UI.painel({
+        trilha: ['Moderação', 'Desbanimento'],
+        titulo: `${r.user.username} foi desbanido(a)`,
+        campos: [{ nome: 'Motivo', valor: motivo }],
+      })],
+    });
   },
 };
