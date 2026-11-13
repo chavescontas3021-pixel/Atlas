@@ -2,6 +2,7 @@
 // (Versão em arquivo único: já inclui a correção da vaga ocupada contada como livre.)
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const db = require('../db');
+const P = require('./personagens');
 
 // ===== util =====
 // Utilidades do sistema de vagas: cor, textos padrão, configuração e normalização de texto.
@@ -242,6 +243,60 @@ function buscar(texto) {
   return achados.sort((a, b) => Number(a.livre) - Number(b.livre)).slice(0, 10);
 }
 
+// ---------- Organização em massa ----------
+const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
+const semObra = () => todas().filter((v) => !v.grupo);
+
+// Procura no AniList a obra das vagas que estão sem obra. Só aceita quando o nome bate inteiro e
+// existe um único personagem com ele; o resto vai para a lista manual. aplicar=false só mostra.
+async function organizarAuto({ aplicar = false, max = 120 } = {}) {
+  const pendentes = semObra();
+  const rel = { total: pendentes.length, lidas: 0, certas: [], ambiguas: [], sem: [] };
+  for (const v of pendentes.slice(0, max)) {
+    rel.lidas++;
+    const base = nomeBase(v.nome);
+    const achados = await P.buscar(v.nome, 4000);
+    const exatos = achados.filter((c) => nomeBase(c.nome) === base);
+    if (exatos.length === 1) {
+      const c = exatos[0];
+      rel.certas.push({ vaga: v, obra: c.obra });
+      if (aplicar) {
+        const repetido = todas().some((o) => o.id !== v.id && o.ext === c.chave);
+        v.grupo = c.obra;
+        if (!v.foto && c.foto) v.foto = c.foto;
+        if (!repetido && (!v.ext || !v.ext.startsWith('al:'))) v.ext = c.chave;
+        salvar(v);
+      }
+    } else if (exatos.length > 1) {
+      rel.ambiguas.push({ vaga: v, obras: [...new Set(exatos.map((c) => c.obra))].slice(0, 3) });
+    } else {
+      rel.sem.push(v);
+    }
+    await dorme(650); // respeita o limite do AniList
+  }
+  return rel;
+}
+
+// Texto "Nome = Obra" (uma por linha) -> preenche a obra das vagas com esse nome
+function definirObras(texto) {
+  const rel = { feitas: 0, naoAchadas: [], invalidas: 0 };
+  for (const linha of String(texto || '').split(/\r?\n/)) {
+    const t = linha.trim();
+    if (!t || /[=|;]\s*$/.test(t)) continue; // linha ainda sem obra: ignora
+    const m = /^(.+?)\s*[=|;]\s*(.+)$/.exec(t);
+    if (!m) { rel.invalidas++; continue; }
+    const obra = m[2].trim().slice(0, 40);
+    const achadas = todas().filter((v) => nomeBase(v.nome) === nomeBase(m[1]));
+    if (!achadas.length) { rel.naoAchadas.push(m[1].trim().slice(0, 30)); continue; }
+    for (const v of (achadas.filter((x) => !x.grupo).length ? achadas.filter((x) => !x.grupo) : achadas)) {
+      v.grupo = obra;
+      salvar(v);
+      rel.feitas++;
+    }
+  }
+  return rel;
+}
+
 // ===== ocupacao =====
 // Ocupar e liberar vagas (e o cargo de ocupante).
 
@@ -287,13 +342,20 @@ async function liberar(guild, vaga) {
 async function registrarDaRecepcao(guild, userId, personagem) {
   const nome = String(personagem || '').trim();
   if (!nome) return { pulou: 'sem nome' };
-  const iguais = acharTodos({ ext: chaveManual(nome, ''), nome, grupo: '' });
-  if (iguais.some((v) => v.ocupanteId === userId)) return { pulou: 'ja-registrado' };
-  const ocupada = iguais.find((v) => v.ocupanteId);
+  // Obra que o membro informou na recepção (só vale se for o mesmo personagem da sessão)
+  const sessao = db.get(`recepcao.sessoes.${userId}`);
+  const obra = sessao && sessao.obra && nomeBase(sessao.personagem) === nomeBase(nome) ? String(sessao.obra).trim().slice(0, 40) : '';
+  // Nome já ocupado bloqueia mesmo que a obra digitada seja outra (erro de digitação não pode burlar a vaga)
+  const mesmoNome = todas().filter((v) => nomeBase(v.nome) === nomeBase(nome));
+  if (mesmoNome.some((v) => v.ocupanteId === userId)) return { pulou: 'ja-registrado' };
+  const ocupada = mesmoNome.find((v) => v.ocupanteId);
   if (ocupada) return { pulou: 'ocupado', vaga: ocupada };
-  let vaga = iguais[0];
+  let vaga = acharTodos({ ext: chaveManual(nome, obra), nome, grupo: obra })[0];
   if (!vaga) {
-    vaga = { id: proximoId(), nome, grupo: '', ext: chaveManual(nome, ''), auto: true, ocupanteId: null, desde: null };
+    vaga = { id: proximoId(), nome, grupo: obra, ext: chaveManual(nome, obra), auto: true, ocupanteId: null, desde: null };
+    salvar(vaga);
+  } else if (obra && !vaga.grupo) {
+    vaga.grupo = obra;
     salvar(vaga);
   }
   const r = await ocupar(guild, vaga, userId);
@@ -405,7 +467,7 @@ module.exports = {
   PADROES, cfg, mensagem, limite, norm,
   todas, obter, salvar, apagar, doUsuario, livres, proximoId,
   pedidos, pedido, proximoPedido, acharVaga,
-  chaveManual, nomeBase, acharPorChave, acharTodos, mesmoPersonagem, estaLivre, buscar, resumo,
+  chaveManual, nomeBase, acharPorChave, acharTodos, mesmoPersonagem, estaLivre, buscar, resumo, semObra, organizarAuto, definirObras,
   infoPedido, pedidoPendente, registrarDaRecepcao,
   ocupar, liberar, embedPainel, embedsPainel, atualizarPainel, botoesPedido, embedPedido, auditar,
 };
