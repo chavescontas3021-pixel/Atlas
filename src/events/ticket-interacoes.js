@@ -1,8 +1,8 @@
-const { MessageFlags, PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits } = require('discord.js');
+const UI = require('../ui/componentes');
 const db = require('../db');
 const F = require('../ticket/fluxo');
 
-const EPH = MessageFlags.Ephemeral;
 
 module.exports = {
   name: 'interactionCreate',
@@ -19,17 +19,22 @@ module.exports = {
         return;
       }
 
+      // Menu de categorias do painel público
+      if (interaction.isStringSelectMenu() && acao === 'novo') {
+        return await F.abrirModal(interaction, interaction.values[0]);
+      }
+
       if (interaction.isModalSubmit()) {
         if (acao === 'modal') return await F.criarTicket(interaction, arg);
         if (acao === 'modalfechar') return await F.receberFechar(interaction);
 
         if (acao === 'pmodal') {
           if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
-            return await interaction.reply({ content: 'Você não tem permissão para isso.', flags: EPH });
+            return await interaction.reply(UI.erro('Você não tem permissão para isso.'));
           }
           const N = require('../ticket/nucleo');
           if (!N.acharPainel(arg) || !['painel', 'abertura'].includes(arg2)) {
-            return await interaction.reply({ content: 'Esse painel não existe mais.', flags: EPH });
+            return await interaction.reply(UI.erro('Esse painel não existe mais.'));
           }
           const titulo = interaction.fields.getTextInputValue('titulo');
           const texto = interaction.fields.getTextInputValue('texto');
@@ -38,12 +43,12 @@ module.exports = {
             arg2 === 'painel'
               ? 'Poste o painel de novo com `/ticketpainel postar`.'
               : 'Vale para os próximos tickets desse painel. Dá para usar {usuario}, {numero}, {categoria} e {emoji}.';
-          return await interaction.reply({ content: `✅ Mensagem salva! ${dica}`, flags: EPH });
+          return await interaction.reply(UI.ok(`Mensagem salva. ${dica}`));
         }
 
         if (acao === 'cfgmodal') {
           if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
-            return await interaction.reply({ content: 'Você não tem permissão para isso.', flags: EPH });
+            return await interaction.reply(UI.erro('Você não tem permissão para isso.'));
           }
           if (!['painel', 'abertura'].includes(arg)) return;
           const titulo = interaction.fields.getTextInputValue('titulo');
@@ -53,12 +58,12 @@ module.exports = {
             arg === 'painel'
               ? 'Poste o painel de novo com `/ticketconfig painel` para ele aparecer.'
               : 'No texto dá para usar {usuario}, {numero}, {categoria} e {emoji}. Vale para os próximos tickets.';
-          return await interaction.reply({ content: `✅ Mensagem salva! ${dica}`, flags: EPH });
+          return await interaction.reply(UI.ok(`Mensagem salva. ${dica}`));
         }
       }
     } catch (erro) {
       console.error('[Ticket] erro na interação:', erro);
-      const msg = { content: 'Ops, deu erro nessa etapa. Chame a staff.', flags: EPH };
+      const msg = UI.erro('Algo deu errado nessa etapa. Chame a staff.');
       if (interaction.replied || interaction.deferred) await interaction.followUp(msg).catch(() => {});
       else await interaction.reply(msg).catch(() => {});
     }
