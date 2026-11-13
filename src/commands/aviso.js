@@ -1,10 +1,34 @@
-const { EmbedBuilder, MessageFlags, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 const N = require('../moderacao/nucleo');
+const UI = require('../ui/componentes');
+const { S, barra, corta, quando } = require('../ui/tema');
 
-const EPH = MessageFlags.Ephemeral;
 const SEM_PING = { parse: [] };
-const responder = (interaction, content) =>
-  interaction.reply({ content, flags: EPH, allowedMentions: SEM_PING });
+
+// Painel com a lista de avisos + menu para remover um deles
+function telaAvisos(user, lista) {
+  const linhas = lista.map((a, i) => {
+    let l = `**${i + 1}**  ${S.sep}  ${quando(a.data, 'd')}  ${S.sep}  por <@${a.por}>\n${S.filho} ${a.motivo}`;
+    if (a.regra) l += `\n${S.filho} regra ${a.regra}`;
+    return l;
+  });
+  const embed = UI.painel({
+    trilha: ['Moderação', 'Avisos'],
+    titulo: user.username,
+    descricao: linhas.length ? linhas.join('\n\n').slice(0, 3800) : 'Nenhum aviso.',
+    rodape: `${lista.length}/${N.limite()}  ${barra(lista.length / N.limite(), N.limite())}`,
+  });
+  const componentes = lista.length
+    ? [UI.menu({
+      id: `aviso:rem:${user.id}`,
+      placeholder: 'Remover um aviso',
+      opcoes: lista.slice(0, 25).map((a, i) => ({
+        valor: String(i), nome: `Aviso ${i + 1}`, desc: corta(a.motivo, 90),
+      })),
+    })]
+    : [];
+  return { embeds: [embed], components: componentes, allowedMentions: SEM_PING };
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -22,7 +46,7 @@ module.exports = {
     .addSubcommand((s) =>
       s
         .setName('listar')
-        .setDescription('Lista os avisos de um membro')
+        .setDescription('Lista os avisos de um membro (e permite remover pelo menu)')
         .addUserOption((o) => o.setName('membro').setDescription('O membro').setRequired(true))
     )
     .addSubcommand((s) =>
@@ -39,25 +63,27 @@ module.exports = {
         .addUserOption((o) => o.setName('membro').setDescription('O membro').setRequired(true))
     ),
 
+  telaAvisos,
+
   async execute(interaction) {
     if (!interaction.inGuild()) return;
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'dar') {
       const membro = interaction.options.getMember('membro');
-      if (!membro) return responder(interaction, '❌ Esse membro não está no servidor.');
-      if (membro.user.bot) return responder(interaction, '❌ Não dá para avisar bots.');
+      if (!membro) return interaction.reply(UI.erro('Esse membro não está no servidor.'));
+      if (membro.user.bot) return interaction.reply(UI.erro('Não dá para avisar bots.'));
 
       const erro = N.checarHierarquia(interaction.member, membro);
-      if (erro) return responder(interaction, `❌ ${erro}`);
+      if (erro) return interaction.reply(UI.erro(erro));
 
       const motivo = interaction.options.getString('motivo');
       const regra = interaction.options.getInteger('regra');
       if (regra && regra > N.regras().length) {
-        return responder(interaction, '❌ Essa regra não existe. Veja com `/regras listar`.');
+        return interaction.reply(UI.erro('Essa regra não existe. Veja com `/regras listar`.'));
       }
 
-      await interaction.deferReply({ flags: EPH });
+      await interaction.deferReply({ flags: UI.EPH });
       // No canal de divergências a advertência sai no próprio canal (sem DM) e ganha um tópico
       const idCanal = N.canalAdvertencia();
       const noCanalCerto = !!idCanal && interaction.channelId === idCanal;
@@ -65,70 +91,97 @@ module.exports = {
         canal: noCanalCerto ? interaction.channel : null,
       });
 
-      let texto;
+      const campos = [
+        { nome: 'Avisos', valor: `${barra(r.total / r.limite, r.limite)}  ${r.total}/${r.limite}`, lado: true },
+        { nome: 'Motivo', valor: motivo },
+      ];
+      let envio;
       if (noCanalCerto && r.noCanal && r.noCanal.msg) {
-        texto = `✅ Advertência dada a ${membro} (**${r.total}/${r.limite}**), registrada no canal.`;
-        if (r.noCanal.topico) texto += ` Tópico: ${r.noCanal.topico}`;
-        else if (r.noCanal.erroTopico) texto += `\n⚠️ Não consegui criar o tópico: ${r.noCanal.erroTopico}.`;
+        envio = 'Registrada no canal';
+        if (r.noCanal.topico) envio += `  ${S.sep}  tópico ${r.noCanal.topico}`;
+        else if (r.noCanal.erroTopico) envio += `\n${S.vazio}  Não consegui criar o tópico: ${r.noCanal.erroTopico}.`;
       } else if (noCanalCerto) {
-        texto = `⚠️ Advertência registrada (**${r.total}/${r.limite}**), mas não consegui postar no canal (${r.noCanal ? r.noCanal.erro : 'erro'}). DM: ${r.dm ? 'enviada' : 'não foi possível (DM fechada)'}.`;
+        envio = `Não consegui postar no canal (${r.noCanal ? r.noCanal.erro : 'erro'})  ${S.sep}  DM ${r.dm ? 'enviada' : 'não enviada'}`;
       } else {
-        texto = `✅ Aviso dado a ${membro} (**${r.total}/${r.limite}**). DM: ${
-          r.dm ? 'enviada' : 'não foi possível (DM fechada)'
-        }.`;
+        envio = `DM ${S.sep} ${r.dm ? 'enviada' : 'não foi possível enviar (DM fechada)'}`;
       }
+      campos.push({ nome: 'Envio', valor: envio });
       if (r.banido) {
-        texto += r.banido.ok
-          ? '\n🔨 Limite de avisos atingido: o membro foi **banido automaticamente**.'
-          : `\n⚠️ Limite de avisos atingido, mas não consegui banir: ${r.banido.erro}.`;
+        campos.push({
+          nome: 'Limite atingido',
+          valor: r.banido.ok ? 'O membro foi **banido automaticamente**.' : `Não consegui banir: ${r.banido.erro}.`,
+        });
       }
-      return interaction.editReply({ content: texto, allowedMentions: SEM_PING });
+      const embed = UI.painel({
+        trilha: ['Moderação', 'Aviso'],
+        titulo: `Aviso dado a ${membro.user.username}`,
+        campos,
+        perigo: !!(r.banido && r.banido.ok),
+      });
+      return interaction.editReply({ embeds: [embed], allowedMentions: SEM_PING });
     }
 
     const user = interaction.options.getUser('membro');
-    const lista = N.avisosDe(user.id);
+    let lista = N.avisosDe(user.id);
 
     if (sub === 'listar') {
-      if (!lista.length) return responder(interaction, `ℹ️ ${user} não tem avisos.`);
-      const linhas = lista.map((a, i) => {
-        let l = `**${i + 1}.** <t:${Math.floor(a.data / 1000)}:d> • por <@${a.por}>\n${a.motivo}`;
-        if (a.regra) l += `\n*Regra ${a.regra}*`;
-        return l;
+      if (!lista.length) return interaction.reply(UI.ok(`${user} não tem avisos.`));
+      await interaction.reply({ ...telaAvisos(user, lista), flags: UI.EPH });
+      const msg = await interaction.fetchReply();
+      const base = `aviso:rem:${user.id}`;
+      const coletor = msg.createMessageComponentCollector({
+        filter: (i) => i.user.id === interaction.user.id && i.customId === base,
+        time: 120000,
       });
-      const embed = new EmbedBuilder()
-        .setColor(N.COR.aviso)
-        .setTitle(`⚠️ Avisos de ${user.username} (${lista.length}/${N.limite()})`)
-        .setDescription(linhas.join('\n\n').slice(0, 4000));
-      return interaction.reply({ embeds: [embed], flags: EPH, allowedMentions: SEM_PING });
+      coletor.on('collect', async (i) => {
+        lista = N.avisosDe(user.id);
+        const removido = lista.splice(parseInt(i.values[0], 10), 1)[0];
+        if (removido) {
+          N.salvarAvisos(user.id, lista);
+          await N.registrar(interaction.guild, {
+            titulo: 'Aviso removido',
+            cor: N.COR.ok,
+            alvo: user,
+            executor: interaction.user,
+            motivo: `Aviso removido: ${removido.motivo}`,
+            extras: [{ name: 'Avisos agora', value: `${lista.length}/${N.limite()}`, inline: true }],
+          });
+        }
+        await i.update(UI.edicao(telaAvisos(user, lista)));
+      });
+      coletor.on('end', () => {
+        interaction.editReply({ components: [] }).catch(() => {});
+      });
+      return;
     }
 
     if (sub === 'remover') {
       const n = interaction.options.getInteger('numero');
-      if (!lista[n - 1]) return responder(interaction, '❌ Não existe aviso com esse número.');
+      if (!lista[n - 1]) return interaction.reply(UI.erro('Não existe aviso com esse número.'));
       const [removido] = lista.splice(n - 1, 1);
       N.salvarAvisos(user.id, lista);
       await N.registrar(interaction.guild, {
-        titulo: '🗑️ Aviso removido',
+        titulo: 'Aviso removido',
         cor: N.COR.ok,
         alvo: user,
         executor: interaction.user,
         motivo: `Aviso removido: ${removido.motivo}`,
         extras: [{ name: 'Avisos agora', value: `${lista.length}/${N.limite()}`, inline: true }],
       });
-      return responder(interaction, `🗑️ Aviso removido. ${user} agora tem **${lista.length}/${N.limite()}**.`);
+      return interaction.reply({ ...UI.ok(`Aviso removido. ${user} agora tem **${lista.length}/${N.limite()}**.`), allowedMentions: SEM_PING });
     }
 
     if (sub === 'limpar') {
-      if (!lista.length) return responder(interaction, `ℹ️ ${user} não tem avisos.`);
+      if (!lista.length) return interaction.reply(UI.ok(`${user} não tem avisos.`));
       N.salvarAvisos(user.id, []);
       await N.registrar(interaction.guild, {
-        titulo: '🧹 Avisos limpos',
+        titulo: 'Avisos limpos',
         cor: N.COR.ok,
         alvo: user,
         executor: interaction.user,
         motivo: `Todos os avisos (${lista.length}) foram removidos.`,
       });
-      return responder(interaction, `🧹 Todos os avisos de ${user} foram removidos.`);
+      return interaction.reply({ ...UI.ok(`Todos os avisos de ${user} foram removidos.`), allowedMentions: SEM_PING });
     }
   },
 };
