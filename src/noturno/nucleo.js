@@ -1,4 +1,4 @@
-const { ChannelType, EmbedBuilder } = require('discord.js');
+const { ChannelType, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const db = require('../db');
 
 const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar'); // não passa pelo editor de mensagens
@@ -9,7 +9,7 @@ const PADROES = {
   aviso: 10,
   fuso: 'America/Sao_Paulo',
   mensagens: {
-    // soTexto: todas vão como mensagem de texto, com banner opcional aparecendo como imagem logo abaixo (config.noturno.mensagens.<tipo>.banner)
+    // soTexto: todas vão como mensagem de texto, com banner opcional anexado como imagem na mesma mensagem (config.noturno.mensagens.<tipo>.banner)
     avisoFechar: {
       soTexto: true,
       texto: '🌙 **Hora de dormir!** Faltam **{minutos} minutos** para os chats fecharem (**{fechar}**). Terminem suas cenas! 💤',
@@ -64,9 +64,17 @@ function bannerValido(url) {
 
 const banner = (tipo) => bannerValido(cfg(`mensagens.${tipo}.banner`));
 
-// O banner aparece como imagem grande logo abaixo do texto (embed só com a imagem)
-function embedBanner(url) {
-  return new EmbedBuilder().setColor(COR).setImage(url);
+// O banner vai como imagem ANEXADA na mesma mensagem do texto (sem embed).
+// O Discord mostra anexos de imagem grandes, logo abaixo do texto.
+function anexoBanner(url) {
+  let ext = 'png';
+  try {
+    const m = new URL(url).pathname.match(/\.(png|jpe?g|gif|webp)$/i);
+    if (m) ext = m[1].toLowerCase();
+  } catch {
+    // mantém png
+  }
+  return new AttachmentBuilder(url, { name: `banner.${ext}` });
 }
 
 function preencher(texto, vars) {
@@ -246,7 +254,7 @@ async function anunciar(guild, tipo) {
   const cargoId = cfg('cargoDorminhoca');
   const ping = marcar && cargoId ? `<@&${cargoId}>` : null;
 
-  // Aviso de fechar e "chats fechados": só texto, com banner opcional logo abaixo
+  // Mensagens só de texto, com banner opcional anexado (imagem junto da mensagem, sem embed)
   if (ehSoTexto(tipo)) {
     const corpo = preencher(msg.texto, vars);
     const opcoes = {
@@ -255,14 +263,14 @@ async function anunciar(guild, tipo) {
       [IGNORAR_TRADUCAO]: true,
     };
     const img = banner(tipo);
-    if (img) opcoes.embeds = [embedBanner(img)];
+    if (img) opcoes.files = [anexoBanner(img)];
     try {
       await canal.send(opcoes);
     } catch (erro) {
       if (!img) throw erro;
       // Se a imagem não puder ser enviada, manda ao menos o texto
       console.error('[Noturno] banner falhou, enviando só o texto:', erro.message);
-      delete opcoes.embeds;
+      delete opcoes.files;
       await canal.send(opcoes);
     }
     return;
@@ -352,7 +360,7 @@ module.exports = {
   ehSoTexto,
   bannerValido,
   banner,
-  embedBanner,
+  anexoBanner,
   canaisVoz,
   expulsarDaVoz,
   ehCanalVoz,
