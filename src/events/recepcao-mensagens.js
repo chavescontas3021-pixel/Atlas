@@ -14,6 +14,7 @@ module.exports = {
 
     try {
       if (sessao.etapa === 'personagem') await F.receberPersonagem(message);
+      else if (sessao.etapa === 'obra') await F.receberObra(message);
       else if (sessao.etapa === 'emoji') await F.receberEmoji(message);
     } catch (erro) {
       console.error('[Recepção] erro ao ler mensagem:', erro);
