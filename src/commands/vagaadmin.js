@@ -34,6 +34,9 @@ module.exports = {
       .addIntegerOption((o) => o.setName('quantidade').setDescription('1 a 10').setRequired(true).setMinValue(1).setMaxValue(10)))
     .addSubcommand((s) => s.setName('auditoria').setDescription('Procura personagens cadastrados em duplicidade')
       .addBooleanOption((o) => o.setName('corrigir').setDescription('Arruma o que for seguro (padrão: só mostrar)')))
+    .addSubcommand((s) => s.setName('organizar').setDescription('Descobre sozinho a obra das vagas que estão sem obra (AniList)')
+      .addBooleanOption((o) => o.setName('aplicar').setDescription('Aplica de verdade (padrão: só mostrar)')))
+    .addSubcommand((s) => s.setName('obras').setDescription('Preenche a obra de várias vagas de uma vez (lista)'))
     .addSubcommand((s) => s.setName('mensagem').setDescription('Edita o texto do painel')),
 
   async execute(interaction) {
@@ -48,6 +51,7 @@ module.exports = {
         { name: 'Cargo de ocupante', value: c('cargo') ? `<@&${c('cargo')}>` : 'nenhum', inline: true },
         { name: 'Limite por pessoa', value: `${N.limite()}`, inline: true },
         { name: 'Personagens', value: `${N.todas().filter((v) => v.ocupanteId).length} ocupados · ${N.livres().length} livres cadastrados`, inline: true },
+        { name: 'Sem obra', value: `${N.semObra().length}`, inline: true },
       );
       return interaction.reply({ embeds: [embed], flags: EPH });
     }
@@ -71,6 +75,34 @@ module.exports = {
       }
       if (!corrigir && rel.removidas.length) linhas.push('\nRode de novo com `corrigir: True` para aplicar.');
       return interaction.editReply({ content: linhas.join('\n').slice(0, 1900), allowedMentions: { parse: [] } });
+    }
+
+    if (sub === 'obras') {
+      const pend = N.semObra().sort((a, b) => N.norm(a.nome).localeCompare(N.norm(b.nome)));
+      let pre = '';
+      for (const p of pend) {
+        const linha = `${p.nome} = \n`;
+        if (pre.length + linha.length > 3900) break;
+        pre += linha;
+      }
+      const campo = new TextInputBuilder().setCustomId('lista').setLabel('Nome = Obra (uma por linha)').setStyle(TextInputStyle.Paragraph).setMaxLength(4000).setRequired(true);
+      if (pre) campo.setValue(pre);
+      return interaction.showModal(new ModalBuilder().setCustomId('vagas:modal:obras').setTitle('Obra das vagas').addComponents(new ActionRowBuilder().addComponents(campo)));
+    }
+
+    if (sub === 'organizar') {
+      const aplicar = !!interaction.options.getBoolean('aplicar');
+      await interaction.deferReply({ flags: EPH });
+      const rel = await N.organizarAuto({ aplicar });
+      if (aplicar && rel.certas.length) await N.atualizarPainel(guild);
+      const cortar = (arr, n) => arr.slice(0, n);
+      const linhas = [`${aplicar ? '✅ Aplicado' : '🔎 Prévia'}: analisei **${rel.lidas}** de **${rel.total}** vagas sem obra.`];
+      if (rel.certas.length) linhas.push(`\n✅ Reconhecidas (${rel.certas.length}):\n${cortar(rel.certas, 10).map((c) => `• ${c.vaga.nome} → ${c.obra}`).join('\n')}${rel.certas.length > 10 ? '\n…' : ''}`);
+      if (rel.ambiguas.length) linhas.push(`\n❓ Mais de uma obra (${rel.ambiguas.length}):\n${cortar(rel.ambiguas, 5).map((c) => `• ${c.vaga.nome} (${c.obras.join(' / ')})`).join('\n')}`);
+      if (rel.sem.length) linhas.push(`\n❌ Não achei (${rel.sem.length}): ${cortar(rel.sem, 12).map((x) => x.nome).join(', ')}${rel.sem.length > 12 ? '…' : ''}`);
+      if (rel.total > rel.lidas) linhas.push(`\nRode de novo para analisar o restante.`);
+      linhas.push(aplicar ? '\nO que sobrou: use `/vagaadmin obras` (a lista já vem preenchida com os nomes).' : '\nGostou? Rode com `aplicar: True`.');
+      return interaction.editReply({ content: linhas.join('\n').slice(0, 1950), allowedMentions: { parse: [] } });
     }
 
     if (sub === 'criar') {
