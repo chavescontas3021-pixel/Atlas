@@ -11,6 +11,8 @@ const {
 } = require('discord.js');
 const db = require('../db');
 const N = require('./nucleo');
+const UI = require('../ui/componentes');
+const T = require('../ui/tema');
 
 const EPH = MessageFlags.Ephemeral;
 const fechando = new Set();
@@ -33,18 +35,12 @@ function limparFantasmas(guild, userId) {
 async function abrirModal(interaction, tipoId) {
   const tipo = N.acharTipo(tipoId);
   if (!tipo) {
-    return interaction.reply({
-      content: 'Essa categoria não existe mais. Peça para a staff repostar o painel.',
-      flags: EPH,
-    });
+    return interaction.reply(UI.erro('Essa categoria não existe mais. Peça para a staff repostar o painel.'));
   }
   limparFantasmas(interaction.guild, interaction.user.id);
   const abertos = N.ticketsDoUsuario(interaction.user.id);
   if (abertos.length >= N.limite()) {
-    return interaction.reply({
-      content: `Você já tem ${abertos.length} ticket(s) aberto(s): ${abertos.map((t) => `<#${t.canalId}>`).join(' ')}`,
-      flags: EPH,
-    });
+    return interaction.reply(UI.erro(`Você já tem ${abertos.length} ticket(s) aberto(s): ${abertos.map((t) => `<#${t.canalId}>`).join(' ')}`));
   }
 
   const modal = new ModalBuilder()
@@ -90,11 +86,11 @@ async function criarTicket(interaction, tipoId) {
   const guild = interaction.guild;
   const member = interaction.member;
   const tipo = N.acharTipo(tipoId);
-  if (!tipo) return interaction.editReply('Essa categoria não existe mais. Peça para a staff repostar o painel.');
+  if (!tipo) return interaction.editReply(UI.edicao(UI.erro('Essa categoria não existe mais. Peça para a staff repostar o painel.')));
 
   limparFantasmas(guild, member.id);
   if (N.ticketsDoUsuario(member.id).length >= N.limite()) {
-    return interaction.editReply('Você já atingiu o limite de tickets abertos.');
+    return interaction.editReply(UI.edicao(UI.erro('Você já atingiu o limite de tickets abertos.')));
   }
 
   const assunto = interaction.fields.getTextInputValue('assunto').trim();
@@ -107,7 +103,7 @@ async function criarTicket(interaction, tipoId) {
     canal = await criarCanal(guild, member, numero, painel);
   } catch (erro) {
     console.error('[Ticket] erro ao criar canal:', erro);
-    return interaction.editReply('⚠️ Não consegui criar o canal. Avise a staff (o limite de canais da categoria pode ter acabado).');
+    return interaction.editReply(UI.edicao(UI.erro('Não consegui criar o canal. Avise a staff (o limite de canais da categoria pode ter acabado).')));
   }
 
   const ticket = {
@@ -140,7 +136,7 @@ async function criarTicket(interaction, tipoId) {
   db.set(`ticket.abertos.${canal.id}`, ticket);
   await msg.pin().catch(() => {});
 
-  return interaction.editReply(`✅ Ticket aberto: ${canal}`);
+  return interaction.editReply(UI.edicao(UI.ok(`Ticket aberto: ${canal}`)));
 }
 
 // ---------- Assumir ----------
@@ -148,12 +144,12 @@ async function criarTicket(interaction, tipoId) {
 async function assumir(interaction) {
   const canal = interaction.channel;
   const t = N.ticketDoCanal(canal.id);
-  if (!t) return interaction.reply({ content: 'Este canal não é um ticket aberto.', flags: EPH });
+  if (!t) return interaction.reply(UI.auto('Este canal não é um ticket aberto.'));
   if (!N.ehStaff(interaction.member, t)) {
-    return interaction.reply({ content: 'Só a staff pode assumir tickets.', flags: EPH });
+    return interaction.reply(UI.auto('Só a staff pode assumir tickets.'));
   }
   if (t.assumidoPor && t.assumidoPor !== interaction.user.id) {
-    return interaction.reply({ content: `Este ticket já está com <@${t.assumidoPor}>.`, flags: EPH, allowedMentions: { parse: [] } });
+    return interaction.reply({ ...UI.auto(`Este ticket já está com <@${t.assumidoPor}>.`), allowedMentions: { parse: [] } });
   }
 
   const liberando = t.assumidoPor === interaction.user.id;
@@ -162,7 +158,7 @@ async function assumir(interaction) {
 
   await interaction.update({ embeds: [N.embedAbertura(t)], components: [N.botoesTicket(!!t.assumidoPor)] });
   await canal.send({
-    content: liberando ? `🔓 ${interaction.user} liberou o ticket.` : `🙋 ${interaction.user} assumiu o ticket.`,
+    content: liberando ? `${T.S.vazio}  ${interaction.user} liberou o ticket.` : `${T.S.ponto}  ${interaction.user} assumiu o ticket.`,
     allowedMentions: { parse: [] },
   });
   canal
@@ -182,9 +178,9 @@ function podeFechar(member, t) {
 
 async function abrirModalFechar(interaction) {
   const t = N.ticketDoCanal(interaction.channel.id);
-  if (!t) return interaction.reply({ content: 'Este canal não é um ticket aberto.', flags: EPH });
+  if (!t) return interaction.reply(UI.auto('Este canal não é um ticket aberto.'));
   if (!podeFechar(interaction.member, t)) {
-    return interaction.reply({ content: 'Só a staff pode fechar tickets.', flags: EPH });
+    return interaction.reply(UI.auto('Só a staff pode fechar tickets.'));
   }
   const modal = new ModalBuilder()
     .setCustomId('ticket:modalfechar')
@@ -195,12 +191,12 @@ async function abrirModalFechar(interaction) {
 
 async function receberFechar(interaction) {
   const t = N.ticketDoCanal(interaction.channel.id);
-  if (!t) return interaction.reply({ content: 'Este canal não é um ticket aberto.', flags: EPH });
+  if (!t) return interaction.reply(UI.auto('Este canal não é um ticket aberto.'));
   if (!podeFechar(interaction.member, t)) {
-    return interaction.reply({ content: 'Só a staff pode fechar tickets.', flags: EPH });
+    return interaction.reply(UI.auto('Só a staff pode fechar tickets.'));
   }
   const motivo = interaction.fields.getTextInputValue('motivo').trim();
-  await interaction.reply('🔒 Fechando o ticket e gerando a transcrição...');
+  await interaction.reply(UI.nota('Fechando o ticket e gerando a transcrição…', 'aviso', { publica: true }));
   return encerrar(interaction.guild, interaction.channel, interaction.user, motivo);
 }
 
@@ -231,20 +227,19 @@ async function encerrar(guild, canal, executor, motivo) {
     const nomeArquivo = `ticket-${N.numeroFmt(t.numero)}.html`;
     const arquivo = () => new AttachmentBuilder(Buffer.from(html, 'utf8'), { name: nomeArquivo });
 
-    const embed = new EmbedBuilder()
-      .setColor(0xe74c3c)
-      .setTitle(`🔒 Ticket #${N.numeroFmt(t.numero)} fechado`)
-      .addFields(
-        { name: 'Categoria', value: `${t.tipoEmoji} ${t.tipoNome}`.trim(), inline: true },
-        { name: 'Aberto por', value: `<@${t.userId}>`, inline: true },
-        { name: 'Fechado por', value: `<@${executor.id}>`, inline: true },
-        { name: 'Atendido por', value: t.assumidoPor ? `<@${t.assumidoPor}>` : 'ninguém assumiu', inline: true },
-        { name: 'Duração', value: formatarDuracao(Date.now() - t.aberto), inline: true },
-        { name: 'Mensagens', value: String(mensagens.length), inline: true },
-        { name: 'Assunto', value: t.assunto.slice(0, 1024) },
-        { name: 'Motivo do fechamento', value: (motivo || 'não informado').slice(0, 1024) }
-      )
-      .setTimestamp();
+    const embed = UI.painel({
+      trilha: ['Ticket', `#${N.numeroFmt(t.numero)}`, 'Fechado'],
+      titulo: t.assunto,
+      campos: [
+        { nome: 'Categoria', valor: t.tipoNome, lado: true },
+        { nome: 'Aberto por', valor: `<@${t.userId}>`, lado: true },
+        { nome: 'Fechado por', valor: `<@${executor.id}>`, lado: true },
+        { nome: 'Atendido por', valor: t.assumidoPor ? `<@${t.assumidoPor}>` : 'ninguém assumiu', lado: true },
+        { nome: 'Duração', valor: formatarDuracao(Date.now() - t.aberto), lado: true },
+        { nome: 'Mensagens', valor: String(mensagens.length), lado: true },
+        { nome: 'Motivo do fechamento', valor: (motivo || 'não informado').slice(0, 1024) },
+      ],
+    }).setTimestamp();
 
     const logId = N.cfgPainel(N.painelDoTicket(t), 'logCanal');
     const log = logId && guild.channels.cache.get(logId);
@@ -255,16 +250,16 @@ async function encerrar(guild, canal, executor, motivo) {
     }
 
     if (abertoPor) {
-      const embedDm = new EmbedBuilder()
-        .setColor(0xe74c3c)
-        .setTitle(`Seu ticket #${N.numeroFmt(t.numero)} foi fechado`)
-        .setDescription(`Servidor: **${guild.name}**\nMotivo: ${motivo || 'não informado'}\n\nSegue a transcrição da conversa (abra o arquivo no navegador).`)
-        .setTimestamp();
+      const embedDm = UI.painel({
+        trilha: [guild.name, 'Ticket'],
+        titulo: `Seu ticket #${N.numeroFmt(t.numero)} foi fechado`,
+        descricao: `Motivo: ${motivo || 'não informado'}\n\nSegue a transcrição da conversa. Abra o arquivo no navegador.`,
+      }).setTimestamp();
       await abertoPor.send({ embeds: [embedDm], files: [arquivo()] }).catch(() => {});
     }
 
     db.remover(`ticket.abertos.${canal.id}`);
-    await canal.send('✅ Ticket fechado. Este canal será apagado em 5 segundos.').catch(() => {});
+    await canal.send(UI.nota('Ticket fechado. Este canal será apagado em 5 segundos.', 'ok', { publica: true })).catch(() => {});
     setTimeout(
       () => canal.delete(`Ticket #${N.numeroFmt(t.numero)} fechado por ${executor.username}`).catch((e) => console.error('[Ticket]', e.message)),
       5000
@@ -272,7 +267,7 @@ async function encerrar(guild, canal, executor, motivo) {
   } catch (erro) {
     console.error('[Ticket] erro ao fechar:', erro);
     fechando.delete(canal.id);
-    await canal.send('⚠️ Deu erro ao fechar o ticket. Tente de novo ou chame a staff.').catch(() => {});
+    await canal.send(UI.nota('Deu erro ao fechar o ticket. Tente de novo ou chame a staff.', 'erro', { publica: true })).catch(() => {});
   }
 }
 
@@ -286,27 +281,27 @@ async function adicionar(interaction, user) {
     AttachFiles: true,
     EmbedLinks: true,
   });
-  return interaction.reply({ content: `➕ ${user} foi adicionado(a) ao ticket.`, allowedMentions: { users: [user.id] } });
+  return interaction.reply({ ...UI.ok(`${user} foi adicionado(a) ao ticket.`, { publica: true }), allowedMentions: { users: [user.id] } });
 }
 
 async function remover(interaction, user) {
   const t = N.ticketDoCanal(interaction.channel.id);
   if (user.id === t.userId) {
-    return interaction.reply({ content: '❌ Não dá para remover quem abriu o ticket.', flags: EPH });
+    return interaction.reply(UI.auto('❌ Não dá para remover quem abriu o ticket.'));
   }
   await interaction.channel.permissionOverwrites.delete(user.id);
-  return interaction.reply({ content: `➖ ${user.username} foi removido(a) do ticket.`, allowedMentions: { parse: [] } });
+  return interaction.reply({ ...UI.ok(`${user.username} foi removido(a) do ticket.`, { publica: true }), allowedMentions: { parse: [] } });
 }
 
 async function renomear(interaction, nome) {
   const limpo = nome.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').slice(0, 90);
-  if (!limpo) return interaction.reply({ content: '❌ Nome inválido.', flags: EPH });
+  if (!limpo) return interaction.reply(UI.auto('❌ Nome inválido.'));
   try {
     await interaction.channel.setName(limpo);
   } catch (erro) {
-    return interaction.reply({ content: '⚠️ Não consegui renomear agora (o Discord limita a 2 trocas a cada 10 minutos).', flags: EPH });
+    return interaction.reply(UI.auto('⚠️ Não consegui renomear agora (o Discord limita a 2 trocas a cada 10 minutos).'));
   }
-  return interaction.reply({ content: `✏️ Canal renomeado para **${limpo}**.` });
+  return interaction.reply(UI.ok(`Canal renomeado para **${limpo}**.`, { publica: true }));
 }
 
 module.exports = {
