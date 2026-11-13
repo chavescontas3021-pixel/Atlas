@@ -1,24 +1,29 @@
-const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const {
+  ActionRowBuilder, ModalBuilder, PermissionFlagsBits, TextInputBuilder, TextInputStyle,
+} = require('discord.js');
+const UI = require('../ui/componentes');
+const T = require('../ui/tema');
 const db = require('../db');
 const Acesso = require('../utils/acesso');
 
-const COR = { aviso: 0xf1c40f, ban: 0xe74c3c, kick: 0xe67e22, ok: 0x2ecc71 };
+// Tudo em preto do Atlas; vermelho só para banimento.
+const COR = { aviso: T.COR.base, ban: T.COR.perigo, kick: T.COR.base, ok: T.COR.base };
 
 const PADROES = {
   limite: 3,
   mensagens: {
     dmAviso: {
-      titulo: '⚠️ Você recebeu um aviso',
+      titulo: 'Você recebeu um aviso',
       texto:
         'Você recebeu um aviso em **{servidor}**.\n\n**Motivo:** {motivo}\n**Regra:** {regra}\n' +
         '**Avisos:** {avisos}/{limite}\n\nAo chegar em {limite} avisos, você será banido(a).',
     },
     dmBan: {
-      titulo: '🔨 Você foi banido(a)',
+      titulo: 'Você foi banido(a)',
       texto: 'Você foi banido(a) de **{servidor}**.\n\n**Motivo:** {motivo}',
     },
     dmExpulsao: {
-      titulo: '👢 Você foi expulso(a)',
+      titulo: 'Você foi expulso(a)',
       texto: 'Você foi expulso(a) de **{servidor}**.\n\n**Motivo:** {motivo}',
     },
   },
@@ -64,7 +69,7 @@ function checarHierarquia(executor, alvo) {
   const guild = alvo.guild;
   if (alvo.id === executor.id) return 'Você não pode fazer isso consigo mesmo.';
   if (alvo.id === guild.ownerId) return 'Não dá para fazer isso com o dono do servidor.';
-  if (alvo.id === guild.client.user.id) return 'Eu não vou fazer isso comigo 😅';
+  if (alvo.id === guild.client.user.id) return 'Eu não vou fazer isso comigo.';
   if (executor.id !== guild.ownerId && alvo.roles.highest.position >= executor.roles.highest.position) {
     return 'Esse membro tem um cargo igual ou acima do seu.';
   }
@@ -73,12 +78,12 @@ function checarHierarquia(executor, alvo) {
 
 async function enviarDM(user, tipo, vars) {
   const msg = mensagem(tipo);
-  const cor = tipo === 'dmAviso' ? COR.aviso : tipo === 'dmBan' ? COR.ban : COR.kick;
-  const embed = new EmbedBuilder()
-    .setColor(cor)
-    .setTitle(preencher(msg.titulo, vars))
-    .setDescription(preencher(msg.texto, vars))
-    .setTimestamp();
+  const embed = UI.painel({
+    trilha: [vars.servidor],
+    titulo: preencher(msg.titulo, vars),
+    descricao: preencher(msg.texto, vars),
+    perigo: tipo === 'dmBan',
+  }).setTimestamp();
   try {
     await user.send({ embeds: [embed] });
     return true;
@@ -98,16 +103,17 @@ async function registrar(guild, { titulo, cor, alvo, executor, motivo, extras = 
   const canal = guild.channels.cache.get(id);
   if (!canal) return;
 
-  const embed = new EmbedBuilder()
-    .setColor(cor)
-    .setTitle(titulo)
-    .addFields(
-      { name: 'Membro', value: `<@${alvo.id}> (\`${alvo.tag}\`)`, inline: true },
-      { name: 'Por', value: `<@${executor.id}>`, inline: true },
-      { name: 'Motivo', value: String(motivo).slice(0, 1024) || '—' },
-      ...extras
-    )
-    .setTimestamp();
+  const embed = UI.painel({
+    trilha: ['Moderação'],
+    titulo,
+    perigo: cor === COR.ban,
+    campos: [
+      { nome: 'Membro', valor: `<@${alvo.id}>  ${T.S.sep}  \`${alvo.tag || alvo.username}\``, lado: true },
+      { nome: 'Por', valor: `<@${executor.id}>`, lado: true },
+      { nome: 'Motivo', valor: String(motivo).slice(0, 1024) || '—' },
+      ...extras.map((x) => ({ nome: x.name, valor: x.value, lado: x.inline })),
+    ],
+  }).setTimestamp();
   await canal.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch((e) => console.error('[Moderação] log:', e.message));
 }
 
@@ -122,7 +128,7 @@ async function banir(guild, executor, user, membro, motivo, apagarSeg = 0) {
   } catch (erro) {
     return { ok: false, erro: erro.message, dm };
   }
-  await registrar(guild, { titulo: '🔨 Banimento', cor: COR.ban, alvo: user, executor, motivo });
+  await registrar(guild, { titulo: 'Banimento', cor: COR.ban, alvo: user, executor, motivo });
   return { ok: true, dm };
 }
 
@@ -133,14 +139,14 @@ async function expulsar(guild, executor, membro, motivo) {
   } catch (erro) {
     return { ok: false, erro: erro.message, dm };
   }
-  await registrar(guild, { titulo: '👢 Expulsão', cor: COR.kick, alvo: membro.user, executor, motivo });
+  await registrar(guild, { titulo: 'Expulsão', cor: COR.kick, alvo: membro.user, executor, motivo });
   return { ok: true, dm };
 }
 
 async function desbanir(guild, executor, id, motivo) {
   try {
     const user = await guild.members.unban(id, `${motivo} | por ${executor.tag}`.slice(0, 512));
-    await registrar(guild, { titulo: '✅ Desbanimento', cor: COR.ok, alvo: user, executor, motivo });
+    await registrar(guild, { titulo: 'Desbanimento', cor: COR.ok, alvo: user, executor, motivo });
     return { ok: true, user };
   } catch (erro) {
     return { ok: false, erro: erro.message };
@@ -157,22 +163,25 @@ const ehStaffTopico = (membro) =>
 
 // Mensagem no canal: marca o membro, mostra o motivo e manda questionar no tópico logo abaixo
 async function anunciarNoCanal(canal, membro, motivo, regraTexto, total, lim) {
-  const linhas = [
-    `⚠️ <@${membro.id}>, você recebeu uma **advertência**.`,
-    '',
-    `**Motivo:** ${motivo}`,
-  ];
-  if (regraTexto) linhas.push(`**Regra:** ${regraTexto}`);
-  linhas.push(`**Advertências:** ${total}/${lim}`, '', 'Se você tiver algo a questionar, mande mensagem no **tópico abaixo**. 👇');
+  const campos = [{ nome: 'Motivo', valor: motivo }];
+  if (regraTexto) campos.push({ nome: 'Regra', valor: regraTexto });
+  campos.push({ nome: 'Advertências', valor: `${T.barra(total / lim, lim)}  ${total}/${lim}` });
+  const embed = UI.painel({
+    trilha: ['Advertência'],
+    titulo: 'Você recebeu uma advertência',
+    descricao: 'Se tiver algo a questionar, escreva no **tópico logo abaixo**.',
+    campos,
+  });
   return canal.send({
-    content: linhas.join('\n').slice(0, 2000),
+    content: `<@${membro.id}>`,
+    embeds: [embed],
     allowedMentions: { users: [membro.id] },
   });
 }
 
 // Tópico logo abaixo da mensagem: só o membro e a staff escrevem (o resto é apagado pelo Atlas)
 async function criarTopico(msg, executor, membro) {
-  const nome = `Advertência • ${membro.user.username}`.slice(0, 100);
+  const nome = `Advertência · ${membro.user.username}`.slice(0, 100);
   const motivo = `Advertência de ${membro.user.tag} por ${executor.tag}`.slice(0, 500);
   let topico;
   try {
@@ -221,14 +230,14 @@ async function darAviso(guild, executor, membro, motivo, numeroRegra, opcoes = {
 
   const extras = [{ name: 'Avisos', value: `${total}/${lim}`, inline: true }];
   if (regraTexto) extras.push({ name: 'Regra', value: regraTexto.slice(0, 1024), inline: true });
-  await registrar(guild, { titulo: '⚠️ Aviso', cor: COR.aviso, alvo: membro.user, executor, motivo, extras });
+  await registrar(guild, { titulo: 'Aviso', cor: COR.aviso, alvo: membro.user, executor, motivo, extras });
 
   let banido = null;
   if (total >= lim) {
     if (!membro.bannable) {
       banido = { ok: false, erro: 'o cargo dele está acima do meu' };
       await registrar(guild, {
-        titulo: '⚠️ Limite de avisos atingido (não consegui banir)',
+        titulo: 'Limite de avisos atingido (não consegui banir)',
         cor: COR.aviso,
         alvo: membro.user,
         executor,
@@ -251,7 +260,26 @@ async function darAviso(guild, executor, membro, motivo, numeroRegra, opcoes = {
   return { total, limite: lim, dm, banido, noCanal };
 }
 
+// Janela para editar as mensagens de DM (usada pelo comando e pelos botões do painel)
+function modalMensagem(tipo) {
+  const atual = mensagem(tipo);
+  return new ModalBuilder()
+    .setCustomId(`moderacao:modal:${tipo}`)
+    .setTitle('Editar mensagem')
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId('titulo').setLabel('Título').setStyle(TextInputStyle.Short)
+          .setMaxLength(200).setRequired(true).setValue(atual.titulo.slice(0, 200))
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId('texto').setLabel('Texto da mensagem').setStyle(TextInputStyle.Paragraph)
+          .setMaxLength(2000).setRequired(true).setValue(atual.texto.slice(0, 2000))
+      )
+    );
+}
+
 module.exports = {
+  modalMensagem,
   COR,
   PADROES,
   cfg,
