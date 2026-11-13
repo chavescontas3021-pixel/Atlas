@@ -345,9 +345,9 @@ module.exports = {
       db.set(`config.noturno.mensagens.${tipo}.banner`, url);
       return interaction.reply({
         content:
-          '✅ Banner salvo! Ele aparece como imagem logo abaixo do texto (a prévia está aí embaixo; se não aparecer, o link não é de uma imagem direta).\n' +
+          '✅ Banner salvo! Ele vai anexado como imagem na mesma mensagem do texto (a prévia está aí embaixo; se não aparecer, o link não é de uma imagem direta).\n' +
           '⚠️ Links de anexos do Discord expiram. Prefira hospedar em outro lugar (ex.: Imgur).',
-        embeds: [N.embedBanner(url)],
+        files: [N.anexoBanner(url)],
         flags: EPH,
       });
     }
