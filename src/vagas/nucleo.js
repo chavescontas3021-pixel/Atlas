@@ -3,6 +3,7 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const db = require('../db');
 const P = require('./personagens');
+const O = require('./obras');
 
 // ===== util =====
 // Utilidades do sistema de vagas: cor, textos padrão, configuração e normalização de texto.
@@ -263,6 +264,7 @@ async function organizarAuto({ aplicar = false, max = 120 } = {}) {
       if (aplicar) {
         const repetido = todas().some((o) => o.id !== v.id && o.ext === c.chave);
         v.grupo = c.obra;
+        v.obraConfere = true;
         if (!v.foto && c.foto) v.foto = c.foto;
         if (!repetido && (!v.ext || !v.ext.startsWith('al:'))) v.ext = c.chave;
         salvar(v);
@@ -277,22 +279,73 @@ async function organizarAuto({ aplicar = false, max = 120 } = {}) {
   return rel;
 }
 
-// Texto "Nome = Obra" (uma por linha) -> preenche a obra das vagas com esse nome
-function definirObras(texto) {
-  const rel = { feitas: 0, naoAchadas: [], invalidas: 0 };
+// Texto "Nome = Obra" (uma por linha) -> preenche a obra das vagas com esse nome.
+// Cada obra é conferida (anime, mangá, filme, série, jogo...) e trocada pelo título oficial quando achada.
+async function definirObras(texto) {
+  const rel = { feitas: 0, naoAchadas: [], invalidas: 0, naoConfirmadas: [], padronizadas: 0 };
+  const conferidas = new Map();
   for (const linha of String(texto || '').split(/\r?\n/)) {
     const t = linha.trim();
     if (!t || /[=|;]\s*$/.test(t)) continue; // linha ainda sem obra: ignora
     const m = /^(.+?)\s*[=|;]\s*(.+)$/.exec(t);
     if (!m) { rel.invalidas++; continue; }
-    const obra = m[2].trim().slice(0, 40);
     const achadas = todas().filter((v) => nomeBase(v.nome) === nomeBase(m[1]));
     if (!achadas.length) { rel.naoAchadas.push(m[1].trim().slice(0, 30)); continue; }
+
+    const digitada = m[2].trim().slice(0, 60);
+    const k = O.limpo(digitada);
+    if (!conferidas.has(k)) {
+      conferidas.set(k, await O.verificar(digitada));
+      await dorme(300);
+    }
+    const r = conferidas.get(k);
+    const oficial = r.status === 'ok';
+    const obra = (oficial ? r.titulo : digitada).slice(0, 40);
+    if (oficial && obra !== digitada) rel.padronizadas++;
+    if (!oficial && !rel.naoConfirmadas.includes(digitada)) rel.naoConfirmadas.push(digitada);
+
     for (const v of (achadas.filter((x) => !x.grupo).length ? achadas.filter((x) => !x.grupo) : achadas)) {
       v.grupo = obra;
+      v.obraConfere = oficial;
       salvar(v);
       rel.feitas++;
     }
+  }
+  return rel;
+}
+
+// Vagas que têm obra mas a obra nunca foi confirmada
+const aConferir = () => todas().filter((v) => v.grupo && v.obraConfere !== true);
+
+// Confere as obras já registradas (uma vez por obra, não por vaga) e padroniza os títulos.
+// aplicar=false só mostra. aceitar=true também usa as sugestões e dá por conferidas as que não achou (a staff garante).
+async function conferirObras({ aplicar = false, aceitar = false, max = 40 } = {}) {
+  const porObra = new Map();
+  for (const v of aConferir()) {
+    const k = norm(v.grupo);
+    if (!porObra.has(k)) porObra.set(k, { nome: v.grupo, vagas: [] });
+    porObra.get(k).vagas.push(v);
+  }
+  const rel = { total: porObra.size, lidas: 0, ok: [], sugestoes: [], nao: [], erro: 0 };
+  const gravar = (g, titulo, confere) => {
+    for (const v of g.vagas) { v.grupo = titulo.slice(0, 40); v.obraConfere = confere; salvar(v); }
+  };
+  for (const g of [...porObra.values()].slice(0, max)) {
+    rel.lidas++;
+    const r = await O.verificar(g.nome);
+    if (r.status === 'ok') {
+      rel.ok.push({ de: g.nome, para: r.titulo, tipo: r.tipo, n: g.vagas.length });
+      if (aplicar) gravar(g, r.titulo, true);
+    } else if (r.status === 'sugestao') {
+      rel.sugestoes.push({ de: g.nome, para: r.titulo, n: g.vagas.length });
+      if (aplicar && aceitar) gravar(g, r.titulo, true);
+    } else if (r.status === 'nao') {
+      rel.nao.push({ de: g.nome, n: g.vagas.length });
+      if (aplicar && aceitar) gravar(g, g.nome, true);
+    } else {
+      rel.erro++;
+    }
+    await dorme(400);
   }
   return rel;
 }
@@ -353,9 +406,11 @@ async function registrarDaRecepcao(guild, userId, personagem) {
   let vaga = acharTodos({ ext: chaveManual(nome, obra), nome, grupo: obra })[0];
   if (!vaga) {
     vaga = { id: proximoId(), nome, grupo: obra, ext: chaveManual(nome, obra), auto: true, ocupanteId: null, desde: null };
+    if (obra) vaga.obraConfere = !!(sessao && sessao.obraConfere);
     salvar(vaga);
   } else if (obra && !vaga.grupo) {
     vaga.grupo = obra;
+    vaga.obraConfere = !!(sessao && sessao.obraConfere);
     salvar(vaga);
   }
   const r = await ocupar(guild, vaga, userId);
@@ -467,7 +522,7 @@ module.exports = {
   PADROES, cfg, mensagem, limite, norm,
   todas, obter, salvar, apagar, doUsuario, livres, proximoId,
   pedidos, pedido, proximoPedido, acharVaga,
-  chaveManual, nomeBase, acharPorChave, acharTodos, mesmoPersonagem, estaLivre, buscar, resumo, semObra, organizarAuto, definirObras,
+  chaveManual, nomeBase, acharPorChave, acharTodos, mesmoPersonagem, estaLivre, buscar, resumo, semObra, aConferir, organizarAuto, definirObras, conferirObras,
   infoPedido, pedidoPendente, registrarDaRecepcao,
   ocupar, liberar, embedPainel, embedsPainel, atualizarPainel, botoesPedido, embedPedido, auditar,
 };
