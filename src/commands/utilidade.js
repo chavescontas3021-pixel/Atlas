@@ -1,11 +1,7 @@
-const {
-  SlashCommandBuilder, EmbedBuilder, MessageFlags, PermissionFlagsBits,
-} = require('discord.js');
-const db = require('../db');
-
-const COR = 0xf5a3c7;
-const EPH = MessageFlags.Ephemeral;
-const NUMEROS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'];
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const UI = require('../ui/componentes');
+const { S } = require('../ui/tema');
+const Enquete = require('../enquete/nucleo');
 
 function calcular(expr) {
   const limpa = expr.replace(/,/g, '.').replace(/\^/g, '**').replace(/\s+/g, '');
@@ -35,7 +31,7 @@ module.exports = {
     .setDescription('Utilidades')
     .addSubcommand((s) => s.setName('calc').setDescription('Calculadora')
       .addStringOption((o) => o.setName('conta').setDescription('Ex: (2+3)*4 ou 2^10').setRequired(true)))
-    .addSubcommand((s) => s.setName('enquete').setDescription('Cria uma enquete')
+    .addSubcommand((s) => s.setName('enquete').setDescription('Cria uma enquete votada por botões')
       .addStringOption((o) => o.setName('pergunta').setDescription('Pergunta').setRequired(true).setMaxLength(200))
       .addStringOption((o) => o.setName('opcao1').setDescription('Opção 1').setRequired(true).setMaxLength(100))
       .addStringOption((o) => o.setName('opcao2').setDescription('Opção 2').setRequired(true).setMaxLength(100))
@@ -54,53 +50,59 @@ module.exports = {
     if (sub === 'calc') {
       const conta = interaction.options.getString('conta');
       const r = calcular(conta);
-      if (r === null) return interaction.reply({ content: 'Conta inválida. Use números e + - * / ^ % ( ).', flags: EPH });
-      return interaction.reply(`🧮 \`${conta}\` = **${Math.round(r * 1e10) / 1e10}**`);
+      if (r === null) return interaction.reply(UI.erro('Conta inválida. Use números e + - * / ^ % ( ).'));
+      const embed = UI.painel({
+        trilha: ['Calculadora'],
+        descricao: `\`${conta}\`\n${S.filho} **${Math.round(r * 1e10) / 1e10}**`,
+      });
+      return interaction.reply({ embeds: [embed] });
     }
 
     if (sub === 'enquete') {
-      const ops = [1, 2, 3, 4, 5]
+      const opcoes = [1, 2, 3, 4, 5]
         .map((n) => interaction.options.getString(`opcao${n}`))
         .filter(Boolean);
-      const emb = new EmbedBuilder()
-        .setColor(COR)
-        .setTitle(`📊 ${interaction.options.getString('pergunta')}`)
-        .setDescription(ops.map((o, i) => `${NUMEROS[i]} ${o}`).join('\n'))
-        .setFooter({ text: `Enquete de ${interaction.user.username}` });
-      await interaction.reply({ embeds: [emb] });
+      const dados = {
+        pergunta: interaction.options.getString('pergunta'),
+        opcoes,
+        autorId: interaction.user.id,
+        autorNome: interaction.member?.displayName || interaction.user.username,
+      };
+      // Mostra a enquete zerada, pega o id da mensagem e só então salva no banco
+      await interaction.reply(Enquete.montar({ ...dados, votos: {}, encerrada: false }));
       const msg = await interaction.fetchReply();
-      for (let i = 0; i < ops.length; i++) await msg.react(NUMEROS[i]).catch(() => {});
+      Enquete.criar(msg.id, dados);
       return;
     }
 
     if (sub === 'falar') {
       if (!temPermissao(interaction, PermissionFlagsBits.ManageMessages)) {
-        return interaction.reply({ content: 'Você precisa de Gerenciar Mensagens.', flags: EPH });
+        return interaction.reply(UI.erro('Você precisa da permissão **Gerenciar Mensagens**.'));
       }
       const canal = interaction.options.getChannel('canal') || interaction.channel;
-      if (!canal.isTextBased()) return interaction.reply({ content: 'Esse canal não é de texto.', flags: EPH });
+      if (!canal.isTextBased()) return interaction.reply(UI.erro('Esse canal não é de texto.'));
       try {
         await canal.send({ content: interaction.options.getString('texto'), allowedMentions: { parse: [] } });
       } catch {
-        return interaction.reply({ content: 'Não consegui enviar nesse canal (falta permissão).', flags: EPH });
+        return interaction.reply(UI.erro('Não consegui enviar nesse canal (falta permissão).'));
       }
-      return interaction.reply({ content: `✅ Enviado em <#${canal.id}>.`, flags: EPH });
+      return interaction.reply(UI.ok(`Mensagem enviada em <#${canal.id}>.`));
     }
 
     if (sub === 'limpar') {
       if (!temPermissao(interaction, PermissionFlagsBits.ManageMessages)) {
-        return interaction.reply({ content: 'Você precisa de Gerenciar Mensagens.', flags: EPH });
+        return interaction.reply(UI.erro('Você precisa da permissão **Gerenciar Mensagens**.'));
       }
       const q = interaction.options.getInteger('quantidade');
       try {
         const apagadas = await interaction.channel.bulkDelete(q, true);
-        return interaction.reply({ content: `🧹 ${apagadas.size} mensagem(ns) apagada(s). (Mensagens com mais de 14 dias não podem ser apagadas.)`, flags: EPH });
+        return interaction.reply(UI.ok(`${apagadas.size} mensagem(ns) apagada(s). Mensagens com mais de 14 dias não podem ser apagadas.`));
       } catch {
-        return interaction.reply({ content: 'Não consegui apagar (falta permissão).', flags: EPH });
+        return interaction.reply(UI.erro('Não consegui apagar (falta permissão).'));
       }
     }
   },
 };
 
-// Comando de lembrete separado, exportado como segundo comando abaixo.
+// Usado também pelo comando de lembrete.
 module.exports.paraMs = paraMs;
