@@ -10,9 +10,11 @@ async function modalObras(interaction) {
       return interaction.reply({ content: '❌ Só a staff.', flags: EPH });
     }
     await interaction.deferReply({ flags: EPH });
-    const rel = N.definirObras(interaction.fields.getTextInputValue('lista'));
+    const rel = await N.definirObras(interaction.fields.getTextInputValue('lista'));
     if (rel.feitas) await N.atualizarPainel(interaction.guild);
     let txt = `✅ Obra definida em **${rel.feitas}** vaga(s). Ainda sem obra: **${N.semObra().length}**.`;
+    if (rel.padronizadas) txt += `\n📚 ${rel.padronizadas} obra(s) trocada(s) pelo título oficial.`;
+    if (rel.naoConfirmadas.length) txt += `\n🤔 Não consegui confirmar que existe: ${rel.naoConfirmadas.slice(0, 10).join(', ')} (usei como você escreveu; veja \`/vagaadmin conferirobras\`).`;
     if (rel.naoAchadas.length) txt += `\n❓ Não achei: ${rel.naoAchadas.slice(0, 15).join(', ')}`;
     if (rel.invalidas) txt += `\n⚠️ ${rel.invalidas} linha(s) sem o formato \`Nome = Obra\`.`;
     return interaction.editReply(txt);
@@ -57,3 +59,4 @@ module.exports = {
     }
   },
 };
+                                                                                                              
