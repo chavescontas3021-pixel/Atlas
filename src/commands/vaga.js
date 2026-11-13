@@ -1,4 +1,6 @@
-const { EmbedBuilder, MessageFlags, SlashCommandBuilder } = require('discord.js');
+const {
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags, SlashCommandBuilder,
+} = require('discord.js');
 const db = require('../db');
 const N = require('../vagas/nucleo');
 const P = require('../vagas/personagens');
@@ -11,6 +13,8 @@ module.exports = {
     .setName('vaga')
     .setDescription('Vagas da house')
     .addSubcommand((s) => s.setName('lista').setDescription('Mostra os personagens ocupados e quem ocupa cada um'))
+    .addSubcommand((s) => s.setName('buscar').setDescription('Vê se um personagem está livre ou ocupado')
+      .addStringOption((o) => o.setName('nome').setDescription('Nome do personagem ou da obra').setRequired(true).setMaxLength(60)))
     .addSubcommand((s) => s.setName('minhas').setDescription('Mostra as vagas que você ocupa'))
     .addSubcommand((s) => s.setName('pedir').setDescription('Pede um personagem (busque pelo nome)')
       .addStringOption((o) => o.setName('personagem').setDescription('Nome do personagem. Escolha na lista ou digite à mão').setRequired(true).setAutocomplete(true).setMaxLength(100))
@@ -23,18 +27,53 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'lista') {
-      const embeds = N.embedsPainel(interaction.guild);
-      await interaction.reply({ embeds: [embeds[0]], allowedMentions: { parse: [] } });
-      for (const e of embeds.slice(1, 5)) await interaction.followUp({ embeds: [e], allowedMentions: { parse: [] } });
-      if (embeds.length > 5) await interaction.followUp({ content: `Mostrei só as primeiras ${5} páginas. Veja o resto no painel fixo.`, flags: EPH });
+      const embeds = N.embedsPainel();
+      let i = 0;
+      const botoes = () => new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('vlista:ant').setEmoji('◀️').setLabel('Anterior').setStyle(ButtonStyle.Secondary).setDisabled(i === 0),
+        new ButtonBuilder().setCustomId('vlista:pos').setEmoji('▶️').setLabel('Próxima').setStyle(ButtonStyle.Secondary).setDisabled(i === embeds.length - 1),
+      );
+      const tela = () => ({ embeds: [embeds[i]], components: embeds.length > 1 ? [botoes()] : [], allowedMentions: { parse: [] } });
+      await interaction.reply(tela());
+      if (embeds.length < 2) return null;
+      const msg = await interaction.fetchReply();
+      const col = msg.createMessageComponentCollector({ time: 5 * 60 * 1000 });
+      col.on('collect', async (b) => {
+        if (b.user.id !== interaction.user.id) return b.reply({ content: 'Só quem usou o comando vira a página. Use `/vaga lista` para ter a sua.', flags: EPH });
+        i = Math.min(embeds.length - 1, Math.max(0, i + (b.customId === 'vlista:pos' ? 1 : -1)));
+        return b.update(tela());
+      });
+      col.on('end', () => interaction.editReply({ components: [] }).catch(() => {}));
       return null;
+    }
+
+    if (sub === 'buscar') {
+      const texto = interaction.options.getString('nome');
+      const achados = N.buscar(texto);
+      if (!achados.length) {
+        return responder(interaction, `🟢 **${texto}** não consta no registro, então está livre. Para pedir, use \`/vaga pedir\`.`);
+      }
+      const linhas = achados.map((a) => {
+        const nome = `**${a.vaga.nome}**${a.vaga.grupo ? ` · ${a.vaga.grupo}` : ''}`;
+        return a.livre ? `🟢 ${nome} — livre` : `🔴 ${nome} — <@${a.donoId}>`;
+      });
+      const emb = new EmbedBuilder().setColor(0xf5a3c7).setTitle(`🔎 Resultado para “${texto.slice(0, 40)}”`).setDescription(linhas.join('\n'));
+      const foto = achados.length === 1 ? achados[0].vaga.foto : null;
+      if (foto) emb.setThumbnail(foto);
+      return interaction.reply({ embeds: [emb], flags: EPH, allowedMentions: { parse: [] } });
     }
 
     if (sub === 'minhas') {
       const minhas = N.doUsuario(interaction.user.id);
-      if (!minhas.length) return responder(interaction, 'Você não ocupa nenhuma vaga.');
-      const txt = minhas.map((v) => `🔴 **${v.nome}**${v.grupo ? ` (${v.grupo})` : ''} — desde <t:${Math.floor(v.desde / 1000)}:D>`).join('\n');
-      return interaction.reply({ embeds: [new EmbedBuilder().setColor(0xf5a3c7).setTitle('Suas vagas').setDescription(txt)], flags: EPH });
+      if (!minhas.length) return responder(interaction, 'Você não ocupa nenhuma vaga. Use `/vaga pedir` para pedir uma.');
+      const emb = new EmbedBuilder().setColor(0xf5a3c7).setTitle('🎭 Suas vagas')
+        .setFooter({ text: `${minhas.length} de ${N.limite()} vaga(s) usada(s)` });
+      for (const v of minhas.slice(0, 10)) {
+        emb.addFields({ name: `🔴 ${v.nome}`.slice(0, 256), value: `${v.grupo ? `${v.grupo} · ` : ''}desde <t:${Math.floor((v.desde || Date.now()) / 1000)}:D> (<t:${Math.floor((v.desde || Date.now()) / 1000)}:R>)` });
+      }
+      const foto = minhas.find((v) => v.foto);
+      if (foto) emb.setThumbnail(foto.foto);
+      return interaction.reply({ embeds: [emb], flags: EPH });
     }
 
     if (sub === 'pedir') {
@@ -73,8 +112,11 @@ module.exports = {
         if (!vaga) novo = { nome: bruto, grupo: obraDigitada, ext: null, foto: null };
       }
 
-      if (vaga && vaga.ocupanteId) return interaction.editReply(`❌ **${vaga.nome}**${vaga.grupo ? ` (${vaga.grupo})` : ''} já está ocupado por <@${vaga.ocupanteId}>.`);
-      if (N.pedidos().some((x) => x.chave === chave)) return interaction.editReply('❌ Já existe um pedido aguardando a staff para esse personagem.');
+      // Confere o personagem inteiro (também as entradas gêmeas), não só a vaga que foi escolhida
+      const alvo = vaga || { ext: novo.ext || chave, nome: novo.nome, grupo: novo.grupo };
+      const dono = N.acharTodos(alvo).find((v) => v.ocupanteId);
+      if (dono) return interaction.editReply(`❌ **${dono.nome}**${dono.grupo ? ` (${dono.grupo})` : ''} já está ocupado por <@${dono.ocupanteId}>.`);
+      if (N.pedidoPendente(alvo, chave)) return interaction.editReply('❌ Já existe um pedido aguardando a staff para esse personagem.');
 
       const p = { id: N.proximoPedido(), userId: interaction.user.id, obs: interaction.options.getString('observacao') || '', chave };
       if (vaga) p.vagaId = vaga.id; else p.novo = novo;
