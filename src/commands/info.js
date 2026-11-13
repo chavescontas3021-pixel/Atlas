@@ -1,6 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-
-const COR = 0xf5a3c7;
+const { SlashCommandBuilder } = require('discord.js');
+const UI = require('../ui/componentes');
+const { S, quando } = require('../ui/tema');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -19,9 +19,15 @@ module.exports = {
 
     if (sub === 'avatar') {
       const user = interaction.options.getUser('membro') || interaction.user;
-      const url = user.displayAvatarURL({ size: 1024 });
+      const png = user.displayAvatarURL({ size: 1024, extension: 'png' });
+      const webp = user.displayAvatarURL({ size: 1024, extension: 'webp' });
+      const embed = UI.painel({ trilha: ['Info', 'Avatar'], titulo: user.username, imagem: png });
       return interaction.reply({
-        embeds: [new EmbedBuilder().setColor(COR).setTitle(`Avatar de ${user.username}`).setImage(url).setDescription(`[Abrir original](${url})`)],
+        embeds: [embed],
+        components: [UI.linha(
+          UI.botao({ label: 'PNG', url: png }),
+          UI.botao({ label: 'WEBP', url: webp }),
+        )],
       });
     }
 
@@ -29,52 +35,59 @@ module.exports = {
       const alvo = interaction.options.getUser('membro') || interaction.user;
       const user = await alvo.fetch(true);
       const url = user.bannerURL({ size: 1024 });
-      if (!url) return interaction.reply({ content: 'Essa pessoa não tem banner.', flags: MessageFlags.Ephemeral });
+      if (!url) return interaction.reply(UI.erro(`**${user.username}** não tem banner.`));
       return interaction.reply({
-        embeds: [new EmbedBuilder().setColor(COR).setTitle(`Banner de ${user.username}`).setImage(url)],
+        embeds: [UI.painel({ trilha: ['Info', 'Banner'], titulo: user.username, imagem: url })],
+        components: [UI.linha(UI.botao({ label: 'Abrir original', url }))],
       });
     }
 
     if (sub === 'usuario') {
       const user = interaction.options.getUser('membro') || interaction.user;
       const member = await interaction.guild.members.fetch(user.id).catch(() => null);
-      const emb = new EmbedBuilder()
-        .setColor(COR)
-        .setTitle(user.username)
-        .setThumbnail(user.displayAvatarURL({ size: 256 }))
-        .addFields(
-          { name: '🆔 ID', value: user.id, inline: true },
-          { name: '📅 Conta criada', value: `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
-        );
+      const campos = [
+        { nome: 'ID', valor: `\`${user.id}\``, lado: true },
+        { nome: 'Conta criada', valor: quando(user.createdTimestamp), lado: true },
+      ];
       if (member) {
         const cargos = member.roles.cache
           .filter((r) => r.id !== interaction.guild.id)
           .sort((a, b) => b.position - a.position)
           .map((r) => r.toString());
-        emb.addFields(
-          { name: '📥 Entrou no servidor', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`, inline: true },
-          { name: `🎭 Cargos (${cargos.length})`, value: cargos.slice(0, 15).join(' ') || 'Nenhum', inline: false },
-        );
+        campos.push({ nome: 'Entrou no servidor', valor: quando(member.joinedTimestamp), lado: true });
+        campos.push({
+          nome: `Cargos  ${S.sep}  ${cargos.length}`,
+          valor: cargos.slice(0, 15).join(' ') || 'Nenhum',
+        });
       }
-      return interaction.reply({ embeds: [emb] });
+      const embed = UI.painel({
+        trilha: ['Info', 'Membro'],
+        titulo: member?.displayName || user.username,
+        descricao: `@${user.username}${user.bot ? `  ${S.sep}  bot` : ''}`,
+        thumb: user.displayAvatarURL({ size: 256 }),
+        campos,
+      });
+      return interaction.reply({ embeds: [embed] });
     }
 
     if (sub === 'servidor') {
       const g = interaction.guild;
       const dono = await g.fetchOwner().catch(() => null);
-      const emb = new EmbedBuilder()
-        .setColor(COR)
-        .setTitle(g.name)
-        .setThumbnail(g.iconURL({ size: 256 }))
-        .addFields(
-          { name: '👑 Dono', value: dono ? `<@${dono.id}>` : '—', inline: true },
-          { name: '👥 Membros', value: `${g.memberCount}`, inline: true },
-          { name: '💬 Canais', value: `${g.channels.cache.size}`, inline: true },
-          { name: '🎭 Cargos', value: `${g.roles.cache.size}`, inline: true },
-          { name: '💎 Boosts', value: `${g.premiumSubscriptionCount || 0}`, inline: true },
-          { name: '📅 Criado', value: `<t:${Math.floor(g.createdTimestamp / 1000)}:R>`, inline: true },
-        );
-      return interaction.reply({ embeds: [emb] });
+      const embed = UI.painel({
+        trilha: ['Info', 'Servidor'],
+        titulo: g.name,
+        descricao: g.description || undefined,
+        thumb: g.iconURL({ size: 256 }),
+        campos: [
+          { nome: 'Dono', valor: dono ? `<@${dono.id}>` : '—', lado: true },
+          { nome: 'Membros', valor: `${g.memberCount}`, lado: true },
+          { nome: 'Canais', valor: `${g.channels.cache.size}`, lado: true },
+          { nome: 'Cargos', valor: `${g.roles.cache.size}`, lado: true },
+          { nome: 'Boosts', valor: `${g.premiumSubscriptionCount || 0}`, lado: true },
+          { nome: 'Criado', valor: quando(g.createdTimestamp), lado: true },
+        ],
+      });
+      return interaction.reply({ embeds: [embed] });
     }
   },
 };
