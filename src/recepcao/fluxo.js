@@ -227,7 +227,13 @@ async function conferirPersonagem(canal, userId, nome) {
 
     const sessao = db.get(chave(userId));
     if (!sessao || sessao.etapa !== 'personagem' || sessao.assumido) return;
-    const { proposta, ...resto } = sessao;
+    const { proposta, obra, ...resto } = sessao;
+    if (U.cfg('perguntarObra', true) !== false) {
+      // Antes do molde, pergunta a obra (deixa o registro de vagas organizado)
+      db.set(chave(userId), { ...resto, personagem: nome, etapa: 'obra' });
+      await canal.send(`✅ **${nome}** está livre!\nAgora me diga **de qual obra** ele é (anime, mangá, jogo, série...). Se não souber, escreva **pular**.`);
+      return;
+    }
     db.set(chave(userId), { ...resto, personagem: nome, etapa: 'molde' });
     await enviarMoldes(canal, userId, nome);
   } finally {
@@ -281,6 +287,28 @@ async function receberPersonagem(message) {
   const nome = bruto.replace(/\s+/g, ' ');
   if (!T.confirmarLigado()) return conferirPersonagem(message.channel, userId, nome);
   return propor(message, nome);
+}
+
+// Quando o membro escreve a obra do personagem
+async function receberObra(message) {
+  const userId = message.author.id;
+  const sessao = db.get(chave(userId));
+  if (!sessao || sessao.etapa !== 'obra') return;
+  const bruto = message.content.trim().replace(/\s+/g, ' ');
+  if (!bruto) return;
+  const invalida = bruto.length > 60 || /[\n?]/.test(message.content) || /https?:\/\/|discord\.gg|<@|<#|@everyone|@here/i.test(bruto);
+  if (invalida) {
+    if (!sessao.avisouObra) {
+      db.set(chave(userId), { ...sessao, avisouObra: true });
+      await message.reply({ content: 'Me envie só o **nome da obra** (ex: Naruto, One Piece). Se não souber, escreva **pular**.', allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
+    }
+    return;
+  }
+  const obra = /^(pular|nao sei|não sei)$/i.test(bruto) ? '' : bruto;
+  const { avisouObra, ...resto } = sessao;
+  db.set(chave(userId), { ...resto, obra, etapa: 'molde' });
+  await message.react('✅').catch(() => {});
+  await enviarMoldes(message.channel, userId, sessao.personagem);
 }
 
 // Botão "Sim, é esse"
@@ -462,6 +490,7 @@ async function verificar(interaction) {
 module.exports = {
   iniciarRecepcao,
   receberPersonagem,
+  receberObra,
   receberEmoji,
   escolherMolde,
   escolherEmoji,
