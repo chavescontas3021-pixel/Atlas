@@ -36,6 +36,9 @@ module.exports = {
       .addBooleanOption((o) => o.setName('corrigir').setDescription('Arruma o que for seguro (padrão: só mostrar)')))
     .addSubcommand((s) => s.setName('organizar').setDescription('Descobre sozinho a obra das vagas que estão sem obra (AniList)')
       .addBooleanOption((o) => o.setName('aplicar').setDescription('Aplica de verdade (padrão: só mostrar)')))
+    .addSubcommand((s) => s.setName('conferirobras').setDescription('Confere se as obras registradas existem e padroniza os títulos')
+      .addBooleanOption((o) => o.setName('aplicar').setDescription('Aplica de verdade (padrão: só mostrar)'))
+      .addBooleanOption((o) => o.setName('aceitar').setDescription('Também aceita sugestões e dá por conferidas as que não achei')))
     .addSubcommand((s) => s.setName('obras').setDescription('Preenche a obra de várias vagas de uma vez (lista)'))
     .addSubcommand((s) => s.setName('mensagem').setDescription('Edita o texto do painel')),
 
@@ -52,6 +55,7 @@ module.exports = {
         { name: 'Limite por pessoa', value: `${N.limite()}`, inline: true },
         { name: 'Personagens', value: `${N.todas().filter((v) => v.ocupanteId).length} ocupados · ${N.livres().length} livres cadastrados`, inline: true },
         { name: 'Sem obra', value: `${N.semObra().length}`, inline: true },
+        { name: 'Obra a conferir', value: `${N.aConferir().length}`, inline: true },
       );
       return interaction.reply({ embeds: [embed], flags: EPH });
     }
@@ -88,6 +92,23 @@ module.exports = {
       const campo = new TextInputBuilder().setCustomId('lista').setLabel('Nome = Obra (uma por linha)').setStyle(TextInputStyle.Paragraph).setMaxLength(4000).setRequired(true);
       if (pre) campo.setValue(pre);
       return interaction.showModal(new ModalBuilder().setCustomId('vagas:modal:obras').setTitle('Obra das vagas').addComponents(new ActionRowBuilder().addComponents(campo)));
+    }
+
+    if (sub === 'conferirobras') {
+      const aplicar = !!interaction.options.getBoolean('aplicar');
+      const aceitar = !!interaction.options.getBoolean('aceitar');
+      await interaction.deferReply({ flags: EPH });
+      const rel = await N.conferirObras({ aplicar, aceitar });
+      if (aplicar) await N.atualizarPainel(guild);
+      const L = [`${aplicar ? '✅ Aplicado' : '🔎 Prévia'}: conferi **${rel.lidas}** de **${rel.total}** obras.`];
+      if (rel.ok.length) L.push(`\n✅ Existem (${rel.ok.length}):\n${rel.ok.slice(0, 10).map((o) => `• ${o.de}${o.de !== o.para ? ` → **${o.para}**` : ''} (${o.tipo}, ${o.n} vaga${o.n > 1 ? 's' : ''})`).join('\n')}${rel.ok.length > 10 ? '\n…' : ''}`);
+      if (rel.sugestoes.length) L.push(`\n🤔 Parecidas, confirme (${rel.sugestoes.length}):\n${rel.sugestoes.slice(0, 8).map((o) => `• ${o.de} → **${o.para}**?`).join('\n')}`);
+      if (rel.nao.length) L.push(`\n❌ Não achei (${rel.nao.length}): ${rel.nao.slice(0, 10).map((o) => o.de).join(', ')}${rel.nao.length > 10 ? '…' : ''}`);
+      if (rel.erro) L.push(`\n⚠️ ${rel.erro} obra(s) não deu para conferir (serviço fora do ar). Tente mais tarde.`);
+      if (rel.total > rel.lidas) L.push('\nRode de novo para conferir o restante.');
+      if (!aplicar) L.push('\nGostou? Rode com `aplicar: True`.');
+      else if (!aceitar && (rel.sugestoes.length || rel.nao.length)) L.push('\nPara aceitar as sugestões e dar as outras por conferidas, rode com `aplicar: True` e `aceitar: True`.');
+      return interaction.editReply({ content: L.join('\n').slice(0, 1950), allowedMentions: { parse: [] } });
     }
 
     if (sub === 'organizar') {
