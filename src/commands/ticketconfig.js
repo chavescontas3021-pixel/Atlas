@@ -12,10 +12,11 @@ const {
   TextInputStyle,
 } = require('discord.js');
 const db = require('../db');
+const UI = require('../ui/componentes');
 const N = require('../ticket/nucleo');
 
 const EPH = MessageFlags.Ephemeral;
-const responder = (interaction, content) => interaction.reply({ content, flags: EPH });
+const responder = (interaction, content) => interaction.reply(UI.auto(content));
 const MAX_TIPOS = 15;
 
 function status(interaction) {
@@ -38,23 +39,7 @@ function status(interaction) {
   return interaction.reply({ embeds: [embed], flags: EPH });
 }
 
-function linhasBotoes(tipos) {
-  const rows = [];
-  const lista = tipos.slice(0, MAX_TIPOS);
-  for (let i = 0; i < lista.length; i += 5) {
-    const row = new ActionRowBuilder();
-    for (const t of lista.slice(i, i + 5)) {
-      const b = new ButtonBuilder()
-        .setCustomId(`ticket:novo:${t.id}`)
-        .setLabel(t.nome.slice(0, 80))
-        .setStyle(ButtonStyle.Primary);
-      if (t.emoji) b.setEmoji(t.emoji);
-      row.addComponents(b);
-    }
-    rows.push(row);
-  }
-  return rows;
-}
+const linhasBotoes = (tipos) => N.componentesPainel(tipos, MAX_TIPOS);
 
 async function tipo(interaction, sub) {
   const lista = [...N.tipos()];
@@ -250,11 +235,7 @@ module.exports = {
       const canal = interaction.options.getChannel('canal');
       const msg = N.mensagem('painel');
       const tipos = N.tipos().slice(0, MAX_TIPOS);
-      const lista = tipos.map((t) => `${t.emoji ? t.emoji + ' ' : ''}**${t.nome}**${t.desc ? ' — ' + t.desc : ''}`).join('\n');
-      const embed = new EmbedBuilder()
-        .setColor(N.COR)
-        .setTitle(msg.titulo)
-        .setDescription(`${msg.texto}\n\n${lista}`.slice(0, 4096));
+      const embed = UI.painel({ trilha: ['Atendimento'], titulo: msg.titulo, descricao: `${msg.texto}\n\n${N.listaCategorias(tipos)}`.slice(0, 4000) });
       await canal.send({ embeds: [embed], components: linhasBotoes(tipos) });
       return responder(interaction, `✅ Painel enviado em ${canal}.`);
     }
