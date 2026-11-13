@@ -3,11 +3,32 @@ const N = require('../vagas/nucleo');
 
 const EPH = MessageFlags.Ephemeral;
 
+// Modal do /vagaadmin obras: linhas "Nome = Obra"
+async function modalObras(interaction) {
+  try {
+    if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
+      return interaction.reply({ content: '❌ Só a staff.', flags: EPH });
+    }
+    await interaction.deferReply({ flags: EPH });
+    const rel = N.definirObras(interaction.fields.getTextInputValue('lista'));
+    if (rel.feitas) await N.atualizarPainel(interaction.guild);
+    let txt = `✅ Obra definida em **${rel.feitas}** vaga(s). Ainda sem obra: **${N.semObra().length}**.`;
+    if (rel.naoAchadas.length) txt += `\n❓ Não achei: ${rel.naoAchadas.slice(0, 15).join(', ')}`;
+    if (rel.invalidas) txt += `\n⚠️ ${rel.invalidas} linha(s) sem o formato \`Nome = Obra\`.`;
+    return interaction.editReply(txt);
+  } catch (err) {
+    console.error('[Vagas] obras:', err);
+    try { await interaction.editReply('Deu erro ao salvar as obras.'); } catch { /* ignora */ }
+  }
+}
+
 module.exports = {
   name: 'interactionCreate',
   once: false,
   async execute(client, interaction) {
-    if (!interaction.isModalSubmit() || interaction.customId !== 'vagas:modal:lote') return;
+    if (!interaction.isModalSubmit()) return;
+    if (interaction.customId === 'vagas:modal:obras') return modalObras(interaction);
+    if (interaction.customId !== 'vagas:modal:lote') return;
     try {
       if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
         return interaction.reply({ content: '❌ Só a staff.', flags: EPH });
@@ -18,7 +39,7 @@ module.exports = {
       let criadas = 0;
       const puladas = [];
       for (const nome of linhas.slice(0, 100)) {
-        if (nome.length > 60 || N.acharVaga(nome)) {
+        if (nome.length > 60 || N.acharTodos({ ext: N.chaveManual(nome, grupo), nome, grupo }).length) {
           puladas.push(nome.slice(0, 30));
           continue;
         }
