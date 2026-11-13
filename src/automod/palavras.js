@@ -18,10 +18,10 @@ module.exports = {
       'buceta', 'bucetinha', 'xoxota', 'xereca', 'pepeca', 'pepeka', 'piroca', 'pirocao',
       'pau duro', 'pau no cu', 'dar o cu', 'dar o rabo', 'sentar na rola', 'sentar no pau',
       'sexo anal', 'sexo oral', 'sexo grupal', 'sexo a tres', 'fazer sexo', 'fazendo sexo',
-      'transar', 'transei', 'transando', 'transamos', 'transa comigo',
+      'transa comigo', 'gozar na boca', 'gozar na cara', 'gozei na boca', 'gozei na cara', 'gozar dentro', 'gozei dentro',
       'boquete', 'chupar pau', 'chupar rola', 'chupa pau', 'chupa rola', 'mamar rola', 'mamar pica',
       'punheta', 'bater punheta', 'siririca', 'masturbar', 'masturbacao', 'masturbando',
-      'gozar na', 'gozei na', 'gozando', 'ejacular', 'ejaculacao',
+      'ejacular', 'ejaculacao',
       'putaria', 'puteiro', 'garota de programa', 'garoto de programa',
       'orgia', 'suruba', 'menage a trois', 'bdsm', 'dominatrix',
       'incesto', 'zoofilia', 'necrofilia', 'bestialidade',
@@ -36,21 +36,23 @@ module.exports = {
       'vou te currar', 'vou currar',
     ],
     'ameaça': [
-      'vou te matar', 'vou matar voce', 'vou matar todo mundo', 'vou matar todos',
+      'vou te matar', 'vou matar voce',
+      'vou matar todo mundo aqui', 'vou matar todos aqui', 'vou matar todos voces', 'vou matar todos vcs',
+      'vou atirar em todo mundo aqui', 'vou atirar em todos aqui', 'vou atirar em todos voces',
       'te mato', 'vou te esfaquear', 'vou te dar um tiro', 'vou te dar um tiro na cara',
-      'vou atirar em todo mundo', 'vou atirar em todos', 'vou te sequestrar',
+      'vou te sequestrar',
       'vou sequestrar', 'vou explodir', 'vou matar a sua familia', 'vou matar sua familia',
       'vou acabar com a sua familia', 'vou te cortar todo',
     ],
     'violência extrema': [
-      'chacina', 'massacre na escola', 'massacre em escola', 'ataque a escola',
-      'ataque na escola', 'tiroteio na escola', 'vou atirar na escola',
+
+      'vou atirar na escola',
       'vou fazer um atentado', 'vou fazer um massacre', 'vou fazer uma chacina',
     ],
     'armas e explosivos': [
       'fazer bomba', 'fazer uma bomba', 'bomba caseira', 'fazer explosivo',
       'fabricar bomba', 'construir bomba', 'fazer coquetel molotov',
-      'vendo arma', 'vendo pistola', 'vendo fuzil', 'vendo municao', 'vendo revolver',
+      'vendo fuzil',
       'comprar arma ilegal', 'arma sem registro', 'arma de fogo sem registro',
     ],
     'drogas': [
@@ -67,7 +69,7 @@ module.exports = {
       'dinheiro falso', 'nota falsa', 'vendo nota falsa', 'comprovante falso',
     ],
     'invasão e exposição': [
-      'doxxing', 'dox', 'vou doxar', 'vou te doxar', 'ddos', 'vou ddosar', 'vou derrubar seu ip',
+      'vou doxar', 'vou te doxar','vou ddosar', 'vou derrubar seu ip',
       'vazar nudes', 'vazei nudes', 'vou vazar suas fotos', 'vou vazar seus nudes',
       'pornografia de vinganca', 'revenge porn',
     ],
@@ -80,7 +82,7 @@ module.exports = {
     ],
     'racismo e apologia ao nazismo': [
       'volta pra senzala', 'volta para a senzala', 'preto fedido', 'negro fedido',
-      'nazismo', 'nazista', 'neonazismo', 'neonazista', 'supremacia branca', 'white power',
+      'white power',
       'heil hitler', 'sieg heil', 'viva hitler', 'hitler tinha razao',
       'holocausto nao aconteceu', 'holocausto foi mentira',
     ],
@@ -89,13 +91,40 @@ module.exports = {
   // LEVE: apaga a mensagem e avisa. Vira advertência só se repetir (ou conforme /automod leve)
   leves: {
     'conteúdo sexual': [
-      'sexo', 'sexshop', 'sex shop', 'tesao', 'tesuda', 'tesudo',
+      'sexo', 'transar', 'transei', 'transando', 'transamos', 'sexshop', 'sex shop', 'tesao', 'tesuda', 'tesudo',
       'safada', 'safado', 'safadinha', 'safadeza', 'sacanagem', 'putinha',
       'gozar', 'gozada', 'orgasmo', 'pelado', 'pelada', 'peladao',
       'prostituta', 'prostituicao', 'pornozinho', 'erotico', 'erotica', 'erotismo',
       'pussy', 'boobs', 'tits', 'horny', 'orgy', 'sexual content',
     ],
   },
+
+  // Expressões do dia a dia que NÃO devem ser bloqueadas (são apagadas do texto antes da checagem).
+  // Escreva do jeito normal; o Atlas normaliza (acentos, maiúsculas) sozinho.
+  inofensivas: [
+    // "te mato de rir", "vou explodir de raiva"... (jeito de falar, não ameaça)
+    'te mato de rir', 'vou te matar de rir', 'vou matar de rir', 'matar de rir', 'mato de rir',
+    'te mato de cocegas', 'vou te matar de cocegas', 'te mato de saudade', 'vou te matar de saudade',
+    'te mato de amor', 'vou te matar de amor', 'te mato de vergonha', 'vou te matar de vergonha',
+    'te mato de abraco', 'vou te matar de abraco', 'te mato de beijo', 'te mato de tanto',
+    'vou explodir de rir', 'vou explodir de tanto rir', 'vou explodir de raiva', 'vou explodir de felicidade',
+    'vou explodir de fofura', 'vou explodir de ansiedade', 'vou explodir de curiosidade', 'vou explodir de emocao',
+    'vou explodir de tanto comer', 'vou explodir de tanto chorar', 'vou explodir de tanto',
+    // "gozar da cara de alguém" (zoar)
+    'gozar da cara', 'gozando da cara', 'gozando da minha cara', 'gozando da sua cara', 'gozou da cara',
+    'gozou da minha cara', 'gozaram da minha cara', 'gozei da cara', 'gozando de voce', 'gozando de mim',
+    'gozar de voce', 'gozar de mim', 'gozar na boa', 'gozando com a cara', 'gozar com a cara',
+    // "pelada" de futebol
+    'jogar pelada', 'jogando pelada', 'jogamos pelada', 'jogou pelada', 'jogo pelada', 'pelada de futebol', 'pelada de domingo',
+    // "sexo" como informação de ficha / bichinho
+    'sexo do personagem', 'sexo da personagem', 'sexo do npc', 'sexo do oc', 'sexo da ficha', 'sexo do pet',
+    'sexo do bichinho', 'sexo do bebe', 'sexo do filhote', 'sexo biologico', 'sexo masculino', 'sexo feminino',
+    'qual o sexo', 'qual e o sexo',
+    // "estou vendo X" (assistindo), em vez de "vendo X" (à venda)
+    'estou vendo', 'to vendo', 'tou vendo', 'ta vendo', 'esta vendo', 'estamos vendo', 'estao vendo',
+    'estava vendo', 'estavam vendo', 'tava vendo', 'tavam vendo', 'ficou vendo', 'fiquei vendo',
+    'ficamos vendo', 'continuo vendo', 'continua vendo', 'continuamos vendo',
+  ],
 
   // Pedaços de endereço de sites adultos (qualquer link que contenha isso é bloqueado)
   dominios: [
