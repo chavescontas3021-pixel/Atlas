@@ -1,26 +1,28 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits } = require('discord.js');
 const db = require('../db');
+const UI = require('../ui/componentes');
+const T = require('../ui/tema');
 
-const COR = 0x5865f2;
+const COR = T.COR.base;
 
 const PADROES = {
   limite: 1,
   tipos: [
-    { id: 'suporte', nome: 'Suporte', emoji: '🛠️', desc: 'Preciso de ajuda com algo' },
-    { id: 'denuncia', nome: 'Denúncia', emoji: '🚨', desc: 'Quero denunciar um problema' },
-    { id: 'duvida', nome: 'Dúvida', emoji: '❓', desc: 'Tenho uma pergunta' },
-    { id: 'parceria', nome: 'Parceria', emoji: '🤝', desc: 'Quero propor uma parceria' },
-    { id: 'outro', nome: 'Outro', emoji: '💬', desc: 'Outro assunto' },
+    { id: 'suporte', nome: 'Suporte', emoji: '', desc: 'Preciso de ajuda com algo' },
+    { id: 'denuncia', nome: 'Denúncia', emoji: '', desc: 'Quero denunciar um problema' },
+    { id: 'duvida', nome: 'Dúvida', emoji: '', desc: 'Tenho uma pergunta' },
+    { id: 'parceria', nome: 'Parceria', emoji: '', desc: 'Quero propor uma parceria' },
+    { id: 'outro', nome: 'Outro', emoji: '', desc: 'Outro assunto' },
   ],
   mensagens: {
     painel: {
-      titulo: '🎫 Central de atendimento',
+      titulo: 'Central de atendimento',
       texto:
         'Precisa falar com a staff? Escolha uma categoria abaixo e abra um ticket.\n' +
         'Só você e a staff vão enxergar o canal.',
     },
     abertura: {
-      titulo: '{emoji} Ticket #{numero} — {categoria}',
+      titulo: 'Ticket #{numero}  ·  {categoria}',
       texto:
         'Olá, {usuario}! A staff já foi avisada e vai te atender em breve.\n' +
         'Enquanto isso, conte tudo com o máximo de detalhes.',
@@ -149,32 +151,50 @@ function embedAbertura(t) {
     usuario: `<@${t.userId}>`,
     numero: numeroFmt(t.numero),
     categoria: t.tipoNome,
-    emoji: t.tipoEmoji || '🎫',
+    emoji: t.tipoEmoji || '',
   };
-  const status = t.assumidoPor ? `🟡 Em atendimento por <@${t.assumidoPor}>` : '🟢 Aguardando a staff';
-  return new EmbedBuilder()
-    .setColor(t.assumidoPor ? 0xf1c40f : COR)
-    .setTitle(preencher(msg.titulo, vars).slice(0, 256))
-    .setDescription(preencher(msg.texto, vars))
-    .addFields(
-      { name: '📌 Assunto', value: t.assunto.slice(0, 1024) },
-      { name: '📝 Descrição', value: t.descricao.slice(0, 1024) },
-      { name: '👤 Aberto por', value: `<@${t.userId}>`, inline: true },
-      { name: '📂 Categoria', value: `${t.tipoEmoji || ''} ${t.tipoNome}`.trim(), inline: true },
-      { name: '📊 Status', value: status, inline: true }
-    )
-    .setTimestamp(t.aberto);
+  const status = t.assumidoPor
+    ? `${T.S.ponto}  Em atendimento por <@${t.assumidoPor}>`
+    : `${T.S.vazio}  Aguardando a staff`;
+  return UI.painel({
+    trilha: ['Ticket', `#${numeroFmt(t.numero)}`],
+    titulo: preencher(msg.titulo, vars).trim(),
+    descricao: preencher(msg.texto, vars),
+    campos: [
+      { nome: 'Assunto', valor: t.assunto },
+      { nome: 'Descrição', valor: t.descricao },
+      { nome: 'Aberto por', valor: `<@${t.userId}>`, lado: true },
+      { nome: 'Categoria', valor: t.tipoNome, lado: true },
+      { nome: 'Status', valor: status, lado: true },
+    ],
+  }).setTimestamp(t.aberto);
 }
 
 function botoesTicket(assumido) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('ticket:assumir')
-      .setLabel(assumido ? 'Liberar' : 'Assumir')
-      .setEmoji('🙋')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('ticket:fechar').setLabel('Fechar').setEmoji('🔒').setStyle(ButtonStyle.Danger)
-  );
+  return UI.botoes([
+    { id: 'ticket:assumir', label: assumido ? 'Liberar' : 'Assumir' },
+    { id: 'ticket:fechar', label: 'Fechar', estilo: 'perigo' },
+  ]);
+}
+
+// Componentes do painel público: até 3 categorias viram botões; mais que isso vira menu de seleção.
+function componentesPainel(tipos, max = 25) {
+  const lista = tipos.slice(0, max);
+  if (lista.length <= 3) {
+    return [UI.botoes(lista.map((t) => ({ id: `ticket:novo:${t.id}`, label: t.nome, emoji: t.emoji || undefined })))];
+  }
+  return [UI.menu({
+    id: 'ticket:novo:menu',
+    placeholder: 'Escolha o assunto para abrir um ticket',
+    opcoes: lista.map((t) => ({ valor: t.id, nome: t.nome, desc: t.desc || undefined, emoji: t.emoji || undefined })),
+  })];
+}
+
+// Texto da lista de categorias que aparece no painel público
+function listaCategorias(tipos) {
+  return tipos
+    .map((t) => `${T.S.seta}  **${t.nome}**${t.desc ? `\n${T.S.filho} ${t.desc}` : ''}`)
+    .join('\n');
 }
 
 // ---------- Transcrição ----------
@@ -300,6 +320,8 @@ module.exports = {
   emojiValido,
   embedAbertura,
   botoesTicket,
+  componentesPainel,
+  listaCategorias,
   buscarMensagens,
   gerarHtml,
 };
