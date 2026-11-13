@@ -63,7 +63,26 @@ async function criarCanal(guild, member, numero, painel) {
     { id: member.id, allow: basico },
     { id: eu.id, allow: [...basico, P.ManageChannels, P.ManageMessages] },
   ];
-  for (const id of N.staffRoles(guild, painel)) permissoes.push({ id, allow: [...basico, P.ManageMessages] });
+  const jaTem = new Set(permissoes.map((p) => p.id));
+  for (const id of N.staffRoles(guild, painel)) {
+    permissoes.push({ id, allow: [...basico, P.ManageMessages] });
+    jaTem.add(id);
+  }
+
+  // Cargos com Administrador/Gerenciar Servidor e o dono recebem acesso EXPLÍCITO ao canal.
+  // Sem isso, com "Mostrar todos os canais" desligado, o ticket some da barra lateral deles
+  // assim que saem do canal (Administrador não conta como acesso explícito).
+  for (const role of guild.roles.cache.values()) {
+    if (role.id === guild.roles.everyone.id || jaTem.has(role.id)) continue;
+    if (role.permissions.has(P.Administrator) || role.permissions.has(P.ManageGuild)) {
+      permissoes.push({ id: role.id, allow: [...basico, P.ManageMessages] });
+      jaTem.add(role.id);
+    }
+  }
+  if (guild.ownerId && !jaTem.has(guild.ownerId)) {
+    permissoes.push({ id: guild.ownerId, allow: [...basico, P.ManageMessages] });
+    jaTem.add(guild.ownerId);
+  }
 
   const nome = `ticket-${N.numeroFmt(numero)}-${member.user.username}`
     .toLowerCase()
@@ -155,6 +174,19 @@ async function assumir(interaction) {
   const liberando = t.assumidoPor === interaction.user.id;
   t.assumidoPor = liberando ? null : interaction.user.id;
   db.set(`ticket.abertos.${canal.id}`, t);
+
+  // Garante que o canal continue aparecendo na lista de quem assumiu, mesmo depois de sair dele
+  if (!liberando) {
+    await canal.permissionOverwrites
+      .edit(interaction.user.id, {
+        ViewChannel: true,
+        SendMessages: true,
+        ReadMessageHistory: true,
+        AttachFiles: true,
+        EmbedLinks: true,
+      })
+      .catch((e) => console.error('[Ticket] erro ao dar acesso a quem assumiu:', e.message));
+  }
 
   await interaction.update({ embeds: [N.embedAbertura(t)], components: [N.botoesTicket(!!t.assumidoPor)] });
   await canal.send({
