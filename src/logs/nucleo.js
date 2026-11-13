@@ -1,21 +1,24 @@
 // Núcleo dos logs: onde cada tipo de log vai parar e como montar as mensagens.
 const { AuditLogEvent, EmbedBuilder } = require('discord.js');
 const db = require('../db');
+const T = require('../ui/tema');
+const UI = require('../ui/componentes');
 
 const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar'); // não passa pelo editor de mensagens
 
 const CATEGORIAS = {
-  membros: '👥 Entradas, saídas e mudanças de membros',
-  moderacao: '🔨 Bans, expulsões e castigos',
-  mensagens: '💬 Mensagens apagadas e editadas',
-  voz: '🔊 Canais de voz',
-  canais: '📁 Canais e tópicos',
-  cargos: '🏷️ Cargos',
-  servidor: '⚙️ Servidor, emojis e convites',
-  comandos: '⌨️ Comandos usados',
+  membros: 'Entradas, saídas e mudanças de membros',
+  moderacao: 'Bans, expulsões e castigos',
+  mensagens: 'Mensagens apagadas e editadas',
+  voz: 'Canais de voz',
+  canais: 'Canais e tópicos',
+  cargos: 'Cargos',
+  servidor: 'Servidor, emojis e convites',
+  comandos: 'Comandos usados',
 };
 
-const CORES = { verde: 0x57f287, vermelho: 0xed4245, amarelo: 0xfee75c, azul: 0x5865f2, rosa: 0xf5a3c7, cinza: 0x99aab5 };
+// Logs em preto do Atlas. Só o vermelho (saídas, bans, apagados) mantém um toque de cor.
+const CORES = { verde: T.COR.base, vermelho: T.COR.perigo, amarelo: T.COR.base, azul: T.COR.base, rosa: T.COR.base, cinza: T.COR.base };
 
 const cfg = (k, p) => db.get(`config.logs.${k}`, p);
 const ativa = (cat) => !(cfg('desligados', []) || []).includes(cat);
@@ -40,9 +43,9 @@ const quandoCompleto = (ms) => `<t:${Math.floor(ms / 1000)}:f>`;
 const pessoa = (u) => (u ? `<@${u.id}> (${u.tag || u.username || u.id})` : 'desconhecido');
 
 function embed(cor, titulo, descricao, campos = []) {
-  const e = new EmbedBuilder().setColor(CORES[cor] || cor).setTitle(corta(titulo, 250)).setTimestamp(new Date());
+  const e = UI.painel({ trilha: ['Registro'], titulo: corta(titulo, 250), perigo: cor === 'vermelho' }).setTimestamp(new Date());
   if (descricao) e.setDescription(corta(descricao, 3900));
-  const lista = campos.filter(Boolean).slice(0, 24).map(([nome, valor, inline]) => ({ name: corta(nome, 250), value: corta(vazio(valor), 1020), inline: !!inline }));
+  const lista = campos.filter(Boolean).slice(0, 24).map(([nome, valor, inline]) => ({ name: corta(T.tirarEmoji(nome) || nome, 250), value: corta(vazio(valor), 1020), inline: !!inline }));
   if (lista.length) e.addFields(...lista);
   return e;
 }
