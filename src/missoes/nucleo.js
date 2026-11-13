@@ -1,9 +1,11 @@
 // Missões diárias/semanais e conquistas (ligadas ao RPG da house).
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
+const UI = require('../ui/componentes');
+const T = require('../ui/tema');
 const db = require('../db');
 const R = require('../rpg/nucleo');
 
-const COR = 0xf5a3c7;
+const COR = T.COR.base;
 const BRT = 3 * 3600 * 1000; // Brasília = UTC-3
 const DIA = 24 * 3600 * 1000;
 
@@ -205,28 +207,31 @@ function prontas(uid) {
 function linhaMissao(m, e) {
   const p = Math.min(e.prog[m.metrica] || 0, m.alvo);
   const feita = e.resg.includes(m.id);
-  const status = feita ? '✅ resgatada' : p >= m.alvo ? '🎁 pronta!' : '';
-  return `**${m.nome}** — ${METRICAS[m.metrica]}: ${R.barra(p, m.alvo, 8)} ${p}/${m.alvo}\n⭐ ${m.stars} · ✨ ${m.xp} XP ${status}`;
+  const pronta = p >= m.alvo;
+  const marca = feita ? T.S.ponto : T.S.vazio;
+  const status = feita ? 'resgatada' : pronta ? 'pronta para resgatar' : '';
+  const nome = feita ? `~~${m.nome}~~` : `**${m.nome}**`;
+  return `${marca}  ${nome}  ${T.S.sep}  ${T.tirarEmoji(METRICAS[m.metrica])}\n${T.barra(p / m.alvo, 10)}  ${p}/${m.alvo}\n${T.S.filho} ⭐ ${m.stars}  ${T.S.sep}  ${m.xp} XP${status ? `  ${T.S.sep}  ${status}` : ''}`;
 }
 
 function embedMissoes(uid) {
   const agora = Date.now();
   const d = estado(uid, 'dia');
   const s = estado(uid, 'semana');
-  return new EmbedBuilder()
-    .setColor(COR)
-    .setTitle('📋 Suas missões')
-    .addFields(
-      { name: `☀️ Diárias — reinicia <t:${Math.floor(fimDoDia(agora) / 1000)}:R>`, value: ativas('dia', d.chave).map((m) => linhaMissao(m, d)).join('\n\n') },
-      { name: `📅 Semanais — reinicia <t:${Math.floor(fimDaSemana(agora) / 1000)}:R>`, value: ativas('semana', s.chave).map((m) => linhaMissao(m, s)).join('\n\n') },
-    )
-    .setFooter({ text: 'O progresso conta mensagens e ações do /rpg.' });
+  return UI.painel({
+    trilha: ['Missões'],
+    titulo: 'Suas missões',
+    campos: [
+      { nome: `Diárias  ${T.S.sep}  reinicia ${T.quando(fimDoDia(agora))}`, valor: ativas('dia', d.chave).map((m) => linhaMissao(m, d)).join('\n\n') },
+      { nome: `Semanais  ${T.S.sep}  reinicia ${T.quando(fimDaSemana(agora))}`, valor: ativas('semana', s.chave).map((m) => linhaMissao(m, s)).join('\n\n') },
+    ],
+    rodape: 'O progresso conta mensagens e ações do /rpg',
+  });
 }
 
 function botoesMissoes(uid) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('missoes:resgatar').setLabel('Resgatar recompensas').setEmoji('🎁').setStyle(ButtonStyle.Success).setDisabled(prontas(uid) === 0),
-  );
+  const n = prontas(uid);
+  return UI.botoes([{ id: 'missoes:resgatar', label: n ? `Resgatar recompensas (${n})` : 'Nada para resgatar', desabilitado: n === 0 }]);
 }
 
 function embedConquistas(uid, nomeUsuario) {
@@ -234,15 +239,16 @@ function embedConquistas(uid, nomeUsuario) {
   const j = R.obter(uid);
   const ctx = { j: j || { vitorias: 0, nivel: 1, moedas: 0 }, tot: totais(uid) };
   const linhas = CONQUISTAS.map((c) => {
-    if (have[c.id]) return `${c.emoji} **${c.nome}** — ${c.desc} ✅ <t:${Math.floor(have[c.id] / 1000)}:d>`;
+    if (have[c.id]) return `${T.S.ponto}  **${c.nome}**  ${T.S.sep}  ${c.desc}\n${T.S.filho} ${T.quando(have[c.id], 'd')}`;
     const [a, b] = c.prog(ctx);
-    return `🔒 **${c.nome}** — ${c.desc} (${Math.min(a, b)}/${b})`;
+    return `${T.S.vazio}  ${c.nome}  ${T.S.sep}  ${c.desc}\n${T.S.filho} ${T.barra(Math.min(a, b) / b, 8)}  ${Math.min(a, b)}/${b}`;
   });
-  return new EmbedBuilder()
-    .setColor(COR)
-    .setTitle(`🏅 Conquistas de ${nomeUsuario}`)
-    .setDescription(linhas.join('\n'))
-    .setFooter({ text: `${Object.keys(have).length}/${CONQUISTAS.length} desbloqueadas` });
+  return UI.painel({
+    trilha: ['Missões', 'Conquistas'],
+    titulo: nomeUsuario,
+    descricao: linhas.join('\n').slice(0, 4000),
+    rodape: `${Object.keys(have).length} de ${CONQUISTAS.length} desbloqueadas`,
+  });
 }
 
 // ---------- Observador do RPG ----------
