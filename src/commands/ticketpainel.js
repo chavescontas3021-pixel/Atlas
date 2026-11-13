@@ -12,30 +12,18 @@ const {
   TextInputStyle,
 } = require('discord.js');
 const db = require('../db');
+const UI = require('../ui/componentes');
 const N = require('../ticket/nucleo');
 
 const EPH = MessageFlags.Ephemeral;
 const MAX_TIPOS = 15;
 const MAX_PAINEIS = 10;
-const responder = (i, content) => i.reply({ content, flags: EPH, allowedMentions: { parse: [] } });
+const responder = (i, content) => i.reply({ ...UI.auto(content), allowedMentions: { parse: [] } });
 
 const optNum = (o) => o.setName('painel').setDescription('Número do painel (veja em /ticketpainel listar)').setRequired(true).setMinValue(1);
 const canaisTexto = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 
-function linhasBotoes(tipos) {
-  const rows = [];
-  const lista = tipos.slice(0, MAX_TIPOS);
-  for (let i = 0; i < lista.length; i += 5) {
-    const row = new ActionRowBuilder();
-    for (const t of lista.slice(i, i + 5)) {
-      const b = new ButtonBuilder().setCustomId(`ticket:novo:${t.id}`).setLabel(t.nome.slice(0, 80)).setStyle(ButtonStyle.Primary);
-      if (t.emoji) b.setEmoji(t.emoji);
-      row.addComponents(b);
-    }
-    rows.push(row);
-  }
-  return rows;
-}
+const linhasBotoes = (tipos) => N.componentesPainel(tipos, MAX_TIPOS);
 
 function pegarPainel(interaction) {
   const n = interaction.options.getInteger('painel');
@@ -188,8 +176,7 @@ module.exports = {
       const tipos = (p.tipos || []).slice(0, MAX_TIPOS);
       if (!tipos.length) return responder(interaction, '❌ Esse painel não tem categorias. Use `/ticketpainel tipoadicionar`.');
       const msg = N.mensagem('painel', p);
-      const desc = tipos.map((t) => `${t.emoji ? t.emoji + ' ' : ''}**${t.nome}**${t.desc ? ' — ' + t.desc : ''}`).join('\n');
-      const embed = new EmbedBuilder().setColor(N.COR).setTitle(msg.titulo).setDescription(`${msg.texto}\n\n${desc}`.slice(0, 4096));
+      const embed = UI.painel({ trilha: ['Atendimento'], titulo: msg.titulo, descricao: `${msg.texto}\n\n${N.listaCategorias(tipos)}`.slice(0, 4000) });
       try {
         await canal.send({ embeds: [embed], components: linhasBotoes(tipos) });
       } catch (e) {
