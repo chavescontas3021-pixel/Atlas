@@ -7,7 +7,7 @@ const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags,
   StringSelectMenuBuilder,
 } = require('discord.js');
-const { COR, S, E, trilha, corta } = require('./tema');
+const { COR, S, E, trilha, corta, tirarEmoji } = require('./tema');
 
 const EPH = MessageFlags.Ephemeral;
 
@@ -23,7 +23,7 @@ function painel({
 } = {}) {
   const e = new EmbedBuilder().setColor(perigo ? COR.perigo : COR.base);
   e.setAuthor({ name: trilha(...[].concat(caminho)) });
-  if (titulo) e.setTitle(corta(titulo, 256));
+  if (titulo) e.setTitle(corta(tirarEmoji(titulo) || titulo, 256));
   if (descricao) e.setDescription(String(descricao).slice(0, 4000));
   if (campos && campos.length) {
     e.addFields(campos.slice(0, 25).map((c) => ({
@@ -121,12 +121,59 @@ const ok = (texto, opts) => nota(texto, 'ok', opts);
 const erro = (texto, opts) => nota(texto, 'erro', opts);
 const aviso = (texto, opts) => nota(texto, 'aviso', opts);
 
+// Converte textos antigos ("✅ Salvo", "❌ Não deu") no formato novo, sem precisar reescrever a frase.
+function auto(texto, opts) {
+  const t = String(texto ?? '');
+  const ehErro = /^\s*(❌|⚠️|🚫)/u.test(t);
+  return nota(tirarEmoji(t) || t, ehErro ? 'erro' : 'ok', opts);
+}
+
+// Para usar em interaction.editReply / update: tira o flag "só para mim" (que só vale ao criar a mensagem).
+function edicao(payload) {
+  const { flags, ...resto } = payload;
+  return { components: [], ...resto };
+}
+
 // Responde ou edita, o que for possível naquele momento
 async function responder(interaction, payload) {
   if (interaction.replied || interaction.deferred) return interaction.followUp(payload);
   return interaction.reply(payload);
 }
 
+// ── Confirmação antes de ações pesadas ───────────────────────
+// Mostra o painel com [Confirmar] [Cancelar] só para quem usou o comando.
+// Devolve true se confirmou (a resposta fica "pendente": use interaction.editReply depois)
+// e false se cancelou ou o tempo acabou (aí a mensagem já foi atualizada).
+async function confirmar(interaction, {
+  painel: embed, sim = 'Confirmar', nao = 'Cancelar', perigo = false, tempo = 30000,
+}) {
+  const base = `conf:${interaction.id}`;
+  await interaction.reply({
+    embeds: [embed],
+    components: [linha(
+      botao({ id: `${base}:sim`, label: sim, estilo: perigo ? 'perigo' : 'neutro' }),
+      botao({ id: `${base}:nao`, label: nao }),
+    )],
+    flags: EPH,
+  });
+  const msg = await interaction.fetchReply();
+  try {
+    const clique = await msg.awaitMessageComponent({
+      filter: (i) => i.user.id === interaction.user.id && i.customId.startsWith(base),
+      time: tempo,
+    });
+    if (clique.customId === `${base}:sim`) {
+      await clique.deferUpdate();
+      return true;
+    }
+    await clique.update(edicao(nota('Cancelado.', 'aviso')));
+    return false;
+  } catch {
+    await interaction.editReply(edicao(nota('Tempo esgotado. Nada foi feito.', 'aviso'))).catch(() => {});
+    return false;
+  }
+}
+
 module.exports = {
-  EPH, painel, botao, botoes, linha, menu, paginacao, nota, ok, erro, aviso, responder,
+  EPH, auto, confirmar, edicao, painel, botao, botoes, linha, menu, paginacao, nota, ok, erro, aviso, responder,
 };
