@@ -1,8 +1,9 @@
-const { EmbedBuilder, MessageFlags, SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const db = require('../db');
 const N = require('../casamento/nucleo');
+const UI = require('../ui/componentes');
+const T = require('../ui/tema');
 
-const EPH = MessageFlags.Ephemeral;
 const MIN = 60 * 1000;
 const ESPERA = 30 * MIN; // cada pessoa só dá um mimo a cada 30 minutos
 const LIMITE_DIA = 8; // mimos que contam pontos por dia, por casal
@@ -10,9 +11,9 @@ const PTS_DIA = 10; // pontos por dia juntos
 const PTS_MIMO = 2; // pontos por mimo contado
 
 const MIMOS = {
-  beijo: { emoji: '💋', nome: 'beijo', frases: ['deu um beijo carinhoso em', 'roubou um beijo de', 'encheu de beijinhos'] },
-  abraco: { emoji: '🤗', nome: 'abraço', frases: ['deu um abraço apertado em', 'abraçou bem forte', 'se aconchegou nos braços de'] },
-  carinho: { emoji: '🥰', nome: 'carinho', frases: ['fez um cafuné em', 'fez um carinho em', 'deu um dengo em'] },
+  beijo: { emoji: '', nome: 'beijo', frases: ['deu um beijo carinhoso em', 'roubou um beijo de', 'encheu de beijinhos'] },
+  abraco: { emoji: '', nome: 'abraço', frases: ['deu um abraço apertado em', 'abraçou bem forte', 'se aconchegou nos braços de'] },
+  carinho: { emoji: '', nome: 'carinho', frases: ['fez um cafuné em', 'fez um carinho em', 'deu um dengo em'] },
 };
 
 const caminhoMimos = (id) => `casamento.mimos.${id}`;
@@ -27,16 +28,17 @@ const dataBR = (ms) => new Date(ms).toLocaleDateString('pt-BR', { timeZone: 'Ame
 function embedCasal(casal) {
   const m = mimosDe(casal.id);
   const dias = diasJuntos(casal);
-  const detalhe = Object.entries(MIMOS).map(([k, v]) => `${v.emoji} ${m.por[k] || 0}`).join(' · ');
-  return new EmbedBuilder()
-    .setColor(N.COR)
-    .setTitle('💞 Casal')
-    .setDescription(`${N.mencao(casal.a)} 💍 ${N.mencao(casal.b)}`)
-    .addFields(
-      { name: '📅 Casados desde', value: `${dataBR(casal.desde)} (${dias} dia${dias === 1 ? '' : 's'})`, inline: true },
-      { name: '🏅 Pontos', value: `**${pontos(casal)}**`, inline: true },
-      { name: '💌 Mimos', value: `**${m.total}** (${detalhe})` }
-    );
+  const detalhe = Object.entries(MIMOS).map(([k, v]) => `${v.nome} ${m.por[k] || 0}`).join(`  ${T.S.sep}  `);
+  return UI.painel({
+    trilha: ['Casais'],
+    titulo: `${dias} dia${dias === 1 ? '' : 's'} juntos`,
+    descricao: `${N.mencao(casal.a)}  ${T.S.sep}  ${N.mencao(casal.b)}`,
+    campos: [
+      { nome: 'Casados desde', valor: dataBR(casal.desde), lado: true },
+      { nome: 'Pontos', valor: `**${pontos(casal)}**`, lado: true },
+      { nome: 'Mimos', valor: `**${m.total}**\n${T.S.filho} ${detalhe}` },
+    ],
+  });
 }
 
 module.exports = {
@@ -52,7 +54,7 @@ module.exports = {
             .setName('tipo')
             .setDescription('Qual mimo')
             .setRequired(true)
-            .addChoices(...Object.entries(MIMOS).map(([k, v]) => ({ name: `${v.emoji} ${v.nome}`, value: k })))
+            .addChoices(...Object.entries(MIMOS).map(([k, v]) => ({ name: v.nome, value: k })))
         )
     )
     .addSubcommand((s) =>
@@ -74,7 +76,7 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    if (!interaction.inGuild()) return interaction.reply({ content: 'Use este comando no servidor.', flags: EPH });
+    if (!interaction.inGuild()) return interaction.reply(UI.erro('Use este comando no servidor.'));
     const sub = interaction.options.getSubcommand();
     const eu = interaction.user.id;
 
@@ -82,7 +84,7 @@ module.exports = {
       const alvo = interaction.options.getUser('membro') || interaction.user;
       const casal = N.casalDe(alvo.id);
       if (!casal) {
-        return interaction.reply({ content: alvo.id === eu ? 'Você não está casado(a). 💜' : `${alvo.username} não está casado(a).`, flags: EPH });
+        return interaction.reply(UI.ok(alvo.id === eu ? 'Você não está casado(a).' : `${alvo.username} não está casado(a).`));
       }
       return interaction.reply({ embeds: [embedCasal(casal)], allowedMentions: { parse: [] } });
     }
@@ -90,30 +92,29 @@ module.exports = {
     if (sub === 'ranking') {
       const tipo = interaction.options.getString('tipo') || 'geral';
       const casais = Object.values(N.casais());
-      if (!casais.length) return interaction.reply({ content: 'Ainda não há casais na house. 💍', flags: EPH });
+      if (!casais.length) return interaction.reply(UI.ok('Ainda não há casais na house.'));
       const valor = { geral: pontos, tempo: (c) => diasJuntos(c), mimos: (c) => mimosDe(c.id).total }[tipo];
       const ordem = [...casais].sort((x, y) => valor(y) - valor(x) || x.desde - y.desde).slice(0, 10);
-      const medalha = ['🥇', '🥈', '🥉'];
-      const linhas = ordem.map((c, i) => {
+            const linhas = ordem.map((c, i) => {
         const resumo = tipo === 'tempo' ? `${diasJuntos(c)} dias juntos` : tipo === 'mimos' ? `${mimosDe(c.id).total} mimos` : `${pontos(c)} pts · ${diasJuntos(c)} dias · ${mimosDe(c.id).total} mimos`;
-        return `${medalha[i] || `**${i + 1}.**`} ${N.mencao(c.a)} 💞 ${N.mencao(c.b)} — ${resumo}`;
+        return `**${String(i + 1).padStart(2, '0')}**  ${N.mencao(c.a)}  ${T.S.sep}  ${N.mencao(c.b)}\n${T.S.filho} ${resumo}`;
       });
-      const titulo = { geral: '🏆 Ranking dos casais', tempo: '📅 Casais mais antigos', mimos: '💌 Casais mais carinhosos' }[tipo];
+      const titulo = { geral: 'Ranking dos casais', tempo: 'Casais mais antigos', mimos: 'Casais mais carinhosos' }[tipo];
       return interaction.reply({
-        embeds: [new EmbedBuilder().setColor(N.COR).setTitle(titulo).setDescription(linhas.join('\n')).setFooter({ text: `${PTS_DIA} pts por dia juntos · ${PTS_MIMO} pts por mimo (até ${LIMITE_DIA} por dia)` })],
+        embeds: [UI.painel({ trilha: ['Casais', 'Ranking'], titulo, descricao: linhas.join('\n\n'), rodape: `${PTS_DIA} pts por dia juntos  ·  ${PTS_MIMO} pts por mimo (até ${LIMITE_DIA} por dia)` })],
         allowedMentions: { parse: [] },
       });
     }
 
     // ---------- Mimo ----------
     const casal = N.casalDe(eu);
-    if (!casal) return interaction.reply({ content: 'Só quem é casado(a) pode dar mimos de casal. 💍', flags: EPH });
+    if (!casal) return interaction.reply(UI.erro('Só quem é casado(a) pode dar mimos de casal.'));
     const par = casal.a === eu ? casal.b : casal.a;
     const m = mimosDe(casal.id);
     const agora = Date.now();
     const falta = (m.cd[eu] || 0) + ESPERA - agora;
     if (falta > 0) {
-      return interaction.reply({ content: `⏳ Calma, apaixonado(a)! Seu próximo mimo é daqui a ${fmtMin(falta)}.`, flags: EPH });
+      return interaction.reply(UI.erro(`Calma, apaixonado(a). Seu próximo mimo é daqui a ${fmtMin(falta)}.`));
     }
 
     const tipo = interaction.options.getString('tipo');
@@ -130,12 +131,12 @@ module.exports = {
     db.set(caminhoMimos(casal.id), m);
 
     const nota = conta
-      ? `💌 Mimos de hoje que contam: ${m.hoje.n}/${LIMITE_DIA}`
-      : `💤 Vocês já bateram o limite de ${LIMITE_DIA} mimos que contam hoje, mas o carinho continua valendo!`;
+      ? `Mimos de hoje que contam: ${m.hoje.n}/${LIMITE_DIA}`
+      : `Vocês já bateram o limite de ${LIMITE_DIA} mimos que contam hoje, mas o carinho continua valendo.`;
     return interaction.reply({
       content: N.mencao(par),
       allowedMentions: { users: [par] },
-      embeds: [new EmbedBuilder().setColor(N.COR).setDescription(`${info.emoji} ${N.mencao(eu)} ${sorteia(info.frases)} ${N.mencao(par)}!`).setFooter({ text: nota })],
+      embeds: [UI.painel({ trilha: ['Casais', info.nome], descricao: `${N.mencao(eu)} ${sorteia(info.frases)} ${N.mencao(par)}`, rodape: nota })],
     });
   },
 };
