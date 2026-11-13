@@ -55,7 +55,11 @@ const corta = (texto, n) => {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 };
 
+// Tira emojis do COMEÇO de um texto: "🔨 Banimento" vira "Banimento".
+// (Emojis de teclado como 1️⃣ e emojis personalizados <:nome:id> ficam como estão.)
+const tirarEmoji = (texto) => String(texto ?? '').replace(/^(?:\p{Extended_Pictographic}|\uFE0F|\u200D|\s)+/u, '');
+
 // Timestamp do Discord (<t:...>)
 const quando = (ms, estilo = 'R') => `<t:${Math.floor(Number(ms) / 1000)}:${estilo}>`;
 
-module.exports = { COR, S, E, MARCA, trilha, barra, corta, quando };
+module.exports = { COR, S, E, MARCA, trilha, barra, corta, quando, tirarEmoji };
