@@ -1,19 +1,10 @@
-const {
-  ActionRowBuilder,
-  ChannelType,
-  EmbedBuilder,
-  MessageFlags,
-  ModalBuilder,
-  PermissionFlagsBits,
-  SlashCommandBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-} = require('discord.js');
+const { ChannelType, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 const db = require('../db');
 const N = require('../moderacao/nucleo');
+const UI = require('../ui/componentes');
+const { S } = require('../ui/tema');
 
-const EPH = MessageFlags.Ephemeral;
-const responder = (interaction, content) => interaction.reply({ content, flags: EPH });
+const responder = (interaction, texto) => interaction.reply(UI.ok(texto));
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -76,34 +67,45 @@ module.exports = {
 
     if (sub === 'status') {
       const log = N.cfg('canalLog');
-      const embed = new EmbedBuilder()
-        .setColor(0xe74c3c)
-        .setTitle('🛡️ Moderação do Atlas')
-        .addFields(
-          { name: 'Canal de log', value: log ? `<#${log}>` : 'não definido' },
-          { name: 'Canal de advertências (divergências)', value: N.canalAdvertencia() ? `<#${N.canalAdvertencia()}>` : 'não definido' },
-          { name: 'Limite de avisos', value: `${N.limite()} (ao atingir, banimento automático)` },
-          { name: 'Regras cadastradas', value: String(N.regras().length) }
-        );
-      return interaction.reply({ embeds: [embed], flags: EPH });
+      const adv = N.canalAdvertencia();
+      const embed = UI.painel({
+        trilha: ['Moderação', 'Configuração'],
+        titulo: 'Moderação do Atlas',
+        campos: [
+          { nome: 'Canal de log', valor: log ? `<#${log}>` : 'não definido', lado: true },
+          { nome: 'Canal de advertências', valor: adv ? `<#${adv}>` : 'não definido', lado: true },
+          { nome: 'Limite de avisos', valor: `${N.limite()}  ${S.sep}  ao atingir, banimento automático` },
+          { nome: 'Regras cadastradas', valor: String(N.regras().length), lado: true },
+        ],
+        rodape: 'Use os botões para editar as mensagens enviadas por DM',
+      });
+      return interaction.reply({
+        embeds: [embed],
+        components: [UI.botoes([
+          { id: 'moderacao:editar:dmAviso', label: 'DM de aviso' },
+          { id: 'moderacao:editar:dmBan', label: 'DM de banimento' },
+          { id: 'moderacao:editar:dmExpulsao', label: 'DM de expulsão' },
+        ])],
+        flags: UI.EPH,
+      });
     }
 
     if (sub === 'canallog') {
       const canal = interaction.options.getChannel('canal');
       db.set('config.moderacao.canalLog', canal.id);
-      return responder(interaction, `✅ Canal de log: ${canal}`);
+      return responder(interaction, `Canal de log definido: ${canal}`);
     }
 
     if (sub === 'canaladvertencia') {
       const canal = interaction.options.getChannel('canal');
       if (!canal) {
         db.remover('config.moderacao.canalAdvertencia');
-        return responder(interaction, '🗑️ Sistema de advertência por canal desligado (voltam as DMs normais).');
+        return responder(interaction, 'Advertência por canal desligada. Voltam as DMs normais.');
       }
       db.set('config.moderacao.canalAdvertencia', canal.id);
       return responder(
         interaction,
-        `✅ Advertências dadas em ${canal} saem no canal, marcando o membro, e ganham um tópico.\n` +
+        `Advertências dadas em ${canal} saem no canal, marcando o membro, e ganham um tópico.\n` +
           'Em outros canais o `/aviso dar` continua mandando DM.'
       );
     }
@@ -111,36 +113,11 @@ module.exports = {
     if (sub === 'limite') {
       const n = interaction.options.getInteger('avisos');
       db.set('config.moderacao.limite', n);
-      return responder(interaction, `✅ Com **${n}** aviso(s) o membro será banido.`);
+      return responder(interaction, `Com **${n}** aviso(s) o membro será banido.`);
     }
 
     if (sub === 'mensagem') {
-      const tipo = interaction.options.getString('tipo');
-      const atual = N.mensagem(tipo);
-      const modal = new ModalBuilder()
-        .setCustomId(`moderacao:modal:${tipo}`)
-        .setTitle('Editar mensagem')
-        .addComponents(
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId('titulo')
-              .setLabel('Título')
-              .setStyle(TextInputStyle.Short)
-              .setMaxLength(200)
-              .setRequired(true)
-              .setValue(atual.titulo.slice(0, 200))
-          ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId('texto')
-              .setLabel('Texto da mensagem')
-              .setStyle(TextInputStyle.Paragraph)
-              .setMaxLength(2000)
-              .setRequired(true)
-              .setValue(atual.texto.slice(0, 2000))
-          )
-        );
-      return interaction.showModal(modal);
+      return interaction.showModal(N.modalMensagem(interaction.options.getString('tipo')));
     }
   },
 };
