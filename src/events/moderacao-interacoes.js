@@ -1,4 +1,5 @@
-const { MessageFlags, PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits } = require('discord.js');
+const UI = require('../ui/componentes');
 const db = require('../db');
 const N = require('../moderacao/nucleo');
 
@@ -18,10 +19,20 @@ module.exports = {
         return await interaction.respond(opcoes);
       }
 
+      // Botões do painel de status: abrem a janela de edição
+      if (interaction.isButton() && interaction.customId.startsWith('moderacao:editar:')) {
+        if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
+          return await interaction.reply(UI.erro('Você não tem permissão para isso.'));
+        }
+        const tipo = interaction.customId.split(':')[2];
+        if (!TIPOS.includes(tipo)) return;
+        return await interaction.showModal(N.modalMensagem(tipo));
+      }
+
       // Janela de edição das mensagens de DM
       if (interaction.isModalSubmit() && interaction.customId.startsWith('moderacao:modal:')) {
         if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
-          return await interaction.reply({ content: 'Você não tem permissão para isso.', flags: MessageFlags.Ephemeral });
+          return await interaction.reply(UI.erro('Você não tem permissão para isso.'));
         }
         const tipo = interaction.customId.split(':')[2];
         if (!TIPOS.includes(tipo)) return;
@@ -30,10 +41,7 @@ module.exports = {
         const texto = interaction.fields.getTextInputValue('texto');
         db.set(`config.moderacao.mensagens.${tipo}`, { titulo, texto });
 
-        return await interaction.reply({
-          content: '✅ Mensagem salva! Você pode usar {servidor}, {motivo}, {regra}, {avisos} e {limite}.',
-          flags: MessageFlags.Ephemeral,
-        });
+        return await interaction.reply(UI.ok('Mensagem salva. Variáveis disponíveis: `{servidor}` `{motivo}` `{regra}` `{avisos}` `{limite}`.'));
       }
     } catch (erro) {
       console.error('[Moderação] erro na interação:', erro);
