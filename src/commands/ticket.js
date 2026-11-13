@@ -1,9 +1,9 @@
-const { MessageFlags, SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
+const UI = require('../ui/componentes');
 const N = require('../ticket/nucleo');
 const F = require('../ticket/fluxo');
 
-const EPH = MessageFlags.Ephemeral;
-const responder = (interaction, content) => interaction.reply({ content, flags: EPH });
+const responder = (interaction, content) => interaction.reply(UI.auto(content));
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -47,7 +47,7 @@ module.exports = {
         return responder(interaction, '❌ Só a staff pode fechar tickets.');
       }
       const motivo = interaction.options.getString('motivo') || '';
-      await interaction.reply('🔒 Fechando o ticket e gerando a transcrição...');
+      await interaction.reply(UI.nota('Fechando o ticket e gerando a transcrição…', 'aviso', { publica: true }));
       return F.encerrar(interaction.guild, interaction.channel, interaction.user, motivo);
     }
 
