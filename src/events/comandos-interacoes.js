@@ -1,18 +1,27 @@
-const { MessageFlags } = require('discord.js');
 const L = require('../ajuda/lista');
+const UI = require('../ui/componentes');
 
+// Trata o menu de categorias (cmds:menu) e a paginação (cmds:<tipo>:<pagina>) da central de ajuda.
 module.exports = {
   name: 'interactionCreate',
   async execute(client, interaction) {
     try {
-      if (!interaction.isButton() || !interaction.customId.startsWith('cmds:')) return;
-      const [, tipo, pag] = interaction.customId.split(':');
-      if (!L.TITULOS[tipo]) return;
-      await interaction.update(L.montar(client, tipo, parseInt(pag, 10) || 0));
+      const id = interaction.customId;
+      if (!id || !id.startsWith('cmds:')) return;
+
+      if (interaction.isStringSelectMenu() && id === 'cmds:menu') {
+        return await interaction.update(L.montar(client, interaction.values[0], 0));
+      }
+
+      if (interaction.isButton()) {
+        const [, tipo, pag] = id.split(':');
+        if (!L.TITULOS[tipo] || pag === 'atual') return await interaction.deferUpdate();
+        return await interaction.update(L.montar(client, tipo, parseInt(pag, 10) || 0));
+      }
     } catch (e) {
       console.error('[Comandos]', e);
       if (!interaction.replied && !interaction.deferred) {
-        interaction.reply({ content: 'Deu erro ao mostrar a lista.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        interaction.reply(UI.erro('Não consegui abrir essa lista agora.')).catch(() => {});
       }
     }
   },
