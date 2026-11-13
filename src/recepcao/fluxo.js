@@ -227,7 +227,7 @@ async function conferirPersonagem(canal, userId, nome) {
 
     const sessao = db.get(chave(userId));
     if (!sessao || sessao.etapa !== 'personagem' || sessao.assumido) return;
-    const { proposta, obra, ...resto } = sessao;
+    const { proposta, obra, obraPendente, obraConfere, avisouObra, ...resto } = sessao;
     if (U.cfg('perguntarObra', true) !== false) {
       // Antes do molde, pergunta a obra (deixa o registro de vagas organizado)
       db.set(chave(userId), { ...resto, personagem: nome, etapa: 'obra' });
@@ -289,26 +289,61 @@ async function receberPersonagem(message) {
   return propor(message, nome);
 }
 
-// Quando o membro escreve a obra do personagem
+// Quando o membro escreve a obra do personagem: confere se ela existe (anime, filme, série, jogo...)
 async function receberObra(message) {
+  const O = require('../vagas/obras');
   const userId = message.author.id;
   const sessao = db.get(chave(userId));
   if (!sessao || sessao.etapa !== 'obra') return;
   const bruto = message.content.trim().replace(/\s+/g, ' ');
   if (!bruto) return;
-  const invalida = bruto.length > 60 || /[\n?]/.test(message.content) || /https?:\/\/|discord\.gg|<@|<#|@everyone|@here/i.test(bruto);
+  const invalida = bruto.length > 60 || /\n/.test(message.content) || (/\?\s*$/.test(bruto) && bruto.split(' ').length > 2)
+    || /https?:\/\/|discord\.gg|<@|<#|@everyone|@here/i.test(bruto);
+  const responder = (texto) => message.reply({ content: texto, allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
   if (invalida) {
     if (!sessao.avisouObra) {
       db.set(chave(userId), { ...sessao, avisouObra: true });
-      await message.reply({ content: 'Me envie só o **nome da obra** (ex: Naruto, One Piece). Se não souber, escreva **pular**.', allowedMentions: { parse: [], repliedUser: false } }).catch(() => {});
+      await responder('Me envie só o **nome da obra** (ex: Naruto, One Piece, Breaking Bad). Se não souber, escreva **pular**.');
     }
     return;
   }
-  const obra = /^(pular|nao sei|não sei)$/i.test(bruto) ? '' : bruto;
-  const { avisouObra, ...resto } = sessao;
-  db.set(chave(userId), { ...resto, obra, etapa: 'molde' });
-  await message.react('✅').catch(() => {});
-  await enviarMoldes(message.channel, userId, sessao.personagem);
+  if (emAndamento.has(userId)) return;
+  emAndamento.add(userId);
+  try {
+    const t = bruto.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+    const pend = sessao.obraPendente || null;
+    const { obraPendente, avisouObra, ...resto } = sessao;
+    const seguir = async (obra, confere, aviso) => {
+      db.set(chave(userId), { ...resto, obra, obraConfere: confere, etapa: 'molde' });
+      await message.react('✅').catch(() => {});
+      if (aviso) await message.channel.send(aviso).catch(() => {});
+      await enviarMoldes(message.channel, userId, sessao.personagem);
+    };
+
+    if (/^(pular|nao sei)$/.test(t)) return await seguir('', false);
+    if (pend) {
+      if (pend.sugestao && /^(sim|s|isso|isso mesmo|e esse|e essa)$/.test(t)) {
+        return await seguir(pend.sugestao, true, `📚 Obra: **${pend.sugestao}**${pend.tipo ? ` (${pend.tipo})` : ''}`);
+      }
+      if (/^(manter|manter assim)$/.test(t)) return await seguir(pend.digitada, false);
+      if (/^(nao|n)$/.test(t)) {
+        await responder('Tudo bem! Me envie o **nome certo** da obra, ou escreva **manter** para usar como você digitou.');
+        return;
+      }
+    }
+
+    await message.channel.sendTyping().catch(() => {});
+    const r = await O.verificar(bruto);
+    if (r.status === 'ok') return await seguir(r.titulo, true, `📚 Obra: **${r.titulo}** (${r.tipo})`);
+    if (r.status === 'erro') return await seguir(bruto, false); // serviços fora do ar: aceita e a staff confere depois
+
+    db.set(chave(userId), { ...resto, obraPendente: r.status === 'sugestao' ? { digitada: bruto, sugestao: r.titulo, tipo: r.tipo } : { digitada: bruto } });
+    await responder(r.status === 'sugestao'
+      ? `🤔 Não achei exatamente **${bruto}**. Você quis dizer **${r.titulo}**${r.tipo ? ` (${r.tipo})` : ''}?\nResponda **sim**, envie o nome certo ou escreva **manter** para usar como digitou.`
+      : `🤔 Não encontrei a obra **${bruto}**. Confira a escrita e me envie de novo.\nSe tiver certeza (obra pouco conhecida ou original), escreva **manter**.`);
+  } finally {
+    emAndamento.delete(userId);
+  }
 }
 
 // Botão "Sim, é esse"
