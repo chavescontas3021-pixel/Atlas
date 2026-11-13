@@ -132,24 +132,32 @@ function listaDoPainel() {
   return lista.filter((v) => v.ocupanteId || !ocupadas.some((o) => mesmoPersonagem(o, v)));
 }
 
-// Divide a lista em páginas de texto (uma obra por bloco, ocupadas e livres)
+// Divide a lista em páginas de texto: um bloco por obra, com o placar "ocupadas/total"
 function paginasPainel(lista) {
   const ordenada = lista.slice().sort((a, b) => norm(a.grupo || 'geral').localeCompare(norm(b.grupo || 'geral')) || norm(a.nome).localeCompare(norm(b.nome)));
+  const tot = new Map();
+  const oc = new Map();
+  for (const v of lista) {
+    const g = v.grupo || 'Geral';
+    tot.set(g, (tot.get(g) || 0) + 1);
+    if (v.ocupanteId) oc.set(g, (oc.get(g) || 0) + 1);
+  }
+  const titulo = (g, cont) => `**${g}**${cont ? ' (cont.)' : ` · ${oc.get(g) || 0}/${tot.get(g)} ocupadas`}\n`;
   const paginas = [];
   let atual = '';
   let grupoAtual = null;
   const empurra = () => { if (atual) paginas.push(atual); atual = ''; };
   for (const v of ordenada) {
     const g = v.grupo || 'Geral';
-    const linha = v.ocupanteId ? `🔴 ${v.nome} — <@${v.ocupanteId}>` : `🟢 ${v.nome} — livre`;
+    const linha = v.ocupanteId ? `🔴 **${v.nome}** — <@${v.ocupanteId}>` : `🟢 ${v.nome} — *livre*`;
     const troca = g !== grupoAtual;
     let cont = false;
-    if (atual && atual.length + (troca ? g.length + 8 : 0) + linha.length + 1 > LIMITE_PAGINA) {
+    if (atual && atual.length + (troca ? titulo(g, false).length : 0) + linha.length + 2 > LIMITE_PAGINA) {
       empurra();
       cont = !troca;
     }
     if (troca || cont) {
-      atual += `${atual ? '\n' : ''}**${g}${cont ? ' (cont.)' : ''}**\n`;
+      atual += `${atual ? '\n' : ''}${titulo(g, cont)}`;
       grupoAtual = g;
     }
     atual += `${linha}\n`;
@@ -158,20 +166,27 @@ function paginasPainel(lista) {
   return paginas;
 }
 
+// Contagem geral (usada no painel, no /vaga lista e no /vaga buscar)
+function resumo() {
+  const lista = listaDoPainel();
+  const ocupadas = lista.filter((v) => v.ocupanteId).length;
+  return { ocupadas, livres: lista.length - ocupadas, total: lista.length };
+}
+
 // Lista de embeds do painel (cada uma vira uma mensagem; o limite do Discord é por mensagem)
 function embedsPainel() {
   const m = mensagem('painel');
   const lista = listaDoPainel();
   const paginas = paginasPainel(lista);
-  const ocupadas = lista.filter((v) => v.ocupanteId).length;
-  const rodape = `${ocupadas} ocupada(s)${lista.length > ocupadas ? ` · ${lista.length - ocupadas} livre(s) cadastrada(s)` : ''}`;
+  const r = resumo();
+  const placar = `🔴 **${r.ocupadas}** ocupadas  ·  🟢 **${r.livres}** livres na lista`;
   if (!paginas.length) {
-    return [new EmbedBuilder().setColor(COR).setTitle(m.titulo).setDescription(`${String(m.texto).slice(0, 600)}\n\nNenhum personagem ocupado ainda.`)];
+    return [new EmbedBuilder().setColor(COR).setTitle(m.titulo).setDescription(`${String(m.texto).slice(0, 600)}\n\nNenhum personagem ocupado ainda.`).setTimestamp()];
   }
   return paginas.map((txt, i) => {
-    const e = new EmbedBuilder().setColor(COR).setDescription(i === 0 ? `${String(m.texto).slice(0, 400)}\n\n${txt}` : txt);
+    const e = new EmbedBuilder().setColor(COR).setDescription(i === 0 ? `${String(m.texto).slice(0, 400)}\n\n${placar}\n\n${txt}` : txt).setTimestamp();
     if (i === 0) e.setTitle(m.titulo);
-    if (i === paginas.length - 1) e.setFooter({ text: rodape });
+    if (paginas.length > 1) e.setFooter({ text: `Página ${i + 1}/${paginas.length}` });
     return e;
   });
 }
@@ -209,6 +224,22 @@ async function atualizarPainel(guild) {
   db.set('config.vagas.painelCanalId', canal.id);
   db.remover('config.vagas.painelMsgId');
   return true;
+}
+
+// Procura personagens pelo nome ou obra (para o /vaga buscar). Esconde cópias livres de uma ocupada.
+function buscar(texto) {
+  const q = norm(texto);
+  if (q.length < 2) return [];
+  const base = nomeBase(texto);
+  const achados = [];
+  for (const v of todas()) {
+    const bate = norm(v.nome).includes(q) || norm(v.grupo).includes(q) || (base && nomeBase(v.nome) === base);
+    if (!bate) continue;
+    const dono = v.ocupanteId ? v : acharTodos(v).find((o) => o.ocupanteId) || null;
+    if (!v.ocupanteId && dono) continue;
+    achados.push({ vaga: v, livre: !dono, donoId: dono ? dono.ocupanteId : null });
+  }
+  return achados.sort((a, b) => Number(a.livre) - Number(b.livre)).slice(0, 10);
 }
 
 // ===== ocupacao =====
@@ -374,7 +405,7 @@ module.exports = {
   PADROES, cfg, mensagem, limite, norm,
   todas, obter, salvar, apagar, doUsuario, livres, proximoId,
   pedidos, pedido, proximoPedido, acharVaga,
-  chaveManual, acharPorChave, acharTodos, mesmoPersonagem, estaLivre,
+  chaveManual, nomeBase, acharPorChave, acharTodos, mesmoPersonagem, estaLivre, buscar, resumo,
   infoPedido, pedidoPendente, registrarDaRecepcao,
   ocupar, liberar, embedPainel, embedsPainel, atualizarPainel, botoesPedido, embedPedido, auditar,
 };
