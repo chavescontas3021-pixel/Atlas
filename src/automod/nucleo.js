@@ -100,11 +100,46 @@ function compilar() {
       categoria: g.categoria,
       advertir: g.advertir,
       regex: new RegExp(`(?:^| )(${limpos.map(padraoDoTermo).join('|')})(?= |$)`),
-      compacto: longos.length ? new RegExp(`(${longos.map(padraoDoTermo).join('|')})`) : null,
+      compacto: longos.length ? new RegExp(`^(${longos.map(padraoDoTermo).join('|')})$`) : null,
     });
   }
   cache = { chave, regras };
   return regras;
+}
+
+// ---------- Expressões inofensivas ----------
+// Frases do dia a dia (ex.: "te mato de rir") são apagadas do texto ANTES de procurar palavras proibidas.
+let regexInofensivas;
+function inofensivas() {
+  if (regexInofensivas === undefined) {
+    const lista = [...new Set((PAL.inofensivas || []).map(normalizar).filter(Boolean))].sort((a, b) => b.length - a.length);
+    regexInofensivas = lista.length ? new RegExp(`(?:^| )(?:${lista.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?= |$)`, 'g') : null;
+  }
+  return regexInofensivas;
+}
+
+function semInofensivas(v) {
+  const re = inofensivas();
+  return re ? v.replace(re, ' ').replace(/ +/g, ' ').trim() : v;
+}
+
+// Palavras longas escritas em pedaços ("pu ta ria"): só vale se algum pedaço for bem curto (1-2 letras).
+// Isso evita juntar palavras normais vizinhas por acidente (ex.: "trans" + "ando").
+function achaCompacto(v, re) {
+  const t = v.split(' ').filter(Boolean);
+  if (t.length < 2) return null;
+  for (let i = 0; i < t.length; i++) {
+    let junto = '';
+    for (let j = i; j < t.length && j < i + 8; j++) {
+      junto += t[j];
+      if (junto.length > 40) break;
+      if (j > i && t.slice(i, j + 1).some((x) => x.length <= 2)) {
+        const m = junto.match(re);
+        if (m) return m[1];
+      }
+    }
+  }
+  return null;
 }
 
 // ---------- Detecção ----------
@@ -137,7 +172,7 @@ function detectar(texto) {
   const dom = linkAdulto(bruto);
   if (dom) return { categoria: 'link de conteúdo adulto', termo: dom, advertir: true };
 
-  const vars = variantes(bruto);
+  const vars = variantes(bruto).map(semInofensivas).filter(Boolean);
   for (const r of compilar()) {
     for (const v of vars) {
       const m = v.match(r.regex);
@@ -145,8 +180,8 @@ function detectar(texto) {
     }
     if (r.compacto) {
       for (const v of vars) {
-        const m = v.replace(/ /g, '').match(r.compacto);
-        if (m) return { categoria: r.categoria, termo: m[1], advertir: r.advertir };
+        const termo = achaCompacto(v, r.compacto);
+        if (termo) return { categoria: r.categoria, termo, advertir: r.advertir };
       }
     }
   }
