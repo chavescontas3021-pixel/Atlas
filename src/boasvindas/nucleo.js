@@ -2,13 +2,14 @@
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../db');
 const L = require('../logs/nucleo');
+const T = require('../ui/tema');
 
 const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar'); // não passa pelo editor de mensagens
 
 // Textos padrão (o site pode trocar). Variáveis: {usuario} {nome} {servidor} {contagem} {id}
 const PADROES = {
-  entrada: '👋 Bem-vindo(a) à **{servidor}**, {usuario}! Você é o membro **#{contagem}**. Aproveite a house! 💜',
-  saida: '😢 {usuario} (**{nome}**) saiu da **{servidor}**. Agora somos **{contagem}** membros.',
+  entrada: 'Bem-vindo(a) à **{servidor}**, {usuario}. Você é o membro **#{contagem}**. Aproveite a house.',
+  saida: '{usuario} (**{nome}**) saiu da **{servidor}**. Agora somos **{contagem}** membros.',
 };
 
 // config.boasvindas.entrada.{ativo,canal,texto,banner} | config.boasvindas.saida.{ativo,canal,texto,banner} | config.boasvindas.canalLog
@@ -61,7 +62,7 @@ async function enviarTexto(guild, canalId, conteudo, userId, pingar, bannerUrl) 
       [IGNORAR_TRADUCAO]: true,
     };
     // Com banner, o texto continua normal e a imagem aparece logo abaixo
-    if (bannerUrl) msg.embeds = [new EmbedBuilder().setColor(0xf5a3c7).setImage(bannerUrl)];
+    if (bannerUrl) msg.embeds = [new EmbedBuilder().setColor(T.COR.base).setImage(bannerUrl)];
     await canal.send(msg);
     return { ok: true, canalId: canal.id };
   } catch (e) {
@@ -79,7 +80,7 @@ async function registrar(guild, emb) {
   }
 }
 
-const situacao = (r) => (r.ok ? `✅ enviada em <#${r.canalId}>` : `⚠️ não enviada: ${r.motivo}`);
+const situacao = (r) => (r.ok ? `${T.S.ponto}  enviada em <#${r.canalId}>` : `${T.S.vazio}  não enviada: ${r.motivo}`);
 
 async function entrada(member) {
   if (member.user.bot || !cfg('entrada.ativo', false)) return;
@@ -88,8 +89,8 @@ async function entrada(member) {
   if (!r.ok) console.warn(`[Boas-vindas] entrada de ${member.id}: ${r.motivo}`);
 
   const nova = Date.now() - member.user.createdTimestamp < 7 * 86400000;
-  await registrar(guild, L.embed('verde', '👋 Boas-vindas', `${L.pessoa(member.user)} entrou no servidor.`, [
-    ['Conta criada', `${L.quando(member.user.createdTimestamp)}${nova ? ' ⚠️ conta nova' : ''}`, true],
+  await registrar(guild, L.embed('verde', 'Boas-vindas', `${L.pessoa(member.user)} entrou no servidor.`, [
+    ['Conta criada', `${L.quando(member.user.createdTimestamp)}${nova ? `  ${T.S.sep}  conta nova` : ''}`, true],
     ['Total de membros', guild.memberCount, true],
     ['Mensagem', situacao(r)],
   ]));
@@ -102,7 +103,7 @@ async function saida(member) {
   if (!r.ok) console.warn(`[Boas-vindas] saída de ${member.id}: ${r.motivo}`);
 
   const cargos = member.roles ? [...member.roles.cache.values()].filter((x) => x.id !== guild.id).map((x) => `<@&${x.id}>`) : [];
-  await registrar(guild, L.embed('vermelho', '📤 Saída', `${L.pessoa(member.user)} saiu do servidor.`, [
+  await registrar(guild, L.embed('vermelho', 'Saída', `${L.pessoa(member.user)} saiu do servidor.`, [
     ['Estava desde', member.joinedTimestamp ? L.quando(member.joinedTimestamp) : '—', true],
     ['Total de membros', guild.memberCount, true],
     cargos.length ? ['Cargos', L.corta(cargos.join(', '), 1000)] : null,
