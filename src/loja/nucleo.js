@@ -1,12 +1,10 @@
 // Loja de itens exclusivos da house (a staff cria os itens; compra com stars).
-const {
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder,
-} = require('discord.js');
 const db = require('../db');
+const UI = require('../ui/componentes');
+const T = require('../ui/tema');
 const R = require('../rpg/nucleo');
 const S = require('../extras/stars');
 
-const COR = 0xf5a3c7;
 
 const norm = (t) => String(t || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[_*~`|]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
@@ -33,33 +31,55 @@ const pedido = (id) => db.get(`loja.pedidos.${id}`, null);
 const canalPedidos = () => db.get('config.loja.canalPedidos', null);
 
 // ---------- Visual ----------
+const disponivel = (i) => i.estoque === null || i.estoque > 0;
+
 function embedLoja() {
   const lista = itens();
-  const emb = new EmbedBuilder().setColor(COR).setTitle('🛍️ Loja exclusiva da house');
-  if (!lista.length) return emb.setDescription('Ainda não há itens à venda.');
-  emb.setDescription(lista.map((i) => {
-    const estoque = i.estoque === null ? '' : i.estoque > 0 ? ` · restam ${i.estoque}` : ' · **ESGOTADO**';
-    const tipo = i.tipo === 'cargo' ? '🎨 cargo' : '🎁 entregue pela staff';
-    return `**${i.nome}** — ⭐ ${i.preco}${estoque}\n${tipo}${i.descricao ? ` · ${i.descricao}` : ''}`;
-  }).join('\n\n').slice(0, 4000));
-  emb.setFooter({ text: 'Compre com /loja comprar' });
-  return emb;
+  if (!lista.length) {
+    return UI.painel({ trilha: ['Loja'], titulo: 'Loja da house', descricao: 'Ainda não há itens à venda.' });
+  }
+  const linhas = lista.map((i) => {
+    const estoque = i.estoque === null ? '' : i.estoque > 0 ? `  ${T.S.sep}  restam ${i.estoque}` : `  ${T.S.sep}  esgotado`;
+    const tipo = i.tipo === 'cargo' ? 'cargo' : 'entregue pela staff';
+    const nome = disponivel(i) ? `**${i.nome}**` : `~~${i.nome}~~`;
+    return `${nome}  ${T.S.sep}  ⭐ ${i.preco}${estoque}\n${T.S.filho} ${tipo}${i.descricao ? `  ${T.S.sep}  ${i.descricao}` : ''}`;
+  });
+  return UI.painel({
+    trilha: ['Loja'],
+    titulo: 'Loja da house',
+    descricao: linhas.join('\n\n').slice(0, 3800),
+    rodape: 'Escolha um item no menu para comprar',
+  });
+}
+
+// Menu de compra: só mostra o que ainda tem estoque
+function menuLoja() {
+  const lista = itens().filter(disponivel).slice(0, 25);
+  if (!lista.length) return null;
+  return UI.menu({
+    id: 'loja:comprar',
+    placeholder: 'Escolher um item para comprar',
+    opcoes: lista.map((i) => ({ valor: i.id, nome: i.nome, desc: `⭐ ${i.preco}${i.descricao ? `  ·  ${i.descricao}` : ''}` })),
+  });
+}
+
+function telaLoja() {
+  const menu = menuLoja();
+  return { embeds: [embedLoja()], components: menu ? [menu] : [] };
 }
 
 function botaoEntrega(id, desligado) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`loja:entregue:${id}`).setLabel('Marcar como entregue').setEmoji('📦').setStyle(ButtonStyle.Success).setDisabled(!!desligado),
-  );
+  return UI.botoes([{ id: `loja:entregue:${id}`, label: desligado ? 'Entregue' : 'Marcar como entregue', desabilitado: !!desligado }]);
 }
 
 function embedPedido(p, estado) {
-  const emb = new EmbedBuilder()
-    .setColor(estado ? 0x57f287 : COR)
-    .setTitle('🛍️ Pedido da loja')
-    .setDescription(`**Membro:** <@${p.userId}>\n**Item:** ${p.nome}\n**Pago:** ⭐ ${p.preco}`)
-    .setFooter({ text: `Pedido #${p.id}` });
-  if (estado) emb.addFields({ name: 'Status', value: `✅ Entregue por <@${p.porId}>` });
-  return emb;
+  const campos = [
+    { nome: 'Membro', valor: `<@${p.userId}>`, lado: true },
+    { nome: 'Item', valor: p.nome, lado: true },
+    { nome: 'Pago', valor: `⭐ ${p.preco}`, lado: true },
+  ];
+  if (estado) campos.push({ nome: 'Status', valor: `${T.S.ponto}  Entregue por <@${p.porId}>` });
+  return UI.painel({ trilha: ['Loja', 'Pedido'], titulo: p.nome, campos, rodape: `Pedido #${p.id}` });
 }
 
 // ---------- Comprar ----------
@@ -114,5 +134,5 @@ async function comprar(guild, uid, item) {
 
 module.exports = {
   norm, itens, obter, salvar, remover, acharItem, proximo, comprasDe, pedido, canalPedidos,
-  embedLoja, botaoEntrega, embedPedido, comprar,
+  embedLoja, menuLoja, telaLoja, botaoEntrega, embedPedido, comprar,
 };
