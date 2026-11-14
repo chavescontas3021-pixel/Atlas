@@ -1,0 +1,154 @@
+const { ChannelType, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const N = require('../conversa/nucleo');
+const Dic = require('../conversa/dicionario');
+const UI = require('../ui/componentes');
+const { S, corta } = require('../ui/tema');
+
+const SEM_PING = { parse: [] };
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('conversa')
+    .setDescription('Configura a conversa do Atlas (staff)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .addSubcommand((s) => s.setName('status').setDescription('Mostra como a conversa está configurada'))
+    .addSubcommand((s) => s.setName('canal').setDescription('Define o único canal onde o Atlas conversa')
+      .addChannelOption((o) => o.setName('canal').setDescription('Canal de texto').setRequired(true)
+        .addChannelTypes(ChannelType.GuildText)))
+    .addSubcommand((s) => s.setName('ligar').setDescription('Liga ou desliga a conversa')
+      .addBooleanOption((o) => o.setName('ativo').setDescription('Ligado?').setRequired(true)))
+    .addSubcommand((s) => s.setName('espera').setDescription('Tempo de espera entre falas de cada pessoa')
+      .addIntegerOption((o) => o.setName('segundos').setDescription('De 5 a 300').setRequired(true).setMinValue(5).setMaxValue(300)))
+    .addSubcommand((s) => s.setName('pai').setDescription('Define quem é o "pai" do Atlas (só o dono do bot)')
+      .addUserOption((o) => o.setName('membro').setDescription('Quem será tratado como pai').setRequired(true)))
+    .addSubcommand((s) => s.setName('ensinar').setDescription('Ensina uma resposta nova ao Atlas')
+      .addStringOption((o) => o.setName('gatilhos').setDescription('Palavras que ativam, separadas por vírgula (ex.: pix, chave pix)').setRequired(true).setMaxLength(200))
+      .addStringOption((o) => o.setName('resposta').setDescription('O que ele responde (use | para dar várias opções)').setRequired(true).setMaxLength(1500))
+      .addBooleanOption((o) => o.setName('so_pai').setDescription('Responder só para o pai?')))
+    .addSubcommand((s) => s.setName('listar').setDescription('Lista as respostas que a staff ensinou'))
+    .addSubcommand((s) => s.setName('esquecer').setDescription('Apaga uma resposta ensinada')
+      .addIntegerOption((o) => o.setName('numero').setDescription('Número da lista').setRequired(true).setMinValue(1)))
+    .addSubcommand((s) => s.setName('testar').setDescription('Vê o que o Atlas responderia a uma frase')
+      .addStringOption((o) => o.setName('frase').setDescription('A frase').setRequired(true).setMaxLength(300))
+      .addBooleanOption((o) => o.setName('como_pai').setDescription('Testar como se fosse o pai falando?')))
+    .addSubcommand((s) => s.setName('dicionario').setDescription('Testa a consulta ao dicionário')
+      .addStringOption((o) => o.setName('palavra').setDescription('Palavra').setRequired(true).setMaxLength(40))),
+
+  async execute(interaction, client) {
+    if (!interaction.inGuild()) return;
+    const sub = interaction.options.getSubcommand();
+    client = client || interaction.client;
+
+    if (sub === 'status') {
+      const canal = N.canal();
+      const pai = await N.paiId(client);
+      const aprendidas = N.aprendidas().length;
+      return interaction.reply({
+        embeds: [UI.painel({
+          trilha: ['Conversa', 'Configuração'],
+          titulo: N.ligado() ? 'A conversa está ligada' : 'A conversa está desligada',
+          campos: [
+            { nome: 'Canal', valor: canal ? `<#${canal}>` : 'não definido (o Atlas não responde em lugar nenhum)', lado: true },
+            { nome: 'Espera', valor: `${N.espera()} s  ${S.sep}  pai: ${N.ESPERA_PAI} s`, lado: true },
+            { nome: 'Pai', valor: pai ? `<@${pai}>` : 'não encontrado', lado: true },
+            { nome: 'Respostas ensinadas', valor: String(aprendidas), lado: true },
+            { nome: 'Como chamar o Atlas', valor: 'Marcar `@Atlas`, responder a uma mensagem dele ou começar a frase com **atlas**' },
+            { nome: 'Nunca responde', valor: 'Bots e membros na blacklist' },
+          ],
+        })],
+        flags: UI.EPH,
+        allowedMentions: SEM_PING,
+      });
+    }
+
+    if (sub === 'canal') {
+      const canal = interaction.options.getChannel('canal');
+      N.setCfg('canal', canal.id);
+      return interaction.reply(UI.ok(`O Atlas vai conversar só em ${canal}.`));
+    }
+
+    if (sub === 'ligar') {
+      const ativo = interaction.options.getBoolean('ativo');
+      N.setCfg('ligado', ativo);
+      return interaction.reply(UI.ok(ativo ? 'Conversa ligada.' : 'Conversa desligada.'));
+    }
+
+    if (sub === 'espera') {
+      const s = interaction.options.getInteger('segundos');
+      N.setCfg('espera', s);
+      return interaction.reply(UI.ok(`Cada pessoa precisa esperar **${s} s** entre uma fala e outra com o Atlas.`));
+    }
+
+    if (sub === 'pai') {
+      const dono = await N.donoId(client);
+      const atual = N.cfg('pai', null);
+      if (interaction.user.id !== dono && interaction.user.id !== atual) {
+        return interaction.reply(UI.erro('Só o dono do bot pode escolher o pai do Atlas.'));
+      }
+      const membro = interaction.options.getUser('membro');
+      if (membro.bot) return interaction.reply(UI.erro('O pai precisa ser uma pessoa.'));
+      N.setCfg('pai', membro.id);
+      return interaction.reply({ ...UI.ok(`${membro} agora é o pai do Atlas.`), allowedMentions: SEM_PING });
+    }
+
+    if (sub === 'ensinar') {
+      const gatilhos = interaction.options.getString('gatilhos').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+      const respostas = interaction.options.getString('resposta').split('|');
+      const r = N.ensinar({
+        gatilhos, respostas, soPai: interaction.options.getBoolean('so_pai') || false, por: interaction.user.id,
+      });
+      if (r.erro) return interaction.reply(UI.erro(r.erro));
+      return interaction.reply(UI.ok(`Aprendi. Quando alguém disser ${r.item.gatilhos.map((g) => `**${g}**`).join(', ')}, eu respondo${r.item.soPai ? ' (só para o pai)' : ''}. Respostas ensinadas: ${r.total}.`));
+    }
+
+    if (sub === 'listar') {
+      const lista = N.aprendidas();
+      if (!lista.length) return interaction.reply(UI.ok('Ainda não ensinaram nenhuma resposta. Use `/conversa ensinar`.'));
+      const linhas = lista.map((a, i) => `**${i + 1}**  ${S.sep}  ${a.gatilhos.join(', ')}${a.soPai ? `  ${S.lock}` : ''}\n${S.filho} ${corta(a.respostas.join('  |  '), 140)}`);
+      return interaction.reply({
+        embeds: [UI.painel({ trilha: ['Conversa', 'Ensinadas'], titulo: 'O que o Atlas aprendeu', descricao: linhas.join('\n\n').slice(0, 3800), rodape: `${S.lock} = só para o pai  ${S.sep}  /conversa esquecer <número>` })],
+        flags: UI.EPH,
+      });
+    }
+
+    if (sub === 'esquecer') {
+      const tirada = N.esquecer(interaction.options.getInteger('numero'));
+      if (!tirada) return interaction.reply(UI.erro('Não existe resposta com esse número.'));
+      return interaction.reply(UI.ok(`Esqueci a resposta para **${tirada.gatilhos.join(', ')}**.`));
+    }
+
+    if (sub === 'testar') {
+      const frase = interaction.options.getString('frase');
+      const pai = interaction.options.getBoolean('como_pai') || false;
+      await interaction.deferReply({ flags: UI.EPH });
+      const r = await N.responder({
+        conteudo: frase, uid: interaction.user.id, nome: interaction.member?.displayName || interaction.user.username, pai, client,
+      });
+      const embed = UI.painel({
+        trilha: ['Conversa', 'Teste'],
+        titulo: `Assunto: ${r.assunto}`,
+        descricao: r.content || '—',
+        rodape: pai ? 'Como se o pai estivesse falando' : 'Como membro comum',
+      });
+      return interaction.editReply({ embeds: [embed, ...(r.embeds || [])], allowedMentions: SEM_PING });
+    }
+
+    if (sub === 'dicionario') {
+      await interaction.deferReply({ flags: UI.EPH });
+      const res = await Dic.definir(interaction.options.getString('palavra'));
+      if (!res.ok) {
+        const msg = res.motivo === 'erro'
+          ? 'Nenhuma das 3 fontes respondeu. O bot pode estar sem acesso à internet ou os sites estão fora do ar.'
+          : res.motivo === 'invalida' ? 'Palavra inválida. Use só letras.' : `Não encontrei **${res.palavra}**.`;
+        return interaction.editReply(UI.edicao(UI.erro(msg)));
+      }
+      return interaction.editReply({
+        embeds: [UI.painel({
+          trilha: ['Dicionário'], titulo: res.palavra,
+          descricao: res.definicoes.map((d, i) => `**${i + 1}.**  ${d}`).join('\n\n').slice(0, 3800),
+          rodape: `Fonte: ${res.fonte}`,
+        })],
+      });
+    }
+  },
+};
