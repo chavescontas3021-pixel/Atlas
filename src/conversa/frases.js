@@ -22,6 +22,7 @@ const ASSUNTOS = [
   ...require('./frases-c'),
   ...require('./frases-d'),
   ...require('./frases-palavrao'),
+  ...require('./frases-extra'),
 ];
 const { NAO_ENTENDI, MOLDES } = require('./frases-moldes');
 
