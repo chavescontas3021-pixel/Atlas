@@ -28,6 +28,7 @@ module.exports = {
 
       const uid = msg.author.id;
       const pai = await N.ehPai(client, uid);
+      const alvo = !pai && N.ehAlvo(uid);
 
       if (N.esperaRestante(uid, pai) > 0) {
         msg.react('⏳').catch(() => {});
@@ -43,6 +44,7 @@ module.exports = {
         uid,
         nome: (msg.member && msg.member.displayName) || msg.author.username,
         pai,
+        alvo,
         client,
       });
 
