@@ -26,6 +26,12 @@ module.exports = {
       // Blacklist: silêncio total, sem nem reagir
       if (B.esta(msg.author.id)) return;
 
+      // Ordem da sub dona (ex.: "atlas, silencia @fulano") dada por quem pode mandar: a conversa não responde
+      try {
+        const bruto = String(msg.content || '').replace(/<@!?\d+>/g, ' ').replace(/\batlas\b[\s,:;!.-]*/i, ' ').trim();
+        if (require('../subdona/interprete').parece(bruto) && (await require('../subdona/nucleo').podeMandar(client, msg.author.id))) return;
+      } catch { /* sub dona não instalada: segue a conversa normal */ }
+
       const uid = msg.author.id;
       const pai = await N.ehPai(client, uid);
       const alvo = !pai && N.ehAlvo(uid);
