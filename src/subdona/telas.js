@@ -15,7 +15,7 @@ async function telaStatus(client) {
   return {
     embeds: [UI.painel({
       trilha: ['Sub dona'],
-      titulo: aus ? 'O pai está ausente. A sub dona está no comando.' : 'O pai está presente',
+      titulo: !N.ativo() ? 'Modo sub dona DESLIGADO' : aus ? 'O pai está ausente. A sub dona está no comando.' : 'O pai está presente',
       descricao: aus
         ? `${aus.motivo ? `Motivo: ${aus.motivo}\n` : ''}Desde ${quando(aus.desde)}${aus.ate ? `  ${S.sep}  volta ${quando(aus.ate)}` : ''}`
         : 'A sub dona obedece ordens do pai e dos delegados, e tudo fica no diário.',
@@ -23,6 +23,9 @@ async function telaStatus(client) {
         { nome: 'Pai', valor: pai ? `<@${pai}>` : 'não encontrado', lado: true },
         { nome: 'Delegados', valor: dele.length ? dele.map((d) => `<@${d}>`).join(' ') : 'ninguém', lado: true },
         { nome: 'Recados', valor: String(N.recados().length), lado: true },
+        { nome: 'Tickets', valor: { sempre: 'atende sempre', ausente: 'atende com o pai ausente', off: 'desligado' }[N.ticketModo()], lado: true },
+        { nome: 'Alertas', valor: N.alertasCanal() ? `<#${N.alertasCanal()}>` : 'DM do pai', lado: true },
+        { nome: 'Pânico', valor: require('./vigia').estadoPanico() ? 'ATIVO' : 'desligado', lado: true },
         { nome: 'Poderes', valor: `${S.ponto} automático  ◐ pede confirmação  ${S.vazio} desligado\n\n${poderes}` },
       ],
       rodape: 'Ordens: "atlas, silencia @fulano 10 min spam"  ·  /subdona poder para mudar',
