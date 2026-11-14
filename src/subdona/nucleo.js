@@ -26,13 +26,32 @@ const PODERES = {
   cargo: { nome: 'Cargos', padrao: 'confirma', perm: 'ManageRoles', info: 'Dá e tira cargos' },
   apelido: { nome: 'Apelidos', padrao: 'auto', perm: 'ManageNicknames', info: 'Muda o apelido de alguém' },
 };
+// Poderes dos vigias (ações automáticas). "Pede confirmação" aqui significa:
+// com você presente ela avisa e espera o clique; com você ausente ela age sozinha (e deixa o botão Desfazer).
+Object.assign(PODERES, {
+  vigia_raid: { nome: 'Vigiar raids', padrao: 'confirma', vigia: true, info: 'Muitas entradas de uma vez: tranca o servidor' },
+  vigia_flood: { nome: 'Vigiar flood e spam', padrao: 'confirma', vigia: true, info: 'Põe de castigo quem floda e apaga o spam' },
+  vigia_golpe: { nome: 'Vigiar golpes', padrao: 'confirma', vigia: true, info: 'Apaga links de golpe e castiga quem postou' },
+  ticket_fechar: { nome: 'Fechar tickets esquecidos', padrao: 'off', vigia: true, info: 'Fecha ticket parado há muito tempo' },
+});
 const MODOS = { off: 'desligado', confirma: 'pede confirmação', auto: 'automático' };
+
+// ── Interruptor mestre (só o pai mexe) ───────────────────────
+const ativo = () => cfg('ativo', true) !== false;
+const setAtivo = (v) => setCfg('ativo', !!v);
 
 const modo = (poder) => {
   const m = cfg(`poderes.${poder}`, null);
   return MODOS[m] ? m : (PODERES[poder] ? PODERES[poder].padrao : 'off');
 };
 const setModo = (poder, m) => setCfg(`poderes.${poder}`, m);
+// Para os vigias: "confirma" vira "auto" enquanto o pai está ausente
+const modoEfetivo = (poder) => (modo(poder) === 'confirma' && PODERES[poder] && PODERES[poder].vigia && ausencia() ? 'auto' : modo(poder));
+
+// ── Configurações da parte 2 ─────────────────────────────────
+const alertasCanal = () => cfg('alertas', null);
+const ticketModo = () => (['sempre', 'ausente', 'off'].includes(cfg('ticket', 'ausente')) ? cfg('ticket', 'ausente') : 'ausente');
+const lorittaId = () => cfg('loritta', '297153970613387264');
 
 // ── Quem manda ───────────────────────────────────────────────
 const paiId = (client) => Conversa.paiId(client);
@@ -89,6 +108,23 @@ function anotarRecado({ de, canalId, guildId, msgId, texto }) {
 const limparRecados = () => db.set('subdona.recados', []);
 
 // ── Pedidos pendentes de confirmação (somem em 3 minutos) ────
+// ── Caixa de sonhos (pagamentos pela Loritta) e cobranças ────
+const caixa = () => db.get('subdona.caixa', []);
+function lancar(p) {
+  const l = caixa();
+  const id = db.get('subdona.caixa_n', 0) + 1;
+  db.set('subdona.caixa_n', id);
+  l.push({ id, em: Date.now(), ...p });
+  db.set('subdona.caixa', l.slice(-500));
+  return id;
+}
+const cobrancas = () => db.get('subdona.cobrancas', []);
+const salvarCobrancas = (l) => db.set('subdona.cobrancas', l.slice(-100));
+const amostrasSonhos = () => db.get('subdona.amostras_sonhos', []);
+function guardarAmostra(txt) {
+  db.set('subdona.amostras_sonhos', [...amostrasSonhos(), { em: Date.now(), txt: String(txt).slice(0, 700) }].slice(-10));
+}
+
 const pendentes = new Map();
 const VALIDADE = 3 * 60 * 1000;
 function guardarPendente(dados) {
@@ -106,6 +142,7 @@ const soltarPendente = (token) => pendentes.delete(token);
 
 module.exports = {
   cfg, setCfg, PODERES, MODOS, modo, setModo, paiId, ehPai, delegados, ehDelegado, podeMandar, delegar, tirarDelegado,
+  ativo, setAtivo, modoEfetivo, alertasCanal, ticketModo, lorittaId, caixa, lancar, cobrancas, salvarCobrancas, amostrasSonhos, guardarAmostra,
   ausencia, ausentar, voltar, diario, registrar, obter, marcarDesfeito, recados, anotarRecado, limparRecados,
   guardarPendente, pegarPendente, soltarPendente,
 };
