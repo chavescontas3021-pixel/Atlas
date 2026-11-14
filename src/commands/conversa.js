@@ -26,6 +26,9 @@ module.exports = {
         .addChoices({ name: 'Vanellope (debochada e cheia de energia)', value: 'vanellope' }, { name: 'Atlas (guia calmo e elegante)', value: 'atlas' })))
     .addSubcommand((s) => s.setName('palavrao').setDescription('Liga ou desliga os palavrões nas respostas')
       .addBooleanOption((o) => o.setName('ativo').setDescription('Pode falar palavrão?').setRequired(true)))
+    .addSubcommand((s) => s.setName('ia').setDescription('Liga ou desliga a IA gratuita e define o limite diário')
+      .addBooleanOption((o) => o.setName('ativo').setDescription('IA ligada?'))
+      .addIntegerOption((o) => o.setName('limite').setDescription('Máximo de respostas da IA por dia (10 a 5000)').setMinValue(10).setMaxValue(5000)))
     .addSubcommand((s) => s.setName('alvo').setDescription('Escolhe quem leva o tratamento "dura e chata" (só o pai)')
       .addUserOption((o) => o.setName('membro').setDescription('Quem será o alvo da implicância'))
       .addBooleanOption((o) => o.setName('remover').setDescription('Tirar o alvo atual?')))
@@ -63,6 +66,7 @@ module.exports = {
             { nome: 'Respostas ensinadas', valor: String(aprendidas), lado: true },
             { nome: 'Personalidade', valor: N.tom() === 'vanellope' ? 'Vanellope' : 'Atlas (guia)', lado: true },
             { nome: 'Palavrões', valor: N.palavrao() ? 'liberados' : 'desligados', lado: true },
+            { nome: 'IA gratuita', valor: !N.IA.disponivel() ? 'sem chave no .env (só respostas prontas)' : `${N.IA.ligada() ? 'ligada' : 'desligada'}  ${S.sep}  ${N.IA.modelo()}  ${S.sep}  hoje ${N.IA.usoHoje()}/${N.IA.limite()}`, lado: true },
             { nome: 'Alvo da implicância', valor: N.alvoId() ? `<@${N.alvoId()}>` : 'ninguém', lado: true },
             { nome: 'Como chamar o Atlas', valor: 'Marcar `@Atlas`, responder a uma mensagem dele ou começar a frase com **atlas**' },
             { nome: 'Nunca responde', valor: 'Bots e membros na blacklist' },
@@ -113,6 +117,15 @@ module.exports = {
       const ativo = interaction.options.getBoolean('ativo');
       N.setCfg('palavrao', ativo);
       return interaction.reply(UI.ok(ativo ? 'Palavrões liberados (só os que o automod não bloqueia).' : 'Palavrões desligados. Ninguém recebe palavrão do Atlas.'));
+    }
+
+    if (sub === 'ia') {
+      const ativo = interaction.options.getBoolean('ativo');
+      const lim = interaction.options.getInteger('limite');
+      if (ativo !== null) N.setCfg('ia', ativo);
+      if (lim !== null) N.setCfg('ia_limite', lim);
+      if (!N.IA.disponivel()) return interaction.reply(UI.aviso('Configuração salva, mas não há IA_KEY no .env do bot. Sem a chave, o Atlas usa só as respostas prontas.'));
+      return interaction.reply(UI.ok(`IA ${N.IA.ligada() ? 'ligada' : 'desligada'}. Limite: ${N.IA.limite()} respostas por dia (hoje: ${N.IA.usoHoje()}).`));
     }
 
     if (sub === 'alvo') {
