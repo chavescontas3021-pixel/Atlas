@@ -15,6 +15,7 @@ const ALVO = require('./alvo');
 const P = require('./palavroes');
 const G = require('./giria');
 const FALL = require('./fallback');
+const IA = require('./ia');
 
 const FUSO = 'America/Sao_Paulo';
 const ESPERA_PADRAO = 20; // segundos
@@ -280,6 +281,9 @@ const botoesAtalho = () => UI.botoes([
   { id: 'conversa:missoes', label: 'Missões' },
 ]);
 
+// Pede a resposta para a IA (se estiver ligada). Devolve null se não der, e aí valem as respostas prontas.
+const pedirIA = ({ bruto, uid, vars, via }) => IA.responder({ texto: bruto, uid, nome: vars.nome, via, tom: tom(), palavrao: palavrao() });
+
 // Função principal: recebe a mensagem já filtrada e devolve o que enviar.
 //   entrada: { conteudo, uid, nome, pai, client }
 //   saída:   { assunto, content?, embeds?, components? }
@@ -308,6 +312,8 @@ async function responder({ conteudo, uid, nome, pai, alvo = false, client, agora
     const ehPergunta = /\?/.test(bruto) || /^(quem|que|qual|quais|como|onde|quando|porque|quanto|quantos|quantas|existe|tem|da pra|pode|sabe|sera|por que)\b/.test(texto);
     const pouco = texto.length < 2 || G.ininteligivel(texto);
     if (!pouco) {
+      const falaIA = await pedirIA({ bruto, uid, vars, via });
+      if (falaIA) return { assunto: 'ia', content: falaIA };
       const c = candidatas({ id: ehPergunta ? 'pergunta' : 'comentario', ...(ehPergunta ? FALL.pergunta : FALL.comentario) }, via);
       return { assunto: ehPergunta ? 'pergunta' : 'comentario', content: sortearSeguro(c.lista, `${uid}:fb`, vars) };
     }
@@ -359,6 +365,11 @@ async function responder({ conteudo, uid, nome, pai, alvo = false, client, agora
     default:
   }
 
+  if (IA.ASSUNTOS_ABERTOS.has(a.id)) {
+    const falaIA = await pedirIA({ bruto, uid, vars, via });
+    if (falaIA) return { assunto: 'ia', content: falaIA };
+  }
+
   const c = candidatas(a, via);
   let frase = sortearSeguro(c.lista, `${uid}:${a.id}:${via}`, vars);
   if (c.prefixo && c.prefixo.length) frase = `${sortearSeguro(c.prefixo, `${uid}:pre`, vars)} ${frase}`;
@@ -384,7 +395,7 @@ async function chamouAtlas(client, msg) {
 }
 
 module.exports = {
-  cfg, setCfg, ligado, canal, espera, ESPERA_PAI, ESPERA_PADRAO, tom, palavrao, alvoId, ehAlvo,
+  cfg, setCfg, ligado, canal, espera, ESPERA_PAI, ESPERA_PADRAO, tom, palavrao, alvoId, ehAlvo, IA,
   norm, limpar, detectar, responder, chamouAtlas,
   donoId, paiId, ehPai, esperaRestante, marcarFala,
   aprendidas, ensinar, esquecer,
