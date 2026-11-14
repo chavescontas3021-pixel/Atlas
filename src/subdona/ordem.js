@@ -13,6 +13,7 @@ const SEM_PING = { parse: [] };
 
 // ctx: { client, guild, canal, executor (GuildMember), executorUser, msgId }
 async function pedir(ctx, acao, params, { origem = 'ordem' } = {}) {
+  if (!N.ativo()) return { payload: UI.aviso('O modo sub dona está desligado. Só o pai liga, em `/subdona modo`.', { publica: true }) };
   ctx.ehPai = await N.ehPai(ctx.client, ctx.executorUser.id);
   const poder = A.PODER_DE[acao];
   const modo = N.modo(poder);
@@ -60,16 +61,17 @@ async function aoClicarConfirmacao(interaction, client, ok, token) {
   const p = N.pegarPendente(token);
   if (!p) return interaction.update({ ...UI.edicao(UI.aviso('Esse pedido expirou. Mande a ordem de novo.')), components: [] });
   const ehPai = await N.ehPai(client, interaction.user.id);
-  if (interaction.user.id !== p.executor && !ehPai) return interaction.reply(UI.erro('Só quem mandou (ou o pai) confirma isso.'));
+  const delegadoOk = p.executor === 'auto' && N.ehDelegado(interaction.user.id);
+  if (interaction.user.id !== p.executor && !ehPai && !delegadoOk) return interaction.reply(UI.erro('Só o pai, os delegados ou quem mandou confirmam isso.'));
   N.soltarPendente(token);
   if (!ok) return interaction.update({ ...UI.edicao(UI.aviso('Cancelado. Nada foi feito.')), components: [] });
 
   await interaction.deferUpdate();
   const guild = interaction.guild;
-  const executor = await guild.members.fetch(p.executor).catch(() => interaction.member);
+  const executor = p.executor === 'auto' ? guild.members.me : await guild.members.fetch(p.executor).catch(() => interaction.member);
   const canal = guild.channels.cache.get(p.canalId) || interaction.channel;
   const params = { ...p.params, canalAlvo: p.params.canalId ? guild.channels.cache.get(p.params.canalId) : undefined };
-  const ctx = { client, guild, canal, executor, executorUser: executor.user, msgId: p.msgId, ehPai: await N.ehPai(client, p.executor) };
+  const ctx = { client, guild, canal, executor, executorUser: executor.user, msgId: p.msgId, ehPai: p.executor === 'auto' ? false : await N.ehPai(client, p.executor) };
   const payload = await rodar(ctx, p.acao, params, p.origem);
   return interaction.editReply({ ...UI.edicao(payload), components: payload.components || [] });
 }
