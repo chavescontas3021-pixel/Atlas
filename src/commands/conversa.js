@@ -21,6 +21,14 @@ module.exports = {
       .addIntegerOption((o) => o.setName('segundos').setDescription('De 5 a 300').setRequired(true).setMinValue(5).setMaxValue(300)))
     .addSubcommand((s) => s.setName('pai').setDescription('Define quem é o "pai" do Atlas (só o dono do bot)')
       .addUserOption((o) => o.setName('membro').setDescription('Quem será tratado como pai').setRequired(true)))
+    .addSubcommand((s) => s.setName('tom').setDescription('Muda a personalidade do Atlas na conversa')
+      .addStringOption((o) => o.setName('qual').setDescription('Personalidade').setRequired(true)
+        .addChoices({ name: 'Vanellope (debochada e cheia de energia)', value: 'vanellope' }, { name: 'Atlas (guia calmo e elegante)', value: 'atlas' })))
+    .addSubcommand((s) => s.setName('palavrao').setDescription('Liga ou desliga os palavrões nas respostas')
+      .addBooleanOption((o) => o.setName('ativo').setDescription('Pode falar palavrão?').setRequired(true)))
+    .addSubcommand((s) => s.setName('alvo').setDescription('Escolhe quem leva o tratamento "dura e chata" (só o pai)')
+      .addUserOption((o) => o.setName('membro').setDescription('Quem será o alvo da implicância'))
+      .addBooleanOption((o) => o.setName('remover').setDescription('Tirar o alvo atual?')))
     .addSubcommand((s) => s.setName('ensinar').setDescription('Ensina uma resposta nova ao Atlas')
       .addStringOption((o) => o.setName('gatilhos').setDescription('Palavras que ativam, separadas por vírgula (ex.: pix, chave pix)').setRequired(true).setMaxLength(200))
       .addStringOption((o) => o.setName('resposta').setDescription('O que ele responde (use | para dar várias opções)').setRequired(true).setMaxLength(1500))
@@ -30,7 +38,8 @@ module.exports = {
       .addIntegerOption((o) => o.setName('numero').setDescription('Número da lista').setRequired(true).setMinValue(1)))
     .addSubcommand((s) => s.setName('testar').setDescription('Vê o que o Atlas responderia a uma frase')
       .addStringOption((o) => o.setName('frase').setDescription('A frase').setRequired(true).setMaxLength(300))
-      .addBooleanOption((o) => o.setName('como_pai').setDescription('Testar como se fosse o pai falando?')))
+      .addBooleanOption((o) => o.setName('como_pai').setDescription('Testar como se fosse o pai falando?'))
+      .addBooleanOption((o) => o.setName('como_alvo').setDescription('Testar como se fosse o alvo da implicância?')))
     .addSubcommand((s) => s.setName('dicionario').setDescription('Testa a consulta ao dicionário')
       .addStringOption((o) => o.setName('palavra').setDescription('Palavra').setRequired(true).setMaxLength(40))),
 
@@ -52,6 +61,9 @@ module.exports = {
             { nome: 'Espera', valor: `${N.espera()} s  ${S.sep}  pai: ${N.ESPERA_PAI} s`, lado: true },
             { nome: 'Pai', valor: pai ? `<@${pai}>` : 'não encontrado', lado: true },
             { nome: 'Respostas ensinadas', valor: String(aprendidas), lado: true },
+            { nome: 'Personalidade', valor: N.tom() === 'vanellope' ? 'Vanellope' : 'Atlas (guia)', lado: true },
+            { nome: 'Palavrões', valor: N.palavrao() ? 'liberados' : 'desligados', lado: true },
+            { nome: 'Alvo da implicância', valor: N.alvoId() ? `<@${N.alvoId()}>` : 'ninguém', lado: true },
             { nome: 'Como chamar o Atlas', valor: 'Marcar `@Atlas`, responder a uma mensagem dele ou começar a frase com **atlas**' },
             { nome: 'Nunca responde', valor: 'Bots e membros na blacklist' },
           ],
@@ -91,6 +103,36 @@ module.exports = {
       return interaction.reply({ ...UI.ok(`${membro} agora é o pai do Atlas.`), allowedMentions: SEM_PING });
     }
 
+    if (sub === 'tom') {
+      const qual = interaction.options.getString('qual');
+      N.setCfg('tom', qual);
+      return interaction.reply(UI.ok(qual === 'vanellope' ? 'Agora o Atlas fala com a personalidade da Vanellope.' : 'Voltei para o jeito calmo de guia.'));
+    }
+
+    if (sub === 'palavrao') {
+      const ativo = interaction.options.getBoolean('ativo');
+      N.setCfg('palavrao', ativo);
+      return interaction.reply(UI.ok(ativo ? 'Palavrões liberados (só os que o automod não bloqueia).' : 'Palavrões desligados. Ninguém recebe palavrão do Atlas.'));
+    }
+
+    if (sub === 'alvo') {
+      const pai = await N.paiId(client);
+      const dono = await N.donoId(client);
+      if (interaction.user.id !== pai && interaction.user.id !== dono) {
+        return interaction.reply(UI.erro('Só o pai do Atlas escolhe o alvo da implicância.'));
+      }
+      if (interaction.options.getBoolean('remover')) {
+        N.setCfg('alvo', null);
+        return interaction.reply(UI.ok('Pronto, o Atlas voltou a tratar todo mundo igual.'));
+      }
+      const membro = interaction.options.getUser('membro');
+      if (!membro) return interaction.reply(UI.erro('Escolha um membro, ou use `remover: true` para tirar o alvo.'));
+      if (membro.bot) return interaction.reply(UI.erro('O alvo precisa ser uma pessoa.'));
+      if (membro.id === pai) return interaction.reply(UI.erro('O pai não pode ser o alvo.'));
+      N.setCfg('alvo', membro.id);
+      return interaction.reply({ ...UI.ok(`${membro} agora leva o tratamento "dura e chata" do Atlas. Use só com quem entende a brincadeira.`), allowedMentions: SEM_PING });
+    }
+
     if (sub === 'ensinar') {
       const gatilhos = interaction.options.getString('gatilhos').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
       const respostas = interaction.options.getString('resposta').split('|');
@@ -120,15 +162,16 @@ module.exports = {
     if (sub === 'testar') {
       const frase = interaction.options.getString('frase');
       const pai = interaction.options.getBoolean('como_pai') || false;
+      const alvo = !pai && (interaction.options.getBoolean('como_alvo') || false);
       await interaction.deferReply({ flags: UI.EPH });
       const r = await N.responder({
-        conteudo: frase, uid: interaction.user.id, nome: interaction.member?.displayName || interaction.user.username, pai, client,
+        conteudo: frase, uid: interaction.user.id, nome: interaction.member?.displayName || interaction.user.username, pai, alvo, client,
       });
       const embed = UI.painel({
         trilha: ['Conversa', 'Teste'],
         titulo: `Assunto: ${r.assunto}`,
         descricao: r.content || '—',
-        rodape: pai ? 'Como se o pai estivesse falando' : 'Como membro comum',
+        rodape: pai ? 'Como se o pai estivesse falando' : alvo ? 'Como se o alvo estivesse falando' : 'Como membro comum',
       });
       return interaction.editReply({ embeds: [embed, ...(r.embeds || [])], allowedMentions: SEM_PING });
     }
