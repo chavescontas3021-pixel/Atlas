@@ -36,6 +36,7 @@ module.exports = {
     try {
       if (!msg.guild || !msg.author || msg.author.bot || msg.webhookId || msg.system) return;
       if (B.esta(msg.author.id)) return; // blacklist: silêncio total
+      if (!N.ativo()) return; // modo sub dona desligado pelo pai
 
       await avisoAusencia(client, msg);
 
