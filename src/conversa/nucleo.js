@@ -13,6 +13,8 @@ const VAN = { ...require('./vanellope-1'), ...require('./vanellope-2') };
 const VAN_M = require('./vanellope-moldes');
 const ALVO = require('./alvo');
 const P = require('./palavroes');
+const G = require('./giria');
+const FALL = require('./fallback');
 
 const FUSO = 'America/Sao_Paulo';
 const ESPERA_PADRAO = 20; // segundos
@@ -42,14 +44,17 @@ function norm(t) {
     .trim();
 }
 
-// Tira menções, o nome "atlas" e espaços. Devolve { bruto, texto }
+// Texto "traduzido": gírias e abreviações viram palavras completas (vc → voce)
+const normG = (t) => G.girias(norm(t));
+
+// Tira menções, o nome "atlas" e espaços. Devolve { bruto, texto, puro }
 function limpar(conteudo) {
   const bruto = String(conteudo || '')
     .replace(/<@!?\d+>|<@&\d+>|<#\d+>/g, ' ')
     .replace(/\batlas\b[\s,:;!?.-]*/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return { bruto, texto: norm(bruto) };
+  return { bruto, texto: normG(bruto), puro: norm(bruto) };
 }
 
 const escapar = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -99,7 +104,7 @@ const salvarAprendidas = (l) => db.set('conversa.aprendidas', l);
 function ensinar({ gatilhos, respostas, soPai = false, por }) {
   const lista = aprendidas();
   if (lista.length >= MAX_APRENDIDAS) return { erro: `Limite de ${MAX_APRENDIDAS} respostas ensinadas atingido.` };
-  const g = [...new Set(gatilhos.map(norm).filter((x) => x.length >= 2))].slice(0, 8);
+  const g = [...new Set(gatilhos.map(normG).filter((x) => x.length >= 2))].slice(0, 8);
   const r = respostas.map((x) => x.trim()).filter(Boolean).slice(0, 8);
   if (!g.length) return { erro: 'Preciso de pelo menos um gatilho com 2 letras ou mais.' };
   if (!r.length) return { erro: 'Falta a resposta.' };
@@ -214,11 +219,17 @@ function personagemDe(uid) {
   }
 }
 
+// Apelidos do Discord vêm cheios de símbolos (✂ . 🩸 Angel Devil ○): fica só o nome legível
+function nomeLimpo(nome) {
+  const m = /[\p{L}\p{N}]+(?:[ /'-][\p{L}\p{N}]+)*/u.exec(String(nome || ''));
+  return m ? m[0].slice(0, 24) : 'você';
+}
+
 function variaveis({ uid, nome, pai, client, agora = new Date() }) {
   const personagem = personagemDe(uid);
   const dono = db.get('config.conversa.pai', null) || donoCache;
   return {
-    nome: pai ? 'pai' : nome,
+    nome: pai ? 'pai' : nomeLimpo(nome),
     personagem,
     personagem_frase: personagem ? ` e seu personagem é **${personagem}**` : '',
     periodo: periodoDoDia(agora),
@@ -273,7 +284,7 @@ const botoesAtalho = () => UI.botoes([
 //   entrada: { conteudo, uid, nome, pai, client }
 //   saída:   { assunto, content?, embeds?, components? }
 async function responder({ conteudo, uid, nome, pai, alvo = false, client, agora = new Date() }) {
-  const { bruto, texto } = limpar(conteudo);
+  const { bruto, texto, puro } = limpar(conteudo);
   const vars = variaveis({ uid, nome, pai, client, agora });
   const via = pai ? 'pai' : alvo ? 'alvo' : 'normal';
   const van = tom() === 'vanellope';
@@ -289,9 +300,17 @@ async function responder({ conteudo, uid, nome, pai, alvo = false, client, agora
     return sortearSeguro(lista, `${uid}:m:${chave}`, { ...vars, ...extra });
   };
 
-  const achado = detectar(texto, { pai });
+  let achado = detectar(texto, { pai });
+  if (!achado) achado = detectar(G.corrigir(texto), { pai }); // erro de digitação
 
   if (!achado) {
+    // Sem assunto: responde ao tipo da frase (pergunta ou comentário). "Não entendi" só para teclada aleatória.
+    const ehPergunta = /\?/.test(bruto) || /^(quem|que|qual|quais|como|onde|quando|porque|quanto|quantos|quantas|existe|tem|da pra|pode|sabe|sera|por que)\b/.test(texto);
+    const pouco = texto.length < 2 || G.ininteligivel(texto);
+    if (!pouco) {
+      const c = candidatas({ id: ehPergunta ? 'pergunta' : 'comentario', ...(ehPergunta ? FALL.pergunta : FALL.comentario) }, via);
+      return { assunto: ehPergunta ? 'pergunta' : 'comentario', content: sortearSeguro(c.lista, `${uid}:fb`, vars) };
+    }
     let lista = NE[via] || NE.normal;
     if (via === 'alvo' && !palavrao()) lista = semPalavrao(lista).length ? semPalavrao(lista) : NE.normal;
     return { assunto: 'nao_entendi', content: sortearSeguro(lista, `${uid}:nao`, vars), components: [botoesAtalho()] };
@@ -323,7 +342,8 @@ async function responder({ conteudo, uid, nome, pai, alvo = false, client, agora
       return { assunto: a.id, content: c ? molde('calculo', c) : molde('calculo_erro') };
     }
     case 'dicionario': {
-      const res = await Dic.definir(achado.captura);
+      const cru = a.regs.map((re) => re.exec(puro)).find(Boolean); // palavra como foi escrita (sem gírias)
+      const res = await Dic.definir((cru && cru[1]) || achado.captura);
       if (!res.ok) {
         const chave = res.motivo === 'erro' ? 'dicionario_erro' : 'dicionario_nada';
         return { assunto: a.id, content: molde(chave, { r: res.palavra }) };
