@@ -143,4 +143,30 @@ async function responder({ texto, uid, nome, via, tom = 'vanellope', palavrao = 
   }
 }
 
-module.exports = { ASSUNTOS_ABERTOS, disponivel, ligada, limite, usoHoje, modelo, responder, _teste: { sistema, limpar, memoria } };
+// Pergunta livre com instruções próprias (usada pelo atendimento de tickets da sub dona).
+async function perguntar({ sistema, texto, uid, maxTokens = 220 }) {
+  if (!ligada() || usoHoje() >= limite()) return null;
+  const entrada = String(texto || '').replace(/<@[!&]?\d+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 800);
+  if (!entrada) return null;
+  try {
+    contar();
+    const msgs = [{ role: 'system', content: sistema }, ...historico(`t:${uid}`), { role: 'user', content: entrada }];
+    const r = await fetch(url(), {
+      method: 'POST', signal: AbortSignal.timeout(TEMPO_LIMITE),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave()}` },
+      body: JSON.stringify({ model: modelo(), messages: msgs, max_tokens: maxTokens, temperature: 0.5 }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    const t = limpar(d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content, { via: 'normal', palavrao: false });
+    if (!t) return null;
+    lembrar(`t:${uid}`, 'user', entrada);
+    lembrar(`t:${uid}`, 'assistant', t);
+    return t;
+  } catch (erro) {
+    console.error('[Conversa IA]', String(erro && erro.message ? erro.message : erro));
+    return null;
+  }
+}
+
+module.exports = { perguntar, ASSUNTOS_ABERTOS, disponivel, ligada, limite, usoHoje, modelo, responder, _teste: { sistema, limpar, memoria } };
