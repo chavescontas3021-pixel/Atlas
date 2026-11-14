@@ -9,6 +9,10 @@ const UI = require('../ui/componentes');
 const T = require('../ui/tema');
 const Dic = require('./dicionario');
 const { ASSUNTOS, NAO_ENTENDI, MOLDES } = require('./frases');
+const VAN = { ...require('./vanellope-1'), ...require('./vanellope-2') };
+const VAN_M = require('./vanellope-moldes');
+const ALVO = require('./alvo');
+const P = require('./palavroes');
 
 const FUSO = 'America/Sao_Paulo';
 const ESPERA_PADRAO = 20; // segundos
@@ -20,6 +24,11 @@ const cfg = (k, padrao = null) => db.get(`config.conversa.${k}`, padrao);
 const setCfg = (k, v) => db.set(`config.conversa.${k}`, v);
 const ligado = () => cfg('ligado', true) !== false;
 const canal = () => cfg('canal', null);
+// Tom da conversa: 'vanellope' (padrão) ou 'atlas' (guia elegante). Palavrões ligados por padrão.
+const tom = () => (cfg('tom', 'vanellope') === 'atlas' ? 'atlas' : 'vanellope');
+const palavrao = () => cfg('palavrao', true) !== false;
+const alvoId = () => cfg('alvo', null);
+const ehAlvo = (uid) => !!uid && uid === alvoId();
 const espera = () => Math.min(300, Math.max(5, Number(cfg('espera', ESPERA_PADRAO)) || ESPERA_PADRAO));
 
 // ── Texto ────────────────────────────────────────────────────
@@ -156,6 +165,42 @@ function periodoDoDia(agora = new Date()) {
   return 'Boa noite';
 }
 
+// Frases possíveis para um assunto, conforme o tom, o palavrão e quem está falando
+function fonte(a) {
+  if (a.id === 'crise') return a; // segurança: texto sempre o cuidadoso
+  return tom() === 'vanellope' && VAN[a.id] ? { ...a, ...VAN[a.id] } : a;
+}
+
+const semPalavrao = (l) => (l || []).filter((x) => !P.temPalavrao(x));
+
+function candidatas(a, via) {
+  const f = fonte(a);
+  const pode = palavrao();
+  if (via === 'alvo' && a.id !== 'crise') {
+    const rude = ALVO.assuntos[a.id] || f.alvo || (a.dinamico === 'lista' ? null : ALVO.geral);
+    if (rude) {
+      let ok = pode ? rude : semPalavrao(rude);
+      if (!ok.length) ok = semPalavrao(ALVO.geral);
+      return { lista: ok.length ? ok : f.normal };
+    }
+    // piada, curiosidade...: o conteúdo de sempre, com uma bronca na frente
+    return { lista: f.normal, prefixo: pode ? ALVO.prefixos : semPalavrao(ALVO.prefixos) };
+  }
+  const base = (via === 'pai' && f.pai && f.pai.length ? f.pai : f.normal);
+  const forte = via === 'pai' ? f.fortePai : f.forte;
+  if (pode && forte && forte.length && Math.random() < (via === 'pai' ? 0.4 : 0.3)) return { lista: forte };
+  return { lista: base };
+}
+
+// Escolhe uma frase que o automod também deixaria um membro dizer
+function sortearSeguro(lista, chave, vars) {
+  for (let i = 0; i < 6; i += 1) {
+    const t = preencher(sortear(lista, chave), vars);
+    if (P.seguroNoAutomod(t)) return t;
+  }
+  return lista.map((x) => preencher(x, vars)).find((x) => P.seguroNoAutomod(x)) || 'Deu glitch aqui. Tenta de novo?';
+}
+
 function preencher(texto, vars) {
   return String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : ''));
 }
@@ -227,21 +272,29 @@ const botoesAtalho = () => UI.botoes([
 // Função principal: recebe a mensagem já filtrada e devolve o que enviar.
 //   entrada: { conteudo, uid, nome, pai, client }
 //   saída:   { assunto, content?, embeds?, components? }
-async function responder({ conteudo, uid, nome, pai, client, agora = new Date() }) {
+async function responder({ conteudo, uid, nome, pai, alvo = false, client, agora = new Date() }) {
   const { bruto, texto } = limpar(conteudo);
   const vars = variaveis({ uid, nome, pai, client, agora });
-  const via = pai ? 'pai' : 'normal';
-  const moldes = MOLDES[via];
-  const molde = (chave, extra = {}) => preencher(sortear(moldes[chave], `${uid}:m:${chave}`), { ...vars, ...extra });
+  const via = pai ? 'pai' : alvo ? 'alvo' : 'normal';
+  const van = tom() === 'vanellope';
+  const NE = van || via === 'alvo' ? VAN_M.NAO_ENTENDI : NAO_ENTENDI;
+  const MO = van || via === 'alvo' ? VAN_M.MOLDES : MOLDES;
+
+  const molde = (chave, extra = {}) => {
+    let lista = (MO[via] && MO[via][chave]) || MO.normal[chave];
+    if (via === 'alvo' && !palavrao()) {
+      const limpa = semPalavrao(lista);
+      lista = limpa.length ? limpa : MO.normal[chave];
+    }
+    return sortearSeguro(lista, `${uid}:m:${chave}`, { ...vars, ...extra });
+  };
 
   const achado = detectar(texto, { pai });
 
   if (!achado) {
-    return {
-      assunto: 'nao_entendi',
-      content: preencher(sortear(NAO_ENTENDI[via], `${uid}:nao`), vars),
-      components: [botoesAtalho()],
-    };
+    let lista = NE[via] || NE.normal;
+    if (via === 'alvo' && !palavrao()) lista = semPalavrao(lista).length ? semPalavrao(lista) : NE.normal;
+    return { assunto: 'nao_entendi', content: sortearSeguro(lista, `${uid}:nao`, vars), components: [botoesAtalho()] };
   }
 
   if (achado.tipo === 'aprendida') {
@@ -286,7 +339,9 @@ async function responder({ conteudo, uid, nome, pai, client, agora = new Date() 
     default:
   }
 
-  const frase = preencher(sortear(a[via] && a[via].length ? a[via] : a.normal, `${uid}:${a.id}:${via}`), vars);
+  const c = candidatas(a, via);
+  let frase = sortearSeguro(c.lista, `${uid}:${a.id}:${via}`, vars);
+  if (c.prefixo && c.prefixo.length) frase = `${sortearSeguro(c.prefixo, `${uid}:pre`, vars)} ${frase}`;
   const saida = { assunto: a.id, content: frase };
   if (a.botoes) saida.components = [botoesAtalho()];
   return saida;
@@ -309,7 +364,7 @@ async function chamouAtlas(client, msg) {
 }
 
 module.exports = {
-  cfg, setCfg, ligado, canal, espera, ESPERA_PAI, ESPERA_PADRAO,
+  cfg, setCfg, ligado, canal, espera, ESPERA_PAI, ESPERA_PADRAO, tom, palavrao, alvoId, ehAlvo,
   norm, limpar, detectar, responder, chamouAtlas,
   donoId, paiId, ehPai, esperaRestante, marcarFala,
   aprendidas, ensinar, esquecer,
