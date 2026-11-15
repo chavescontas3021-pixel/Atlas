@@ -2,6 +2,7 @@ const { ChannelType, PermissionFlagsBits, SlashCommandBuilder } = require('disco
 const Vigia = require('../subdona/vigia');
 const N = require('../subdona/nucleo');
 const Telas = require('../subdona/telas');
+const Resumo = require('../subdona/resumo');
 const UI = require('../ui/componentes');
 const { S, quando } = require('../ui/tema');
 
@@ -105,17 +106,10 @@ module.exports = {
       const feitos = N.diario().filter((d) => d.em >= desde && d.ausencia);
       const rec = N.recados().length;
       N.voltar();
+      const tela = Resumo.montar({ desde: desde || Date.now() - 24 * 3600 * 1000, titulo: aus ? 'Bem-vindo de volta. Isto é o que perdeu.' : 'Bem-vindo de volta', trilha: 'Ao voltar' });
       return interaction.reply({
-        embeds: [UI.painel({
-          trilha: ['Sub dona'],
-          titulo: 'Bem-vindo de volta',
-          descricao: aus ? `Você ficou fora desde ${quando(aus.desde)}.` : 'Você não estava marcado como ausente.',
-          campos: [
-            { nome: 'Ações que fiz', valor: String(feitos.length), lado: true },
-            { nome: 'Recados', valor: String(rec), lado: true },
-          ],
-        })],
-        components: [UI.botoes([{ id: 'sd:diarioa:0', label: 'Ver o que fiz' }, { id: 'sd:recados:0', label: 'Ver recados' }])],
+        ...tela,
+        components: [UI.botoes([{ id: 'sd:diarioa:0', label: `Ver o que fiz (${feitos.length})` }, { id: 'sd:recados:0', label: `Ver recados (${rec})` }])],
         flags: UI.EPH,
       });
     }
