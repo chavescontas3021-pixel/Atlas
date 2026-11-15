@@ -1,4 +1,4 @@
-// ATLAS · sub dona · ronda (roda a cada 5 minutos): tickets parados, cobranças vencidas
+// ATLAS · sub dona · ronda (roda a cada 5 minutos): tickets parados, cobranças vencidas, rotinas, resumos e backup
 const UI = require('../ui/componentes');
 const N = require('./nucleo');
 const At = require('./atendente');
@@ -41,9 +41,12 @@ function cobrancas() {
 }
 
 async function tick(client) {
+  require('./backup').tick(); // backup semanal da configuração (se ligado)
   if (!N.ativo()) return;
   await tickets(client).catch((e) => console.error('[Sub dona] ronda tickets:', e));
   cobrancas();
+  await require('./rotinas').tick(client).catch((e) => console.error('[Sub dona] rotinas:', e));
+  await require('./resumo').tick(client).catch((e) => console.error('[Sub dona] resumo:', e));
 }
 
 module.exports = { tick };
