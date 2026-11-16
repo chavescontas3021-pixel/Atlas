@@ -7,6 +7,7 @@ module.exports = {
   async execute(client, interaction) {
     try {
       if (!interaction.isButton() || !interaction.customId.startsWith('conversa:')) return;
+      require('../subdona/publico').aplicar(interaction);
 
       // Quem está na blacklist não usa nada do Atlas
       if (B.esta(interaction.user.id)) return await interaction.deferUpdate();
