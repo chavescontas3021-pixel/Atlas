@@ -50,6 +50,8 @@ function motivoDe(bruto, rxVerbo, { tirarTempo = true, tirarNumero = false } = {
 // ── Principal ────────────────────────────────────────────────
 // entrada: { bruto (texto sem o "atlas"), usuarios:[ids], cargos:[ids], canais:[ids] }
 function entender({ bruto, usuarios = [], cargos = [], canais = [] }) {
+  const extra = require('./interprete2').entender({ bruto, usuarios, cargos, canais }); // ordens com substantivo (ticket, sorteio, canal...)
+  if (extra) return extra;
   const texto = sem(String(bruto).replace(/<[@#&!]+\d+>/g, ' '));
   if (!texto) return null;
   const candidatas = ORDENS.filter((o) => o.rx.test(texto)).sort((a, b) => b.p - a.p);
@@ -110,6 +112,6 @@ function entender({ bruto, usuarios = [], cargos = [], canais = [] }) {
 }
 
 // A frase parece uma ordem? (a conversa usa isso para não responder "não entendi" a uma ordem)
-const parece = (bruto) => ORDENS.some((o) => o.rx.test(sem(String(bruto).replace(/<[@#&!]+\d+>/g, ' ').replace(/^\s*atlas[\s,:;!-]*/i, ''))));
+const parece = (bruto) => require('./interprete2').parece(bruto) || ORDENS.some((o) => o.rx.test(sem(String(bruto).replace(/<[@#&!]+\d+>/g, ' ').replace(/^\s*atlas[\s,:;!-]*/i, ''))));
 
 module.exports = { entender, parece, tempo, sem };
