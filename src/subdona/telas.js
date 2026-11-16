@@ -25,6 +25,7 @@ async function telaStatus(client) {
         { nome: 'Recados', valor: String(N.recados().length), lado: true },
         { nome: 'Tickets', valor: { sempre: 'atende sempre', ausente: 'atende com o pai ausente', off: 'desligado' }[N.ticketModo()], lado: true },
         { nome: 'Alertas', valor: N.alertasCanal() ? `<#${N.alertasCanal()}>` : 'DM do pai', lado: true },
+        { nome: 'Canais movimentados', valor: N.canaisLivres().length ? N.canaisLivres().map((c) => `<#${c}>`).join(' ') : 'nenhum', lado: true },
         { nome: 'Pânico', valor: require('./vigia').estadoPanico() ? 'ATIVO' : 'desligado', lado: true },
         { nome: 'Poderes', valor: `${S.ponto} automático  ◐ pede confirmação  ${S.vazio} desligado\n\n${poderes}` },
       ],
