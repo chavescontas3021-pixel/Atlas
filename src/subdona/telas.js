@@ -51,11 +51,14 @@ function telaDiario(pagina = 0, soAusencia = false) {
 function telaRecados(pagina = 0) {
   const lista = N.recados().slice().reverse();
   const total = Math.max(1, Math.ceil(lista.length / POR_PAGINA));
-  const p = Math.min(Math.max(0, pagina), total - 1);
+  const p = Math.min(Math.max(0, Number(pagina) || 0), total - 1);
   const itens = lista.slice(p * POR_PAGINA, (p + 1) * POR_PAGINA);
-  const linhas = itens.map((r) => `<@${r.de}>  ${S.sep}  ${quando(r.em)}  ${S.sep}  [ir à mensagem](https://discord.com/channels/${r.guildId}/${r.canalId}/${r.msgId})\n${S.filho} ${corta(r.texto, 160)}`);
+  const linhas = itens.map((r) => {
+    const link = r.guildId && r.canalId && r.msgId ? `  ${S.sep}  [ir à mensagem](https://discord.com/channels/${r.guildId}/${r.canalId}/${r.msgId})` : '';
+    return `${r.de ? `<@${r.de}>` : 'Alguém'}  ${S.sep}  ${quando(r.em || Date.now())}${link}\n${S.filho} ${corta(r.texto || '(só marcou você)', 160)}`;
+  });
   return {
-    embeds: [UI.painel({ trilha: ['Sub dona', 'Recados'], titulo: 'Quem procurou você', descricao: linhas.length ? linhas.join('\n\n') : 'Nenhum recado.', rodape: `${lista.length} recado(s)  ·  /subdona recados limpar:true` })],
+    embeds: [UI.painel({ trilha: ['Sub dona', 'Recados'], titulo: 'Quem procurou você', descricao: (linhas.join('\n\n') || 'Nenhum recado.').slice(0, 3900), rodape: `${lista.length} recado(s)  ·  /subdona recados limpar:true` })],
     components: [UI.paginacao('sd:recados', p, total)].filter(Boolean),
     allowedMentions: SEM_PING,
   };
