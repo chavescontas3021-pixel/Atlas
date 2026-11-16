@@ -27,6 +27,11 @@ async function avisoAusencia(client, msg) {
   if (Date.now() - (avisados.get(chave) || 0) < 3 * 60 * 1000) return;
   if (avisados.size > 2000) avisados.clear();
   avisados.set(chave, Date.now());
+  // O recado chega até você na hora (canal de alertas ou DM), além de ficar na lista do /subdona recados
+  require('../subdona/resumo').entregar(client, {
+    embeds: [UI.painel({ trilha: ['Sub dona', 'Recado'], titulo: 'Alguém te procurou', descricao: `<@${msg.author.id}> em <#${msg.channelId}>\n${S.filho} ${String(msg.content || '').replace(/<@!?\d+>/g, '').trim().slice(0, 300) || '(só marcou você)'}\n[ir à mensagem](${msg.url || `https://discord.com/channels/${msg.guildId}/${msg.channelId}/${msg.id}`})` })],
+    allowedMentions: { parse: [] },
+  }).catch(() => {});
   await msg.reply({
     embeds: [UI.painel({
       trilha: ['Sub dona'],
