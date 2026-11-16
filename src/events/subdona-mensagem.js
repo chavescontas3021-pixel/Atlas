@@ -8,17 +8,25 @@ const UI = require('../ui/componentes');
 const { S, quando } = require('../ui/tema');
 
 const SEM_PING = { allowedMentions: { repliedUser: false, parse: [] } };
-const avisados = new Map(); // canal → última vez que avisei que o pai está ausente
+const avisados = new Map(); // canal:pessoa → última vez que avisei que o pai está ausente
 
 async function avisoAusencia(client, msg) {
   const aus = N.ausencia();
   if (!aus || msg.author.bot) return;
   const pai = await N.paiId(client);
-  if (!pai || msg.author.id === pai || !msg.mentions.users.has(pai)) return;
+  if (!pai || msg.author.id === pai) return;
+  // Avisa quando: marcam o pai, respondem a uma mensagem dele, ou perguntam à Atlas onde ele está ("atlas, cadê o pai?")
+  const marcouPai = msg.mentions.users.has(pai) || (msg.mentions.repliedUser && msg.mentions.repliedUser.id === pai);
+  const f = String(msg.content || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const chamouAtlas = msg.mentions.users.has(client.user.id) || /\batlas\b/.test(f);
+  const perguntou = chamouAtlas && /\b(pai|dono|dona)\b/.test(f) && /\b(cade|onde|esta|ta|volta|vem|responde|fala|sumiu|online|ausente|fora)\b/.test(f);
+  if (!marcouPai && !perguntou) return;
 
   N.anotarRecado({ de: msg.author.id, canalId: msg.channelId, guildId: msg.guildId, msgId: msg.id, texto: msg.content.replace(/<@!?\d+>/g, '').trim() || '(só marcou você)' });
-  if (Date.now() - (avisados.get(msg.channelId) || 0) < 10 * 60 * 1000) return;
-  avisados.set(msg.channelId, Date.now());
+  const chave = `${msg.channelId}:${msg.author.id}`; // um aviso por pessoa a cada 3 minutos (o recado é anotado sempre)
+  if (Date.now() - (avisados.get(chave) || 0) < 3 * 60 * 1000) return;
+  if (avisados.size > 2000) avisados.clear();
+  avisados.set(chave, Date.now());
   await msg.reply({
     embeds: [UI.painel({
       trilha: ['Sub dona'],
