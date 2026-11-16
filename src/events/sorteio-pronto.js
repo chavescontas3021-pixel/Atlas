@@ -1,12 +1,14 @@
-const N = require('../eventos/nucleo');
+// Sub dona: ronda periódica (tickets parados, cobranças vencidas).
+const Ronda = require('../subdona/ronda');
 
 module.exports = {
   name: 'clientReady',
   once: true,
   execute(client) {
-    const rodar = () => N.tick(client).catch((e) => console.error('[Sorteios/Eventos]', e));
-    setTimeout(rodar, 5000);
-    setInterval(rodar, 15000);
-    console.log('[Sorteios/Eventos] agendador iniciado');
+    const rodar = () => Ronda.tick(client).catch((e) => console.error('[Sub dona] ronda:', e));
+    require('../subdona/presenca').iniciar(client);
+    setTimeout(rodar, 30000);
+    setInterval(rodar, 5 * 60 * 1000);
+    console.log('[Sub dona] ronda iniciada');
   },
 };
