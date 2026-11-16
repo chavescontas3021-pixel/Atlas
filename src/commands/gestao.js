@@ -10,8 +10,7 @@ const DIA = 24 * 3600 * 1000;
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('gestao')
-    .setDescription('Sub dona: resumos, conselhos e backup (só o pai)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDescription('Sub dona: resumos, conselhos e backup (pai e delegados)')
     .addSubcommand((s) => s.setName('resumo').setDescription('Resumo do que aconteceu')
       .addStringOption((o) => o.setName('periodo').setDescription('Quanto tempo olhar (padrão: 1 dia)')
         .addChoices({ name: 'Último dia', value: '1' }, { name: 'Última semana', value: '7' }, { name: 'Último mês', value: '30' })))
@@ -29,7 +28,7 @@ module.exports = {
   async execute(interaction, client) {
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
-    if (!(await N.ehPai(client, interaction.user.id))) return interaction.reply(UI.erro('Isso é só do pai.'));
+    if (!(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('Isso é só do pai e dos delegados.'));
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'resumo') {
