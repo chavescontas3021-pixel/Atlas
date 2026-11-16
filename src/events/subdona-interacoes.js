@@ -42,7 +42,7 @@ module.exports = {
       }
     } catch (erro) {
       console.error('[Sub dona] botão:', erro);
-      if (!interaction.replied && !interaction.deferred) interaction.reply(UI.erro('Não consegui fazer isso agora.')).catch(() => {});
+      if (!interaction.replied && !interaction.deferred) interaction.reply(UI.erro(`Não consegui fazer isso agora. (${String(erro && erro.message || erro).slice(0, 120)})`)).catch(() => {});
     }
   },
 };
