@@ -46,6 +46,7 @@ module.exports = {
       .addStringOption((o) => o.setName('palavra').setDescription('Palavra').setRequired(true).setMaxLength(40))),
 
   async execute(interaction, client) {
+    require('../subdona/publico').aplicar(interaction); // respostas ficam no canal, não somem
     if (!interaction.inGuild()) return;
     const sub = interaction.options.getSubcommand();
     client = client || interaction.client;
