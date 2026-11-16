@@ -1,238 +1,147 @@
-// ─────────────────────────────────────────────────────────────
-//  ATLAS · sub dona · as mãos
-//  Cada ação confere permissões e hierarquia ANTES de agir e devolve
-//  { ok, texto, desfazer } — "desfazer" é o que o botão Desfazer executa.
-//  Regras fixas (nem o pai muda): nunca age contra o dono do servidor, contra o
-//  pai nem contra ela mesma, e nunca passa por cima da hierarquia de cargos.
-// ─────────────────────────────────────────────────────────────
-const { PermissionFlagsBits: PF } = require('discord.js');
-const Mod = require('../moderacao/nucleo');
-const N = require('./nucleo');
+// ATLAS · sub dona · ordens extras 1: tickets, sorteios e eventos, canais, pânico, avisos
+// Instalado por acoes.js. Cada função devolve { ok, texto, desfazer } como as ações da parte 1.
+const UI = require('../ui/componentes');
+const { S, quando, corta } = require('../ui/tema');
 
 const PODER_DE = {
-  advertir: 'advertir', silenciar: 'silenciar', tirar_silencio: 'silenciar', expulsar: 'expulsar', banir: 'banir', desbanir: 'desbanir',
-  limpar: 'limpar', trancar: 'trancar', destrancar: 'trancar', lento: 'lento', anunciar: 'anunciar', cargo_dar: 'cargo', cargo_tirar: 'cargo', apelido: 'apelido',
+  tk_fechar: 'ticket_gerir', tk_add: 'ticket_gerir', tk_rem: 'ticket_gerir', tk_renomear: 'ticket_gerir',
+  sorteio_criar: 'sorteios', sorteio_encerrar: 'sorteios', sorteio_rerolar: 'sorteios', evento_criar: 'sorteios',
+  canal_criar: 'canais', canal_renomear: 'canais', canal_apagar: 'canais', panico_on: 'panico', panico_off: 'panico', avisos_limpar: 'advertir',
 };
 const ROTULO = {
-  advertir: 'Advertir', silenciar: 'Silenciar', tirar_silencio: 'Tirar o castigo', expulsar: 'Expulsar', banir: 'Banir', desbanir: 'Desbanir',
-  limpar: 'Limpar mensagens', trancar: 'Trancar o canal', destrancar: 'Destrancar o canal', lento: 'Modo lento', anunciar: 'Anunciar',
-  cargo_dar: 'Dar cargo', cargo_tirar: 'Tirar cargo', apelido: 'Mudar apelido', apagar_msg: 'Apagar o anúncio',
+  tk_fechar: 'Fechar o ticket', tk_add: 'Adicionar ao ticket', tk_rem: 'Tirar do ticket', tk_renomear: 'Renomear o ticket',
+  sorteio_criar: 'Criar sorteio', sorteio_encerrar: 'Encerrar sorteio', sorteio_rerolar: 'Sortear de novo', evento_criar: 'Criar evento',
+  canal_criar: 'Criar canal', canal_renomear: 'Renomear canal', canal_apagar: 'Apagar canal', panico_on: 'Trancar o servidor', panico_off: 'Destrancar o servidor',
+  avisos_ver: 'Ver avisos', avisos_limpar: 'Limpar avisos',
 };
-const REVERSIVEL = new Set(['silenciar', 'tirar_silencio', 'banir', 'trancar', 'destrancar', 'lento', 'anunciar', 'cargo_dar', 'cargo_tirar', 'apelido']);
+const LEITURA = ['avisos_ver'];
 
-const falha = (texto) => ({ ok: false, texto });
-const bom = (texto, desfazer = null) => ({ ok: true, texto, desfazer });
-const fala = (s) => `${s}`.length > 28 ? `${String(s).slice(0, 27)}…` : String(s);
+const FLAGS_TICKET = { ViewChannel: true, SendMessages: true, ReadMessageHistory: true, AttachFiles: true, EmbedLinks: true };
+const nomeCanal = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9_-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 90);
 
-function formatarTempo(ms) {
-  const s = Math.round(ms / 1000);
-  if (s % 86400 === 0 && s >= 86400) return `${s / 86400} dia(s)`;
-  if (s % 3600 === 0 && s >= 3600) return `${s / 3600} h`;
-  if (s % 60 === 0 && s >= 60) return `${s / 60} min`;
-  return `${s} s`;
-}
-
-// ── Conferências ─────────────────────────────────────────────
-async function conferirPermissao(ctx, acao) {
-  const poder = N.PODERES[PODER_DE[acao]];
-  if (!poder) return null;
-  const flag = PF[poder.perm];
-  if (!ctx.ehPai && !ctx.delegado && !(ctx.executor.permissions && ctx.executor.permissions.has(flag))) return `Você precisa da permissão **${poder.nome}** do Discord para mandar isso.`;
-  const eu = ctx.guild.members.me;
-  if (eu && !eu.permissions.has(flag)) return `Eu não tenho a permissão do Discord para isso (${poder.perm}). Peça a um admin para me dar.`;
-  return null;
-}
-
-async function protegerAlvo(ctx, alvo) {
-  const g = ctx.guild;
-  if (alvo.id === g.ownerId) return 'Não mexo com o dono do servidor.';
-  if (alvo.id === ctx.client.user.id) return 'Comigo mesma eu não faço isso.';
-  if (alvo.id === (await N.paiId(ctx.client))) return 'Com o pai eu não faço isso, nem por ordem de ninguém.';
-  const eu = g.members.me;
-  if (eu && alvo.roles.highest.position >= eu.roles.highest.position) return 'O cargo dessa pessoa está acima do meu.';
-  if (!ctx.ehPai) {
-    const e = ctx.delegado ? null : Mod.checarHierarquia(ctx.executor, alvo);
-    if (e) return e;
-    if (alvo.permissions.has(PF.Administrator) || alvo.permissions.has(PF.ManageGuild)) return 'Essa pessoa é da staff. Só o pai manda eu agir contra a staff.';
-  }
-  return null;
-}
-
-async function membroDe(ctx, id) {
-  if (!id) return null;
-  try { return await ctx.guild.members.fetch(id); } catch { return null; }
-}
-
-// ── Ações ────────────────────────────────────────────────────
-const FAZ = {
-  async silenciar(ctx, p) {
-    const m = await membroDe(ctx, p.alvo);
-    if (!m) return falha('Marque quem eu devo silenciar (a pessoa precisa estar no servidor).');
-    const e = await protegerAlvo(ctx, m); if (e) return falha(e);
-    if (!m.moderatable) return falha('Não consigo silenciar essa pessoa.');
-    await m.timeout(p.ms, `${p.motivo || 'sem motivo'} | Atlas a mando de ${ctx.executorUser.tag}`.slice(0, 500));
-    return bom(`**${m.displayName}** está de castigo por ${formatarTempo(p.ms)}.`, { acao: 'tirar_silencio', alvo: m.id });
-  },
-  async tirar_silencio(ctx, p) {
-    const m = await membroDe(ctx, p.alvo);
-    if (!m) return falha('Marque quem eu devo liberar.');
-    await m.timeout(null, `Atlas a mando de ${ctx.executorUser.tag}`);
-    return bom(`**${m.displayName}** foi liberado do castigo.`);
-  },
-  async advertir(ctx, p) {
-    const m = await membroDe(ctx, p.alvo);
-    if (!m) return falha('Marque quem eu devo advertir.');
-    const e = await protegerAlvo(ctx, m); if (e) return falha(e);
-    const r = await Mod.darAviso(ctx.guild, ctx.executorUser, m, p.motivo || 'Sem motivo informado');
-    return bom(`**${m.displayName}** recebeu o aviso ${r.total}/${r.limite}.${r.banido && r.banido.ok ? ' Chegou ao limite e foi banido.' : ''}`);
-  },
-  async expulsar(ctx, p) {
-    const m = await membroDe(ctx, p.alvo);
-    if (!m) return falha('Marque quem eu devo expulsar.');
-    const e = await protegerAlvo(ctx, m); if (e) return falha(e);
-    if (!m.kickable) return falha('Não consigo expulsar essa pessoa.');
-    const r = await Mod.expulsar(ctx.guild, ctx.executorUser, m, p.motivo || 'Sem motivo informado');
-    return r.ok ? bom(`**${m.displayName}** foi expulso.`) : falha(`Não consegui expulsar: ${r.erro}`);
-  },
-  async banir(ctx, p) {
-    const m = await membroDe(ctx, p.alvo);
-    let user = m && m.user;
-    if (!user) { try { user = await ctx.client.users.fetch(p.alvo); } catch { return falha('Não achei essa pessoa. Marque ou use o ID.'); } }
-    if (m) { const e = await protegerAlvo(ctx, m); if (e) return falha(e); if (!m.bannable) return falha('Não consigo banir essa pessoa.'); }
-    const r = await Mod.banir(ctx.guild, ctx.executorUser, user, m, p.motivo || 'Sem motivo informado', 0);
-    return r.ok ? bom(`**${user.username}** foi banido.`, { acao: 'desbanir', alvo: user.id }) : falha(`Não consegui banir: ${r.erro}`);
-  },
-  async desbanir(ctx, p) {
-    if (!p.alvo) return falha('Use o ID de quem eu devo desbanir.');
-    const r = await Mod.desbanir(ctx.guild, ctx.executorUser, p.alvo, p.motivo || 'Sem motivo informado');
-    return r.ok ? bom(`**${r.user.username}** foi desbanido.`) : falha(`Não consegui desbanir: ${r.erro}`);
-  },
-  async limpar(ctx, p) {
-    const canal = p.canalAlvo || ctx.canal;
-    const lote = await canal.messages.fetch({ limit: 100 });
-    const limite = Date.now() - 13.5 * 86400 * 1000;
-    let lista = [...lote.values()].filter((x) => x.id !== ctx.msgId && !x.pinned && x.createdTimestamp > limite);
-    if (p.alvo) lista = lista.filter((x) => x.author.id === p.alvo);
-    lista = lista.slice(0, p.n);
-    if (ctx.msgId) { const cmd = lote.get(ctx.msgId); if (cmd) lista.push(cmd); }
-    if (!lista.length) return falha('Não achei mensagens para apagar (só consigo apagar as de menos de 14 dias).');
-    const apagadas = await canal.bulkDelete(lista, true);
-    return bom(`Apaguei **${Math.max(0, apagadas.size - (ctx.msgId ? 1 : 0))}** mensagem(ns).`);
-  },
-  async trancar(ctx, p) {
-    const canal = p.canalAlvo || ctx.canal;
-    const todos = ctx.guild.roles.everyone;
-    const atual = canal.permissionOverwrites.cache.get(todos.id);
-    const era = atual ? (atual.allow.has(PF.SendMessages) ? true : atual.deny.has(PF.SendMessages) ? false : null) : null;
-    if (era === false) return falha('Esse canal já está trancado.');
-    await canal.permissionOverwrites.edit(todos, { SendMessages: false }, { reason: `${p.motivo || 'Sem motivo'} | Atlas a mando de ${ctx.executorUser.tag}`.slice(0, 500) });
-    return bom(`Tranquei ${canal}.`, { acao: 'destrancar', canalId: canal.id, era });
-  },
-  async destrancar(ctx, p) {
-    const canal = p.canalAlvo || ctx.canal;
-    const era = p.era === undefined ? null : p.era;
-    await canal.permissionOverwrites.edit(ctx.guild.roles.everyone, { SendMessages: era }, { reason: `Atlas a mando de ${ctx.executorUser.tag}` });
-    return bom(`Destranquei ${canal}.`, p.era === undefined ? { acao: 'trancar', canalId: canal.id } : null);
-  },
-  async lento(ctx, p) {
-    const canal = p.canalAlvo || ctx.canal;
-    const antes = canal.rateLimitPerUser || 0;
-    await canal.setRateLimitPerUser(p.segundos, `Atlas a mando de ${ctx.executorUser.tag}`);
-    return bom(p.segundos ? `Modo lento de **${p.segundos} s** em ${canal}.` : `Modo lento desligado em ${canal}.`, { acao: 'lento', canalId: canal.id, segundos: antes });
-  },
-  async anunciar(ctx, p) {
-    const canal = p.canalAlvo || ctx.canal;
-    if (!p.texto) return falha('Faltou o texto do anúncio. Exemplo: `atlas, anuncia #avisos: Evento hoje às 20h`.');
-    const texto = p.texto.replace(/@(everyone|here)/gi, '@$1');
-    const msg = await canal.send({ content: texto, allowedMentions: { parse: [] } });
-    return bom(`Anúncio postado em ${canal}.`, { acao: 'apagar_msg', canalId: canal.id, msgId: msg.id });
-  },
-  async apagar_msg(ctx, p) {
-    const canal = ctx.guild.channels.cache.get(p.canalId);
-    const m = canal && await canal.messages.fetch(p.msgId).catch(() => null);
-    if (!m) return falha('A mensagem já não existe.');
-    await m.delete();
-    return bom('Anúncio apagado.');
-  },
-  async cargo_dar(ctx, p) { return trocarCargo(ctx, p, true); },
-  async cargo_tirar(ctx, p) { return trocarCargo(ctx, p, false); },
-  async apelido(ctx, p) {
-    const m = await membroDe(ctx, p.alvo);
-    if (!m) return falha('Marque de quem eu devo mudar o apelido.');
-    const e = await protegerAlvo(ctx, m); if (e) return falha(e);
-    if (!m.manageable) return falha('Não consigo mudar o apelido dessa pessoa.');
-    const antes = m.nickname || null;
-    await m.setNickname(p.apelido || null, `Atlas a mando de ${ctx.executorUser.tag}`);
-    return bom(p.apelido ? `Apelido de **${fala(m.user.username)}** agora é **${p.apelido}**.` : 'Apelido removido.', { acao: 'apelido', alvo: m.id, apelido: antes });
-  },
-};
-
-async function trocarCargo(ctx, p, dar) {
-  const m = await membroDe(ctx, p.alvo);
-  const cargo = p.cargo && ctx.guild.roles.cache.get(p.cargo);
-  if (!m || !cargo) return falha('Marque a pessoa e o cargo. Exemplo: `atlas, dá o cargo @Membro para @fulano`.');
-  const e = await protegerAlvo(ctx, m); if (e) return falha(e);
-  const eu = ctx.guild.members.me;
-  if (cargo.managed || cargo.id === ctx.guild.id) return falha('Esse cargo não pode ser dado ou tirado por mim.');
-  if (eu && cargo.position >= eu.roles.highest.position) return falha('Esse cargo está acima do meu.');
-  if (!ctx.ehPai) {
-    if (!ctx.delegado && ctx.executor.roles.highest.position <= cargo.position && ctx.executor.id !== ctx.guild.ownerId) return falha('Esse cargo está acima do seu.');
-    if (cargo.permissions.has(PF.Administrator)) return falha('Cargo com permissão de administrador só o pai manda eu mexer.');
-  }
-  if (dar) await m.roles.add(cargo, `Atlas a mando de ${ctx.executorUser.tag}`);
-  else await m.roles.remove(cargo, `Atlas a mando de ${ctx.executorUser.tag}`);
-  return bom(`${dar ? 'Dei' : 'Tirei'} o cargo **${cargo.name}** ${dar ? 'a' : 'de'} **${m.displayName}**.`, { acao: dar ? 'cargo_tirar' : 'cargo_dar', alvo: m.id, cargo: cargo.id });
-}
-
-// ── Ordens extras (acoes2: tickets, sorteios, canais...  acoes3: consultas e controles) ──
-const EXTRAS = [require('./acoes2'), require('./acoes3')];
-const LEITURA = new Set();
-for (const X of EXTRAS) {
-  Object.assign(FAZ, X.instalar({ falha, bom, membroDe, protegerAlvo, formatarTempo }));
-  Object.assign(PODER_DE, X.PODER_DE); Object.assign(ROTULO, X.ROTULO);
-  (X.LEITURA || []).forEach((a) => LEITURA.add(a));
-}
-
-// ── Entrada principal ────────────────────────────────────────
-// ctx: { client, guild, canal, executor (GuildMember), executorUser, ehPai, msgId }
-async function executar(acao, params, ctx) {
-  const fn = FAZ[acao];
-  if (!fn) return falha('Essa ação eu não conheço.');
-  if (acao !== 'apagar_msg' && PODER_DE[acao]) {
-    const poder = PODER_DE[acao];
-    if (N.modo(poder) === 'off') return falha(`O poder **${N.PODERES[poder].nome}** está desligado. O pai liga em \`/subdona poder\`.`);
-    const e = await conferirPermissao(ctx, acao);
-    if (e) return falha(e);
-  }
-  try {
-    return await fn(ctx, params);
-  } catch (erro) {
-    console.error(`[Sub dona] ${acao}:`, erro);
-    return falha(`Não consegui: ${String(erro.message || erro).slice(0, 150)}`);
-  }
-}
-
-// Texto curto do que vai acontecer (usado no painel de confirmação e no diário)
-function descrever(acao, p, nomes = {}) {
-  const quem = p.alvo ? (nomes.alvo || `<@${p.alvo}>`) : '';
-  const mot = p.motivo ? ` · motivo: ${p.motivo}` : '';
+function descrever(acao, p) {
+  const quem = p.alvo ? `<@${p.alvo}>` : '';
   switch (acao) {
-    case 'silenciar': return `Silenciar ${quem} por ${formatarTempo(p.ms)}${mot}`;
-    case 'tirar_silencio': return `Tirar o castigo de ${quem}`;
-    case 'advertir': return `Advertir ${quem}${mot}`;
-    case 'expulsar': return `Expulsar ${quem}${mot}`;
-    case 'banir': return `Banir ${quem}${mot}`;
-    case 'desbanir': return `Desbanir ${quem}${mot}`;
-    case 'limpar': return `Apagar ${p.n} mensagem(ns)${p.alvo ? ` de ${quem}` : ''}`;
-    case 'trancar': return 'Trancar o canal';
-    case 'destrancar': return 'Destrancar o canal';
-    case 'lento': return p.segundos ? `Modo lento de ${p.segundos} s` : 'Desligar o modo lento';
-    case 'anunciar': return `Anunciar: ${String(p.texto || '').slice(0, 120)}`;
-    case 'cargo_dar': return `Dar o cargo <@&${p.cargo}> a ${quem}`;
-    case 'cargo_tirar': return `Tirar o cargo <@&${p.cargo}> de ${quem}`;
-    case 'apelido': return `Mudar o apelido de ${quem} para ${p.apelido || '(nenhum)'}`;
-    default: for (const X of EXTRAS) { const d = X.descrever && X.descrever(acao, p); if (d) return d; } return ROTULO[acao] || acao;
+    case 'tk_fechar': return 'Fechar este ticket e mandar a transcrição';
+    case 'tk_add': return `Adicionar ${quem} ao ticket`;
+    case 'tk_rem': return `Tirar ${quem} do ticket`;
+    case 'tk_renomear': return `Renomear o ticket para ${nomeCanal(p.nome)}`;
+    case 'sorteio_criar': return `Sorteio de **${p.premio}**, ${p.vencedores || 1} vencedor(es), termina em ${Math.round(p.ms / 60000)} min`;
+    case 'sorteio_encerrar': return `Encerrar o sorteio #${p.id}`;
+    case 'sorteio_rerolar': return `Sortear de novo no sorteio #${p.id}`;
+    case 'evento_criar': return `Criar o evento **${p.titulo}** para daqui a ${Math.round(p.ms / 60000)} min`;
+    case 'canal_criar': return `Criar o canal de ${p.voz ? 'voz' : 'texto'} **${nomeCanal(p.nome)}**`;
+    case 'canal_renomear': return `Renomear o canal para **${nomeCanal(p.nome)}**`;
+    case 'canal_apagar': return `**APAGAR** o canal ${p.canalAlvo ? `#${p.canalAlvo.name}` : (p.canalId ? `<#${p.canalId}>` : '')} (não dá para desfazer)`;
+    case 'panico_on': return 'Trancar TODOS os canais de texto do servidor';
+    case 'panico_off': return 'Destrancar todos os canais que o pânico trancou';
+    case 'avisos_limpar': return `Apagar todos os avisos de ${quem}`;
+    default: return null;
   }
 }
 
-module.exports = { LEITURA, executar, descrever, conferirPermissao, PODER_DE, ROTULO, REVERSIVEL, formatarTempo };
+function instalar({ falha, bom, membroDe, protegerAlvo }) {
+  const tk = (ctx, p) => {
+    const canal = p.canalAlvo || ctx.canal;
+    const t = canal && require('../ticket/nucleo').ticketDoCanal(canal.id);
+    return t ? { canal, t } : null;
+  };
+  const SEM_TK = 'Isso só funciona dentro de um ticket (ou marcando o canal do ticket).';
+
+  return {
+    async tk_fechar(ctx, p) {
+      const r = tk(ctx, p); if (!r) return falha(SEM_TK);
+      await require('../ticket/fluxo').encerrar(ctx.guild, r.canal, ctx.executorUser, p.motivo || `Fechado pela Atlas a pedido de ${ctx.executorUser.tag}`);
+      return bom('Ticket encerrado. A transcrição foi enviada.');
+    },
+    async tk_add(ctx, p) {
+      const r = tk(ctx, p); if (!r) return falha(SEM_TK);
+      const m = await membroDe(ctx, p.alvo); if (!m) return falha('Marque quem eu devo adicionar ao ticket.');
+      await r.canal.permissionOverwrites.edit(m.id, FLAGS_TICKET);
+      return bom(`**${m.displayName}** foi adicionado ao ticket.`, { acao: 'tk_rem', alvo: m.id, canalId: r.canal.id });
+    },
+    async tk_rem(ctx, p) {
+      const r = tk(ctx, p); if (!r) return falha(SEM_TK);
+      if (p.alvo === r.t.userId) return falha('Não dá para tirar quem abriu o ticket.');
+      const m = await membroDe(ctx, p.alvo); if (!m) return falha('Marque quem eu devo tirar do ticket.');
+      await r.canal.permissionOverwrites.delete(m.id);
+      return bom(`**${m.displayName}** foi tirado do ticket.`, { acao: 'tk_add', alvo: m.id, canalId: r.canal.id });
+    },
+    async tk_renomear(ctx, p) {
+      const r = tk(ctx, p); if (!r) return falha(SEM_TK);
+      const nome = nomeCanal(p.nome); if (!nome) return falha('Diga o novo nome. Exemplo: `atlas, renomeia o ticket para duvida-vaga`.');
+      const antes = r.canal.name;
+      await r.canal.setName(nome);
+      return bom(`Ticket renomeado para **${nome}**.`, { acao: 'tk_renomear', nome: antes, canalId: r.canal.id });
+    },
+
+    async sorteio_criar(ctx, p) {
+      if (!p.premio) return falha('Diga o prêmio. Exemplo: `atlas, faz um sorteio de Nitro por 1 hora`.');
+      const canal = p.canalAlvo || ctx.canal;
+      const E = require('../eventos/nucleo');
+      const s = { id: E.proximoId('sorteios'), guildId: ctx.guild.id, canalId: canal.id, msgId: null, criadorId: ctx.executorUser.id, criadorNome: ctx.executorUser.username || 'Atlas', premioTipo: 'texto', premio: String(p.premio).slice(0, 100), vencedores: Math.min(10, p.vencedores || 1), fim: Date.now() + p.ms, cargoExigido: null, nivelMin: 0, participantes: [], ganhadores: [], status: 'ativo' };
+      const msg = await canal.send({ embeds: [E.embedSorteio(s)], components: E.botoesSorteio(s), allowedMentions: { parse: [] } });
+      s.msgId = msg.id; E.salvarSorteio(s);
+      return bom(`Sorteio **#${s.id}** criado em ${canal}: ${s.premio}.`);
+    },
+    async sorteio_encerrar(ctx, p) {
+      if (!p.id) return falha('Diga o número do sorteio. Exemplo: `atlas, encerra o sorteio 3`.');
+      const r = await require('../eventos/nucleo').encerrarSorteio(ctx.client, String(p.id));
+      if (r.erro) return falha(r.erro);
+      return bom(r.ganhadores && r.ganhadores.length ? `Sorteio #${p.id} encerrado. Vencedor(es): ${r.ganhadores.map((i) => `<@${i}>`).join(' ')}` : `Sorteio #${p.id} encerrado, mas ninguém elegível participou.`);
+    },
+    async sorteio_rerolar(ctx, p) {
+      if (!p.id) return falha('Diga o número do sorteio. Exemplo: `atlas, sorteia de novo o sorteio 3`.');
+      const r = await require('../eventos/nucleo').rerolarSorteio(ctx.client, String(p.id), 1);
+      if (r.erro) return falha(r.erro);
+      return bom(`Sorteei de novo no #${p.id}: ${r.ganhadores.map((i) => `<@${i}>`).join(' ')}`);
+    },
+    async evento_criar(ctx, p) {
+      if (!p.titulo) return falha('Diga o nome. Exemplo: `atlas, cria o evento Noite de jogos daqui 2 horas`.');
+      const canal = p.canalAlvo || ctx.canal;
+      const E = require('../eventos/nucleo');
+      const e = { id: E.proximoId('eventos'), guildId: ctx.guild.id, canalId: canal.id, msgId: null, titulo: String(p.titulo).slice(0, 100), descricao: '', quando: Date.now() + p.ms, criadorId: ctx.executorUser.id, cargoPing: null, confirmados: [], aviso15: false, iniciou: false, status: 'ativo' };
+      const msg = await canal.send({ embeds: [E.embedEvento(e)], components: E.botoesEvento(e), allowedMentions: { parse: [] } });
+      e.msgId = msg.id; E.salvarEvento(e);
+      return bom(`Evento **#${e.id}** criado em ${canal}: ${e.titulo}, ${quando(e.quando)}.`);
+    },
+
+    async canal_criar(ctx, p) {
+      const nome = nomeCanal(p.nome); if (!nome) return falha('Diga o nome do canal. Exemplo: `atlas, cria um canal chamado eventos`.');
+      const c = await ctx.guild.channels.create({ name: nome, type: p.voz ? 2 : 0, reason: `Atlas a mando de ${ctx.executorUser.tag}` });
+      return bom(`Canal ${p.voz ? `**${c.name}** (voz)` : c} criado.`, { acao: 'canal_apagar', canalId: c.id });
+    },
+    async canal_renomear(ctx, p) {
+      const c = p.canalAlvo || ctx.canal; const nome = nomeCanal(p.nome);
+      if (!nome) return falha('Diga o novo nome. Exemplo: `atlas, renomeia o canal #geral para conversa`.');
+      const antes = c.name; await c.setName(nome, `Atlas a mando de ${ctx.executorUser.tag}`);
+      return bom(`Canal renomeado para **${nome}**.`, { acao: 'canal_renomear', nome: antes, canalId: c.id });
+    },
+    async canal_apagar(ctx, p) {
+      const c = p.canalAlvo; if (!c) return falha('Por segurança, marque o canal que devo apagar. Exemplo: `atlas, apaga o canal #teste`.');
+      if ([ctx.guild.rulesChannelId, ctx.guild.systemChannelId, require('./nucleo').alertasCanal()].includes(c.id)) return falha('Esse canal é importante (regras, sistema ou alertas). Apague você mesmo.');
+      if (require('../ticket/nucleo').ticketDoCanal(c.id)) return falha('Isso é um ticket. Peça para eu **fechar** o ticket.');
+      const nome = c.name; await c.delete(`Atlas a mando de ${ctx.executorUser.tag}`);
+      return bom(`Canal **${nome}** apagado.`);
+    },
+
+    async panico_on(ctx) { const r = await require('./vigia').panico(ctx.guild, true); return bom(`Servidor trancado: ${r.trancados} canais.`, { acao: 'panico_off' }); },
+    async panico_off(ctx) { const r = await require('./vigia').panico(ctx.guild, false); return bom(`Servidor destrancado: ${r.abertos} canais.`, { acao: 'panico_on' }); },
+
+    async avisos_ver(ctx, p) {
+      if (!p.alvo) return falha('Marque de quem eu devo mostrar os avisos.');
+      const lista = require('../moderacao/nucleo').avisosDe(p.alvo);
+      const linhas = lista.slice(-8).reverse().map((a) => `**#${a.id}**  ${S.sep}  ${quando(a.data)}  ${S.sep}  por <@${a.por}>\n${S.filho} ${corta(a.motivo, 120)}`);
+      return { ok: true, payload: { embeds: [UI.painel({ trilha: ['Sub dona', 'Avisos'], titulo: `${lista.length} aviso(s)`, descricao: `<@${p.alvo}>\n\n${linhas.join('\n\n') || 'Nenhum aviso.'}` })], allowedMentions: { parse: [] } } };
+    },
+    async avisos_limpar(ctx, p) {
+      const m = await membroDe(ctx, p.alvo); if (!m) return falha('Marque de quem eu devo limpar os avisos.');
+      const Mod = require('../moderacao/nucleo'); const lista = Mod.avisosDe(m.id);
+      if (!lista.length) return falha('Essa pessoa não tem avisos.');
+      Mod.salvarAvisos(m.id, []);
+      return bom(`Apaguei os ${lista.length} aviso(s) de **${m.displayName}**.`);
+    },
+  };
+}
+
+module.exports = { instalar, PODER_DE, ROTULO, LEITURA, descrever };
