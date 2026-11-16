@@ -26,6 +26,7 @@ module.exports = {
       .addIntegerOption((o) => o.setName('copia').setDescription('Ou uma cópia interna (1 = a mais recente)').setMinValue(1).setMaxValue(3))),
 
   async execute(interaction, client) {
+    require('../subdona/publico').aplicar(interaction); // respostas ficam no canal, não somem
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
     if (!(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('Isso é só do pai e dos delegados.'));
