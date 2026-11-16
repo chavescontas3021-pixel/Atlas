@@ -1,4 +1,4 @@
-const { ChannelType, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const N = require('../subdona/nucleo');
 const Sonhos = require('../subdona/sonhos');
 const UI = require('../ui/componentes');
@@ -10,8 +10,7 @@ const fmt = (n) => Number(n).toLocaleString('pt-BR');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('caixa')
-    .setDescription('Pagamentos em sonhos (Loritta) recebidos pelo pai')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDescription('Pagamentos em sonhos (Loritta) feitos em tickets')
     .addSubcommand((s) => s.setName('extrato').setDescription('Últimos pagamentos e o total'))
     .addSubcommand((s) => s.setName('cobrar').setDescription('Cria uma cobrança: quando a pessoa pagar, a Atlas confirma e entrega o cargo')
       .addUserOption((o) => o.setName('membro').setDescription('Quem vai pagar').setRequired(true))
@@ -21,8 +20,6 @@ module.exports = {
     .addSubcommand((s) => s.setName('cobrancas').setDescription('Lista as cobranças'))
     .addSubcommand((s) => s.setName('cancelar').setDescription('Cancela uma cobrança aberta')
       .addIntegerOption((o) => o.setName('numero').setDescription('Número da cobrança').setRequired(true).setMinValue(1)))
-    .addSubcommand((s) => s.setName('canal').setDescription('Só olhar pagamentos neste canal (vazio = todos)')
-      .addChannelOption((o) => o.setName('canal').setDescription('Canal').addChannelTypes(ChannelType.GuildText)))
     .addSubcommand((s) => s.setName('loritta').setDescription('Muda o ID da Loritta (se você usa outra versão dela)')
       .addStringOption((o) => o.setName('id').setDescription('ID do bot').setRequired(true).setMaxLength(25)))
     .addSubcommand((s) => s.setName('amostras').setDescription('Mensagens da Loritta que citaram o pai (para ajustar o leitor)'))
@@ -32,13 +29,13 @@ module.exports = {
   async execute(interaction, client) {
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
-    if (!(await N.ehPai(client, interaction.user.id))) return interaction.reply(UI.erro('O caixa é só do pai.'));
+    if (!(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('O caixa é só do pai e dos delegados.'));
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'extrato') {
       const l = N.caixa().slice().reverse();
       const total = l.reduce((s, x) => s + x.valor, 0);
-      const linhas = l.slice(0, 10).map((x) => `**${fmt(x.valor)}**  ${S.sep}  <@${x.pagador}>  ${S.sep}  ${quando(x.em)}${x.cobranca ? `  ${S.sep}  cobrança #${x.cobranca}` : ''}`);
+      const linhas = l.slice(0, 10).map((x) => `**${fmt(x.valor)}**  ${S.sep}  <@${x.pagador}>  ${S.sep}  ${quando(x.em)}${x.ticket ? `  ${S.sep}  ticket #${x.ticket}` : ''}${x.cobranca ? `  ${S.sep}  cobrança #${x.cobranca}` : ''}`);
       return interaction.reply({ embeds: [UI.painel({ trilha: ['Caixa'], titulo: `${fmt(total)} sonhos no total`, descricao: linhas.join('\n') || 'Nenhum pagamento ainda.', rodape: `${l.length} pagamento(s) registrados` })], flags: UI.EPH, allowedMentions: SEM_PING });
     }
 
@@ -61,12 +58,6 @@ module.exports = {
       if (!c) return interaction.reply(UI.erro('Não achei uma cobrança aberta com esse número.'));
       c.status = 'cancelada'; N.salvarCobrancas(l);
       return interaction.reply(UI.ok(`Cobrança #${c.id} cancelada.`));
-    }
-
-    if (sub === 'canal') {
-      const c = interaction.options.getChannel('canal');
-      N.setCfg('sonhos_canal', c ? c.id : null);
-      return interaction.reply(UI.ok(c ? `Só olho pagamentos em ${c}.` : 'Olho pagamentos em qualquer canal.'));
     }
 
     if (sub === 'loritta') {
