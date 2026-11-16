@@ -46,6 +46,7 @@ module.exports = {
       .addBooleanOption((o) => o.setName('limpar').setDescription('Apagar todos os recados? (só o pai)'))),
 
   async execute(interaction, client) {
+    require('../subdona/publico').aplicar(interaction); // respostas ficam no canal, não somem
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
     const sub = interaction.options.getSubcommand();
