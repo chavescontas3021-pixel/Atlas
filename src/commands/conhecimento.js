@@ -28,6 +28,7 @@ module.exports = {
       .addStringOption((o) => o.setName('quando').setDescription('Quando').setRequired(true).addChoices({ name: 'Sempre', value: 'sempre' }, { name: 'Só com o pai ausente', value: 'ausente' }, { name: 'Nunca', value: 'off' }))),
 
   async execute(interaction, client) {
+    require('../subdona/publico').aplicar(interaction); // respostas ficam no canal, não somem
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
     const staff = interaction.memberPermissions && interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild);
