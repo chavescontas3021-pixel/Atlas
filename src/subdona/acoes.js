@@ -37,7 +37,7 @@ async function conferirPermissao(ctx, acao) {
   const poder = N.PODERES[PODER_DE[acao]];
   if (!poder) return null;
   const flag = PF[poder.perm];
-  if (!ctx.ehPai && !(ctx.executor.permissions && ctx.executor.permissions.has(flag))) return `Você precisa da permissão **${poder.nome}** do Discord para mandar isso.`;
+  if (!ctx.ehPai && !ctx.delegado && !(ctx.executor.permissions && ctx.executor.permissions.has(flag))) return `Você precisa da permissão **${poder.nome}** do Discord para mandar isso.`;
   const eu = ctx.guild.members.me;
   if (eu && !eu.permissions.has(flag)) return `Eu não tenho a permissão do Discord para isso (${poder.perm}). Peça a um admin para me dar.`;
   return null;
@@ -51,7 +51,7 @@ async function protegerAlvo(ctx, alvo) {
   const eu = g.members.me;
   if (eu && alvo.roles.highest.position >= eu.roles.highest.position) return 'O cargo dessa pessoa está acima do meu.';
   if (!ctx.ehPai) {
-    const e = Mod.checarHierarquia(ctx.executor, alvo);
+    const e = ctx.delegado ? null : Mod.checarHierarquia(ctx.executor, alvo);
     if (e) return e;
     if (alvo.permissions.has(PF.Administrator) || alvo.permissions.has(PF.ManageGuild)) return 'Essa pessoa é da staff. Só o pai manda eu agir contra a staff.';
   }
@@ -176,7 +176,7 @@ async function trocarCargo(ctx, p, dar) {
   if (cargo.managed || cargo.id === ctx.guild.id) return falha('Esse cargo não pode ser dado ou tirado por mim.');
   if (eu && cargo.position >= eu.roles.highest.position) return falha('Esse cargo está acima do meu.');
   if (!ctx.ehPai) {
-    if (ctx.executor.roles.highest.position <= cargo.position && ctx.executor.id !== ctx.guild.ownerId) return falha('Esse cargo está acima do seu.');
+    if (!ctx.delegado && ctx.executor.roles.highest.position <= cargo.position && ctx.executor.id !== ctx.guild.ownerId) return falha('Esse cargo está acima do seu.');
     if (cargo.permissions.has(PF.Administrator)) return falha('Cargo com permissão de administrador só o pai manda eu mexer.');
   }
   if (dar) await m.roles.add(cargo, `Atlas a mando de ${ctx.executorUser.tag}`);
@@ -184,12 +184,21 @@ async function trocarCargo(ctx, p, dar) {
   return bom(`${dar ? 'Dei' : 'Tirei'} o cargo **${cargo.name}** ${dar ? 'a' : 'de'} **${m.displayName}**.`, { acao: dar ? 'cargo_tirar' : 'cargo_dar', alvo: m.id, cargo: cargo.id });
 }
 
+// ── Ordens extras (acoes2: tickets, sorteios, canais...  acoes3: consultas e controles) ──
+const EXTRAS = [require('./acoes2'), require('./acoes3')];
+const LEITURA = new Set();
+for (const X of EXTRAS) {
+  Object.assign(FAZ, X.instalar({ falha, bom, membroDe, protegerAlvo, formatarTempo }));
+  Object.assign(PODER_DE, X.PODER_DE); Object.assign(ROTULO, X.ROTULO);
+  (X.LEITURA || []).forEach((a) => LEITURA.add(a));
+}
+
 // ── Entrada principal ────────────────────────────────────────
 // ctx: { client, guild, canal, executor (GuildMember), executorUser, ehPai, msgId }
 async function executar(acao, params, ctx) {
   const fn = FAZ[acao];
   if (!fn) return falha('Essa ação eu não conheço.');
-  if (acao !== 'apagar_msg') {
+  if (acao !== 'apagar_msg' && PODER_DE[acao]) {
     const poder = PODER_DE[acao];
     if (N.modo(poder) === 'off') return falha(`O poder **${N.PODERES[poder].nome}** está desligado. O pai liga em \`/subdona poder\`.`);
     const e = await conferirPermissao(ctx, acao);
@@ -222,8 +231,8 @@ function descrever(acao, p, nomes = {}) {
     case 'cargo_dar': return `Dar o cargo <@&${p.cargo}> a ${quem}`;
     case 'cargo_tirar': return `Tirar o cargo <@&${p.cargo}> de ${quem}`;
     case 'apelido': return `Mudar o apelido de ${quem} para ${p.apelido || '(nenhum)'}`;
-    default: return ROTULO[acao] || acao;
+    default: for (const X of EXTRAS) { const d = X.descrever && X.descrever(acao, p); if (d) return d; } return ROTULO[acao] || acao;
   }
 }
 
-module.exports = { executar, descrever, conferirPermissao, PODER_DE, ROTULO, REVERSIVEL, formatarTempo };
+module.exports = { LEITURA, executar, descrever, conferirPermissao, PODER_DE, ROTULO, REVERSIVEL, formatarTempo };
