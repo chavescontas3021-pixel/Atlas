@@ -23,8 +23,7 @@ const ping = (o) => o.setName('mencionar').setDescription('Cargo para mencionar'
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('rotina')
-    .setDescription('Sub dona: tarefas automáticas (só o pai)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDescription('Sub dona: tarefas automáticas (pai e delegados)')
     .addSubcommand((s) => agenda(s.setName('anuncio').setDescription('Posta um aviso sozinha')
       .addChannelOption(canal).addStringOption((o) => o.setName('texto').setDescription('O aviso').setRequired(true).setMaxLength(1500)).addRoleOption(ping)))
     .addSubcommand((s) => agenda(s.setName('sorteio').setDescription('Cria sorteios sozinha')
@@ -53,7 +52,7 @@ module.exports = {
   async execute(interaction, client) {
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
-    if (!(await N.ehPai(client, interaction.user.id))) return interaction.reply(UI.erro('Isso é só do pai.'));
+    if (!(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('Isso é só do pai e dos delegados.'));
     const sub = interaction.options.getSubcommand();
     const g = (n) => interaction.options.getString(n);
     const i = (n) => interaction.options.getInteger(n);
