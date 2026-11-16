@@ -50,6 +50,7 @@ module.exports = {
       .addIntegerOption((o) => o.setName('id').setDescription('Número da rotina').setRequired(true).setMinValue(1))),
 
   async execute(interaction, client) {
+    require('../subdona/publico').aplicar(interaction); // respostas ficam no canal, não somem
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
     if (!(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('Isso é só do pai e dos delegados.'));
