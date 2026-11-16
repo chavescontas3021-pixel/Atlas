@@ -12,7 +12,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('subdona')
     .setDescription('A Atlas como sub dona: ausência, poderes, delegados e diário')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((s) => s.setName('status').setDescription('Mostra como a sub dona está configurada'))
     .addSubcommand((s) => s.setName('modo').setDescription('Liga ou desliga TODO o modo sub dona (só o pai)')
       .addBooleanOption((o) => o.setName('ativo').setDescription('Modo sub dona ligado?').setRequired(true)))
@@ -23,6 +22,10 @@ module.exports = {
     .addSubcommand((s) => s.setName('ticket').setDescription('Quando a sub dona atende os tickets')
       .addStringOption((o) => o.setName('modo').setDescription('Quando atender').setRequired(true)
         .addChoices({ name: 'Só com o pai ausente', value: 'ausente' }, { name: 'Sempre', value: 'sempre' }, { name: 'Nunca', value: 'off' })))
+    .addSubcommand((s) => s.setName('canais').setDescription('Canais movimentados: ali eu não castigo por flood')
+      .addStringOption((o) => o.setName('acao').setDescription('O que fazer').setRequired(true)
+        .addChoices({ name: 'Adicionar canal', value: 'add' }, { name: 'Tirar canal', value: 'tirar' }, { name: 'Ver a lista', value: 'ver' }))
+      .addChannelOption((o) => o.setName('canal').setDescription('Canal (para adicionar ou tirar)').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice)))
     .addSubcommand((s) => s.setName('raid').setDescription('Quantas entradas em 1 minuto contam como raid')
       .addIntegerOption((o) => o.setName('limite').setDescription('De 3 a 50 (padrão 8)').setRequired(true).setMinValue(3).setMaxValue(50)))
     .addSubcommand((s) => s.setName('ausente').setDescription('Avisa que você saiu e deixa a sub dona no comando (só o pai)')
@@ -47,18 +50,18 @@ module.exports = {
     client = client || interaction.client;
     const sub = interaction.options.getSubcommand();
     const pai = await N.ehPai(client, interaction.user.id);
-    const mandaTudo = pai; // só o pai muda configuração
-    const podeVer = mandaTudo || N.ehDelegado(interaction.user.id);
+    const mandaTudo = await N.podeMandar(client, interaction.user.id); // pai e delegados mudam tudo...
+    const podeVer = mandaTudo;
 
-    const soPai = () => interaction.reply(UI.erro('Isso é só do pai.'));
+    const soPai = () => interaction.reply(UI.erro(pai || !mandaTudo ? 'Só o pai e os delegados mexem nisso.' : 'Isso é só do pai.'));
 
     if (sub === 'status') {
       if (!podeVer) return interaction.reply(UI.erro('Só o pai e os delegados veem isso.'));
       return interaction.reply({ ...(await Telas.telaStatus(client)), flags: UI.EPH });
     }
 
-    if (sub === 'modo') {
-      if (!mandaTudo) return soPai();
+    if (sub === 'modo') { // ...menos ligar e desligar o modo sub dona: isso é só do pai
+      if (!pai) return interaction.reply(UI.erro('Só o pai liga e desliga o modo sub dona.'));
       const ativo = interaction.options.getBoolean('ativo');
       N.setAtivo(ativo);
       return interaction.reply(UI.ok(ativo ? 'Modo sub dona **ligado**.' : 'Modo sub dona **desligado**. Nenhuma ordem, vigia, atendimento de ticket ou caixa funciona até você ligar de novo.'));
@@ -83,6 +86,15 @@ module.exports = {
       const m = interaction.options.getString('modo');
       N.setCfg('ticket', m);
       return interaction.reply(UI.ok({ ausente: 'Vou atender os tickets quando você estiver ausente.', sempre: 'Vou atender todos os tickets até a staff assumir.', off: 'Não atendo mais tickets.' }[m]));
+    }
+
+    if (sub === 'canais') {
+      const acao = interaction.options.getString('acao'); const c = interaction.options.getChannel('canal');
+      if (acao !== 'ver' && !c) return interaction.reply(UI.erro('Escolha o canal.'));
+      if (acao === 'add') N.setCanaisLivres([...N.canaisLivres(), c.id]);
+      if (acao === 'tirar') N.setCanaisLivres(N.canaisLivres().filter((x) => x !== c.id));
+      const l = N.canaisLivres();
+      return interaction.reply({ ...UI.ok(`${acao === 'add' ? `${c} agora é movimentado. ` : acao === 'tirar' ? `${c} voltou a ser vigiado. ` : ''}Canais movimentados: ${l.length ? l.map((i) => `<#${i}>`).join(' ') : 'nenhum'}.\nNesses canais não castigo flood nem repetição. Golpes e spam de menção continuam vigiados.`), allowedMentions: SEM_PING });
     }
 
     if (sub === 'raid') {
