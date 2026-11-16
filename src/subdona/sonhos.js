@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 //  ATLAS · sub dona · caixa de sonhos (Loritta)
 //
+//  O caixa só registra pagamentos feitos DENTRO DE TICKETS (em qualquer outro canal ela ignora).
 //  A Atlas não guarda sonhos (bot não consegue gastar). Ela VIGIA as mensagens da Loritta,
 //  reconhece quando alguém paga o pai, anota no caixa, agradece e avisa o pai.
 //  Cobranças: o pai cria uma cobrança (/caixa cobrar) e, quando o pagamento chega, a Atlas
@@ -45,8 +46,8 @@ async function aoMensagem(client, msg) {
   if (!N.ativo() || !msg.guild || !msg.author || msg.author.id !== N.lorittaId()) return;
   const pai = await N.paiId(client);
   if (!pai) return;
-  const canalFixo = N.cfg('sonhos_canal', null);
-  if (canalFixo && msg.channelId !== canalFixo) return;
+  const tk = require('../ticket/nucleo').ticketDoCanal(msg.channelId);
+  if (!tk) return; // o caixa só registra pagamentos feitos dentro de tickets
 
   const texto = textoDe(msg);
   if (!texto) return;
@@ -64,7 +65,7 @@ async function aoMensagem(client, msg) {
   // Cobrança aberta desse pagador?
   const cobs = N.cobrancas();
   const cob = cobs.find((c) => c.status === 'aberta' && c.membro === p.pagador && p.valor >= c.valor);
-  const id = N.lancar({ pagador: p.pagador, valor: p.valor, msgId: msg.id, canalId: msg.channelId, cobranca: cob ? cob.id : null });
+  const id = N.lancar({ pagador: p.pagador, valor: p.valor, msgId: msg.id, canalId: msg.channelId, ticket: tk.numero || null, cobranca: cob ? cob.id : null });
 
   let entrega = '';
   if (cob) {
@@ -83,7 +84,7 @@ async function aoMensagem(client, msg) {
   await msg.reply({
     embeds: [UI.painel({
       trilha: ['Caixa'], titulo: 'Pagamento recebido',
-      descricao: `<@${p.pagador}> enviou **${p.valor.toLocaleString('pt-BR')} sonhos** para <@${pai}>${cob ? `\nCobrança **#${cob.id}** paga${cob.motivo ? `: ${cob.motivo}` : ''}.` : ''}${entrega}\n${aus ? 'Anotei para o pai, que está ausente.' : 'Anotei no caixa.'} Obrigada!`,
+      descricao: `<@${p.pagador}> enviou **${p.valor.toLocaleString('pt-BR')} sonhos** para <@${pai}> neste ticket${cob ? `\nCobrança **#${cob.id}** paga${cob.motivo ? `: ${cob.motivo}` : ''}.` : ''}${entrega}\n${aus ? 'Anotei para o pai, que está ausente.' : 'Anotei no caixa.'} Obrigada!`,
       rodape: `Total no caixa: ${total.toLocaleString('pt-BR')} sonhos`,
     })],
     allowedMentions: SEM_PING,
