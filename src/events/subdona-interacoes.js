@@ -12,6 +12,7 @@ module.exports = {
   async execute(client, interaction) {
     try {
       if (!interaction.isButton()) return;
+      if (/^sdt?:/.test(interaction.customId)) require('../subdona/publico').aplicar(interaction);
       const id = interaction.customId;
       if (!id.startsWith('sd:') && !id.startsWith('sdt:')) return;
       if (B.esta(interaction.user.id)) return await interaction.deferUpdate();
