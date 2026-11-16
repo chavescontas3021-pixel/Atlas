@@ -42,6 +42,7 @@ function cobrancas() {
 
 async function tick(client) {
   require('./backup').tick(); // backup semanal da configuração (se ligado)
+  require('./presenca').atualizar(client); // status do bot acompanha a ausência (inclusive quando ela expira)
   if (!N.ativo()) return;
   await tickets(client).catch((e) => console.error('[Sub dona] ronda tickets:', e));
   cobrancas();
