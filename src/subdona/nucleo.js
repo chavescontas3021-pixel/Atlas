@@ -45,7 +45,7 @@ const MODOS = { off: 'desligado', confirma: 'pede confirmação', auto: 'automá
 
 // ── Interruptor mestre (só o pai mexe) ───────────────────────
 const ativo = () => cfg('ativo', true) !== false;
-const setAtivo = (v) => setCfg('ativo', !!v);
+const setAtivo = (v) => { setCfg('ativo', !!v); avisarMudanca(); };
 
 const modo = (poder) => {
   const m = cfg(`poderes.${poder}`, null);
@@ -96,8 +96,11 @@ function ausencia() {
   }
   return a;
 }
-const ausentar = ({ motivo, horas }) => setCfg('ausente', { desde: Date.now(), ate: horas ? Date.now() + horas * 3600 * 1000 : null, motivo: motivo || '' });
-const voltar = () => setCfg('ausente', null);
+let ouvinteAusencia = null; // presenca.js usa isto para trocar o status do bot quando você sai ou volta
+const aoMudarAusencia = (f) => { ouvinteAusencia = f; };
+const avisarMudanca = () => { try { if (ouvinteAusencia) ouvinteAusencia(); } catch (e) { console.error('[Sub dona] presença:', e.message); } };
+const ausentar = ({ motivo, horas }) => { setCfg('ausente', { desde: Date.now(), ate: horas ? Date.now() + horas * 3600 * 1000 : null, motivo: motivo || '' }); avisarMudanca(); };
+const voltar = () => { setCfg('ausente', null); avisarMudanca(); };
 
 // ── Diário (tudo que a sub dona fez) ─────────────────────────
 const diario = () => db.get('subdona.diario', []);
@@ -160,6 +163,6 @@ module.exports = {
   cfg, setCfg, PODERES, MODOS, modo, setModo, paiId, ehPai, delegados, ehDelegado, podeMandar, delegar, tirarDelegado,
   ativo, setAtivo, modoEfetivo, alertasCanal, ticketModo, lorittaId, caixa, lancar, cobrancas, salvarCobrancas, amostrasSonhos, guardarAmostra,
   canaisLivres, setCanaisLivres, canalLivre, perguntas, setPerguntas,
-  ausencia, ausentar, voltar, diario, registrar, obter, marcarDesfeito, recados, anotarRecado, limparRecados,
+  ausencia, ausentar, voltar, aoMudarAusencia, diario, registrar, obter, marcarDesfeito, recados, anotarRecado, limparRecados,
   guardarPendente, pegarPendente, soltarPendente,
 };
