@@ -27,6 +27,7 @@ module.exports = {
       .addStringOption((o) => o.setName('texto').setDescription('Cole a mensagem da Loritta (use a menção, ex.: <@123>)').setRequired(true).setMaxLength(1000))),
 
   async execute(interaction, client) {
+    require('../subdona/publico').aplicar(interaction); // respostas ficam no canal, não somem
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
     if (!(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('O caixa é só do pai e dos delegados.'));
