@@ -116,7 +116,7 @@ function entender({ bruto, usuarios = [], cargos = [], canais = [] }) {
   if (t('\\bconselhos?\\b|analisa o servidor|analise do servidor|como (?:esta|ta) o servidor|checa o servidor', f)) return { acao: 'conselho' };
   if (t('^\\s*status\\s*$|status d[aoe] (?:sub ?dona|atlas|modo)|como (?:esta|ta) a sub ?dona|situacao d[aoe] (?:sub ?dona|atlas)', f)) return { acao: 'status_sd' };
   if (t('\\b(?:caixa|extrato)\\b|quanto (?:eu )?(?:recebi|entrou|ganhei)|sonhos recebidos', f)) return { acao: 'caixa_ver' };
-  if (t('\\brecados\\b|quem me procurou|quem me chamou', f)) return { acao: 'recados_ver' };
+  if (t('\\brecados\\b|\\b(?:quem|alguem)\\b.{0,12}\\b(?:me )?(?:procurou|chamou|marcou|perguntou por mim)|me procuraram|\\b(?:tem|algum|alguma|mostra|ver|ve|cade|quais)\\b.{0,20}\\brecado\\b|\\brecado\\b.{0,12}\\bpra mim\\b|\\bpara mim\\b.{0,10}\\brecado', f)) return { acao: 'recados_ver' };
   if (t('\\bdiario\\b|o que (?:voce|vc) (?:ja )?fez', f)) return { acao: 'diario_ver' };
 
   // 10) ausência
