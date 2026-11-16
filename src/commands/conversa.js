@@ -10,7 +10,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('conversa')
     .setDescription('Configura a conversa do Atlas (staff)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((s) => s.setName('status').setDescription('Mostra como a conversa está configurada'))
     .addSubcommand((s) => s.setName('canal').setDescription('Define o único canal onde o Atlas conversa')
       .addChannelOption((o) => o.setName('canal').setDescription('Canal de texto').setRequired(true)
@@ -50,6 +49,11 @@ module.exports = {
     if (!interaction.inGuild()) return;
     const sub = interaction.options.getSubcommand();
     client = client || interaction.client;
+
+    // Quem pode mexer: staff com Gerenciar Servidor, o pai e os delegados da sub dona
+    let permitido = !!(interaction.memberPermissions && interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild));
+    if (!permitido) { try { permitido = await require('../subdona/nucleo').podeMandar(client, interaction.user.id); } catch { permitido = false; } }
+    if (!permitido) return interaction.reply(UI.erro('Só a staff, o pai e os delegados mexem na conversa.'));
 
     if (sub === 'status') {
       const canal = N.canal();
