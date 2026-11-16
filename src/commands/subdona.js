@@ -30,7 +30,8 @@ module.exports = {
       .addIntegerOption((o) => o.setName('limite').setDescription('De 3 a 50 (padrão 8)').setRequired(true).setMinValue(3).setMaxValue(50)))
     .addSubcommand((s) => s.setName('ausente').setDescription('Avisa que você saiu e deixa a sub dona no comando (só o pai)')
       .addStringOption((o) => o.setName('motivo').setDescription('Por que está ausente (aparece para quem te marcar)').setMaxLength(200))
-      .addIntegerOption((o) => o.setName('horas').setDescription('Volta em quantas horas? (vazio = até você voltar)').setMinValue(1).setMaxValue(720)))
+      .addIntegerOption((o) => o.setName('horas').setDescription('Volta em quantas horas? (vazio = até você voltar)').setMinValue(1).setMaxValue(720))
+      .addChannelOption((o) => o.setName('canal').setDescription('Canal onde eu aviso a todos que você está ausente').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)))
     .addSubcommand((s) => s.setName('voltar').setDescription('Você voltou: mostra o que aconteceu e tira o modo ausência (só o pai)'))
     .addSubcommand((s) => s.setName('poder').setDescription('Define o que a sub dona pode fazer (só o pai)')
       .addStringOption((o) => o.setName('poder').setDescription('Qual poder').setRequired(true)
@@ -109,6 +110,8 @@ module.exports = {
       const motivo = interaction.options.getString('motivo') || '';
       const horas = interaction.options.getInteger('horas');
       N.ausentar({ motivo, horas });
+      const aviso = interaction.options.getChannel('canal');
+      if (aviso) await aviso.send({ embeds: [UI.painel({ trilha: ['Sub dona'], titulo: 'O pai está ausente', descricao: `${motivo ? `${motivo}\n` : ''}${horas ? `Volta em cerca de ${horas} h.\n` : ''}Eu sou a sub dona e estou no comando. Quem precisar de algo pode falar comigo ou abrir um ticket.` })], allowedMentions: SEM_PING }).catch(() => {});
       return interaction.reply(UI.ok(`Combinado. Estou no comando${horas ? ` por ${horas} h` : ' até você voltar'}. Quem te marcar recebe resposta e eu anoto o recado. Use \`/subdona voltar\` quando voltar.`));
     }
 
