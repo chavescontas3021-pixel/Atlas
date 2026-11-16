@@ -34,6 +34,13 @@ Object.assign(PODERES, {
   vigia_golpe: { nome: 'Vigiar golpes', padrao: 'confirma', vigia: true, info: 'Apaga links de golpe e castiga quem postou' },
   ticket_fechar: { nome: 'Fechar tickets esquecidos', padrao: 'off', vigia: true, info: 'Fecha ticket parado há muito tempo' },
 });
+// Poderes das ordens extras (parte 4)
+Object.assign(PODERES, {
+  ticket_gerir: { nome: 'Gerir tickets', padrao: 'auto', perm: 'ManageChannels', info: 'Fecha, renomeia e mexe em quem está no ticket' },
+  sorteios: { nome: 'Sorteios e eventos', padrao: 'auto', perm: 'ManageGuild', info: 'Cria, encerra e refaz sorteios; cria eventos' },
+  canais: { nome: 'Criar e apagar canais', padrao: 'confirma', perm: 'ManageChannels', info: 'Cria, renomeia e apaga canais' },
+  panico: { nome: 'Trancar o servidor', padrao: 'confirma', perm: 'ManageChannels', info: 'Tranca ou destranca todos os canais de texto' },
+});
 const MODOS = { off: 'desligado', confirma: 'pede confirmação', auto: 'automático' };
 
 // ── Interruptor mestre (só o pai mexe) ───────────────────────
@@ -52,6 +59,15 @@ const modoEfetivo = (poder) => (modo(poder) === 'confirma' && PODERES[poder] && 
 const alertasCanal = () => cfg('alertas', null);
 const ticketModo = () => (['sempre', 'ausente', 'off'].includes(cfg('ticket', 'ausente')) ? cfg('ticket', 'ausente') : 'ausente');
 const lorittaId = () => cfg('loritta', '297153970613387264');
+
+// ── Canais movimentados: o vigia de flood não pune quem fala rápido ali ──
+const canaisLivres = () => cfg('canais_livres', []) || [];
+const setCanaisLivres = (l) => setCfg('canais_livres', [...new Set(l)].slice(0, 50));
+const canalLivre = (...ids) => ids.some((i) => i && canaisLivres().includes(i));
+
+// ── Perguntas (base de conhecimento): modo sempre | ausente | off e canais de dúvidas ──
+const perguntas = () => ({ modo: 'sempre', canais: [], ...(cfg('perguntas', {}) || {}) });
+const setPerguntas = (v) => setCfg('perguntas', { ...perguntas(), ...v });
 
 // ── Quem manda ───────────────────────────────────────────────
 const paiId = (client) => Conversa.paiId(client);
@@ -143,6 +159,7 @@ const soltarPendente = (token) => pendentes.delete(token);
 module.exports = {
   cfg, setCfg, PODERES, MODOS, modo, setModo, paiId, ehPai, delegados, ehDelegado, podeMandar, delegar, tirarDelegado,
   ativo, setAtivo, modoEfetivo, alertasCanal, ticketModo, lorittaId, caixa, lancar, cobrancas, salvarCobrancas, amostrasSonhos, guardarAmostra,
+  canaisLivres, setCanaisLivres, canalLivre, perguntas, setPerguntas,
   ausencia, ausentar, voltar, diario, registrar, obter, marcarDesfeito, recados, anotarRecado, limparRecados,
   guardarPendente, pegarPendente, soltarPendente,
 };
