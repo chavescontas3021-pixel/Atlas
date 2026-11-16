@@ -1,117 +1,133 @@
 // ─────────────────────────────────────────────────────────────
-//  ATLAS · sub dona · entende ordens em português
-//  "atlas, silencia @fulano 10 min spam"  →  { acao:'silenciar', alvo, ms, motivo }
-//  Só regras e palavras-chave: sem IA, sem custo. Função pura (fácil de testar).
+//  ATLAS · sub dona · ordens extras em português (parte 2 do interpretador)
+//  Tickets, sorteios, eventos, canais, pânico, vigias, avisos, consultas e ausência.
+//  É consultado ANTES do interprete.js: aqui os verbos vêm sempre com um substantivo
+//  ("ticket", "sorteio", "canal"...), então não atrapalham as ordens simples.
 // ─────────────────────────────────────────────────────────────
-const sem = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
-const ABERTURA = '^(?:(?:por favor|pf|pode|consegue|poderia|vc pode|voce pode|faz favor de|faz|agora|entao|bora|vai)\\s+)*';
+const { tempo } = require('./interprete');
 
-// Cada ordem: id, padrão do verbo e prioridade (a maior ganha). 
-const ORDENS = [
-  { acao: 'desbanir', p: 90, re: 'desban[a-z]*|unban|tira (?:o )?ban[a-z]*|perdoa' },
-  { acao: 'tirar_silencio', p: 88, re: 'desmuta[a-z]*|tira (?:o )?(?:castigo|silencio|mute|timeout)(?: d[eoa])?|destimeout|solta|libera' },
-  { acao: 'banir', p: 80, re: 'ban[a-z]*|bani[a-z]*' },
-  { acao: 'expulsar', p: 80, re: 'expuls[a-z]*|kika[a-z]*|kick[a-z]*|chuta[a-z]*' },
-  { acao: 'silenciar', p: 80, re: 'silencia[a-z]*|muta[a-z]*|castiga[a-z]*|timeout|cala' },
-  { acao: 'advertir', p: 80, re: 'advert[a-z]*|adverte[a-z]*|da (?:um )?aviso (?:a|para|pro|pra)|dar (?:um )?aviso (?:a|para|pro|pra)|avisa (?:o|a)|avisa' },
-  { acao: 'limpar', p: 82, re: '(?:limpa|limpar|apaga|apagar|deleta|deletar)(?: as| os| as ultimas| os ultimos| ultimas| ultimos)?' },
-  { acao: 'destrancar', p: 86, re: 'destranc[a-z]*|desbloque[a-z]*|abre|abrir|libera(?= (?:o )?(?:canal|chat))' },
-  { acao: 'trancar', p: 84, re: 'tranc[a-z]*|bloque[a-z]*|fecha|fechar' },
-  { acao: 'lento', p: 85, re: '(?:tira|tirar|desliga|desligar|sem|ativa|ativar|liga|ligar|poe|bota|coloca|muda)?\\s*(?:o )?(?:modo lento|slowmode|slow mode)' },
-  { acao: 'cargo_tirar', p: 92, re: '(?:tira|tirar|remove|remover|retira|retirar) (?:o )?(?:cargo|role)' },
-  { acao: 'cargo_dar', p: 92, re: '(?:da|dar|adiciona|adicionar|coloca|colocar|bota|botar|poe|por) (?:o )?(?:cargo|role)' },
-  { acao: 'apelido', p: 92, re: '(?:muda|mudar|troca|trocar|altera|alterar|coloca|poe|bota) (?:o )?(?:apelido|nick|nickname)' },
-  { acao: 'anunciar', p: 95, re: 'anunci[a-z]*|manda (?:um )?(?:aviso|anuncio|recado)|posta|avisa (?:no|em|na)|diz (?:no|em|na)' },
-].map((o) => ({ ...o, rx: new RegExp(`${ABERTURA}(?:${o.re})(?![a-z])`) }));
+// minúsculas sem acento, mantendo o mesmo tamanho do texto original (índices alinhados)
+const fold = (t) => String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const CRIAR = '(?:cria|criar|crie|faz|fazer|abre|abrir|inicia|iniciar|comeca|comecar|bota|poe|monta|organiza|marca|agenda|quero|preciso de)';
+const t = (re, f) => new RegExp(re).test(f);
 
-// ── Tempo ("10 min", "2h", "1 dia", "meia hora") ─────────────
-const UNIDADE = { s: 1, seg: 1, segundo: 1, segundos: 1, m: 60, min: 60, minuto: 60, minutos: 60, h: 3600, hr: 3600, hrs: 3600, hora: 3600, horas: 3600, d: 86400, dia: 86400, dias: 86400, sem: 604800, semana: 604800, semanas: 604800 };
-function tempo(t) {
-  const x = sem(t);
-  if (/meia hora/.test(x)) return { s: 1800, trecho: /meia hora/ };
-  const m = /(\d+)\s*(segundos?|seg|s|minutos?|min|m|horas?|hrs?|h|dias?|d|semanas?|sem)(?![a-z])/.exec(x) || /\b(uma?|dois|duas|tres|cinco|dez)\s+(segundos?|minutos?|horas?|dias?|semanas?)/.exec(x);
-  if (!m) return null;
-  const n = /^\d+$/.test(m[1]) ? parseInt(m[1], 10) : { um: 1, uma: 1, dois: 2, duas: 2, tres: 3, cinco: 5, dez: 10 }[m[1]];
-  return { s: n * UNIDADE[m[2]], trecho: new RegExp(m[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) };
+function aposVerbo(cru, f, rx) { // texto depois do primeiro trecho que casa com rx
+  const m = new RegExp(rx).exec(f);
+  return m ? cru.slice(m.index + m[0].length) : cru;
 }
+const tiraTempo = (txt) => {
+  const tm = tempo(txt);
+  return tm ? txt.replace(new RegExp(tm.trecho.source.replace(/\\ /g, '\\s*'), 'i'), ' ') : txt;
+};
+const limpa = (s) => { let a = s, b; do { b = a; a = limpa1(b); } while (a !== b); return a; };
+const limpa1 = (s) => s.replace(/\b(?:daqui(?: a)?|durante|dura|duracao|por|em|a|as|de|do|da|com|valendo|chamado|chamada|nome|de nome|o|um|uma)\b(?=\s*$)/gi, ' ').replace(/^[\s,:;.-]+|[\s,:;.-]+$/g, '').replace(/\s+/g, ' ').trim();
+const numeroDe = (f) => { const m = /#?\b(\d{1,6})\b/.exec(f); return m ? parseInt(m[1], 10) : null; };
 
-// Tira da frase o verbo, o tempo e palavras de ligação, sobrando o motivo
-function motivoDe(bruto, rxVerbo, { tirarTempo = true, tirarNumero = false } = {}) {
-  let t = String(bruto).replace(/<[@#&!]+\d+>/g, ' ').replace(/\b\d{17,20}\b/g, ' ');
-  const base = sem(t);
-  const mv = new RegExp(`${ABERTURA.replace('^', '')}(?:${rxVerbo})`).exec(base);
-  if (mv) t = t.slice(mv.index + mv[0].length);
-  if (tirarTempo) { const tm = tempo(t); if (tm) t = t.replace(new RegExp(tm.trecho.source.replace(/\\ /g, '\\s*'), 'i'), ' '); }
-  if (tirarNumero) t = t.replace(/\b\d+\b/, ' ');
-  t = t.replace(/^(?:[\s,:;.-]|(?:de|do|da|por|pq|porque|motivo|pra|para|a|o|causa)(?![a-zà-ú]))+/i, ' ');
-  return t.replace(/\s+/g, ' ').trim();
-}
-
-// ── Principal ────────────────────────────────────────────────
-// entrada: { bruto (texto sem o "atlas"), usuarios:[ids], cargos:[ids], canais:[ids] }
 function entender({ bruto, usuarios = [], cargos = [], canais = [] }) {
-  const extra = require('./interprete2').entender({ bruto, usuarios, cargos, canais }); // ordens com substantivo (ticket, sorteio, canal...)
-  if (extra) return extra;
-  const texto = sem(String(bruto).replace(/<[@#&!]+\d+>/g, ' '));
-  if (!texto) return null;
-  const candidatas = ORDENS.filter((o) => o.rx.test(texto)).sort((a, b) => b.p - a.p);
-  const ordem = candidatas[0];
-  if (!ordem) return null;
-  let acao = ordem.acao;
-  const ids = (String(bruto).match(/\b\d{17,20}\b/g) || []);
-  const alvo = usuarios[0] || ids[0] || null;
+  const cru = String(bruto).replace(/<[@#&!]+\d+>/g, ' ').replace(/^\s*atlas[\s,:;!-]*/i, '');
+  const f = fold(cru);
+  if (!f.trim()) return null;
+  // "anuncia ...", "manda um aviso ...", "posta ...": o resto é o texto do anúncio, não uma ordem (fica com o interprete.js)
+  if (/^\s*(?:anunci|manda (?:um )?(?:aviso|anuncio|recado)|posta\b|avisa (?:no|em|na)\b|diz (?:no|em|na)\b)/.test(f)) return null;
+  const alvo = usuarios[0] || (String(bruto).match(/\b\d{17,20}\b/) || [null])[0];
   const canal = canais[0] || null;
-  const tm = tempo(texto);
-  const base = { acao, alvo, canal };
+  const tm = tempo(f);
 
-  // "libera @fulano" é tirar castigo; "abre"/"libera" sem alvo é destrancar
-  if (acao === 'destrancar' && usuarios.length) acao = 'tirar_silencio';
-  if (acao === 'tirar_silencio' && !alvo) acao = 'destrancar';
-  base.acao = acao;
-  const rx = ordem.re;
+  // 1) pânico
+  if (t('\\bpanico\\b', f) && t('\\b(?:liga|ativa|ligar|ativar|entra)', f)) return { acao: 'panico_on' };
+  if (t('\\bpanico\\b', f) && t('\\b(?:desliga|desativa|desligar|desativar|sai|acabou)', f)) return { acao: 'panico_off' };
+  if (t('\\b(?:tranca|trancar|bloqueia|bloquear|fecha|fechar)\\b.*\\b(?:servidor|todos os canais|todos os chats)\\b|^\\s*(?:tranca|bloqueia|fecha) tudo\\s*[!.]*\\s*$', f)) return { acao: 'panico_on' };
+  if (t('\\b(?:destranca|destrancar|desbloqueia|desbloquear|abre|abrir|libera|liberar)\\b.*\\b(?:servidor|todos os canais|todos os chats)\\b|^\\s*(?:destranca|desbloqueia|libera|abre) tudo\\s*[!.]*\\s*$', f)) return { acao: 'panico_off' };
 
-  switch (acao) {
-    case 'limpar': {
-      const n = /(\d{1,3})/.exec(texto);
-      if (!n && !/mensage|msg/.test(texto)) return null; // "apaga" sozinho é vago demais
-      return { ...base, n: Math.min(100, Math.max(1, n ? parseInt(n[1], 10) : 10)), alvo: usuarios[0] || null };
-    }
-    case 'silenciar':
-      return { ...base, ms: Math.min(28 * 86400, tm ? tm.s : 600) * 1000, motivo: motivoDe(bruto, rx) };
-    case 'tirar_silencio':
-    case 'expulsar':
-    case 'advertir':
-    case 'banir':
-    case 'desbanir':
-      return { ...base, motivo: motivoDe(bruto, rx, { tirarTempo: false }) };
-    case 'trancar':
-    case 'destrancar':
-      return { ...base, motivo: motivoDe(bruto, rx, { tirarTempo: false }).replace(/^(?:o )?(?:canal|chat)\b/i, '').trim() };
-    case 'lento': {
-      const desliga = /(tira|tirar|desliga|desligar|sem|sem o|desativa)/.test(texto) || /\b0\b/.test(texto);
-      const seg = desliga ? 0 : (tm ? tm.s : (/(\d+)/.exec(texto) ? parseInt(/(\d+)/.exec(texto)[1], 10) : 10));
-      return { ...base, segundos: Math.min(21600, seg) };
-    }
-    case 'cargo_dar':
-    case 'cargo_tirar':
-      return { ...base, cargo: cargos[0] || null };
-    case 'apelido': {
-      const m = /(?:para|pra|:|como)\s+(.+)$/i.exec(String(bruto).replace(/<[@#&!]+\d+>/g, ' ').trim());
-      return { ...base, apelido: m ? m[1].trim().slice(0, 32) : null };
-    }
-    case 'anunciar': {
-      const cru = String(bruto).replace(/<[@&!]+\d+>/g, ' ').replace(/<#\d+>/g, ' ');
-      const m = /:\s*([\s\S]+)$/.exec(cru);
-      let msg = m ? m[1] : motivoDe(bruto, rx, { tirarTempo: false });
-      msg = msg.replace(/^(?:no|em|na|para|pro|pra)\s+(?:canal\s+)?/i, '').trim();
-      return { ...base, texto: msg.slice(0, 1500) };
-    }
-    default:
-      return null;
+  // 2) vigias
+  if (t('\\bvigia|\\bvigil', f)) {
+    const vigia = t('raid', f) ? 'raid' : t('flood|spam', f) ? 'flood' : t('golpe|scam|phishing', f) ? 'golpe' : null;
+    const modo = t('\\b(?:desliga|desativa|desligar|desativar|tira|para)', f) ? 'off' : t('confirma', f) ? 'confirma' : t('\\b(?:liga|ativa|ligar|ativar|automatico)', f) ? 'auto' : null;
+    if (vigia && modo) return { acao: 'vigia_modo', vigia, modo };
   }
+
+  // 3) avisos de membro (plural: "avisos"; "dá um aviso" continua sendo advertir)
+  if (alvo && t('\\bavisos\\b', f)) {
+    if (t('\\b(?:limpa|limpar|zera|zerar|apaga|apagar|remove|remover|tira|tirar)\\b', f)) return { acao: 'avisos_limpar', alvo };
+    return { acao: 'avisos_ver', alvo };
+  }
+
+  // 4) tickets
+  if (t('\\btickets?\\b', f)) {
+    if (t('\\b(?:renomeia|renomear|muda o nome|mudar o nome|troca o nome|trocar o nome)\\b', f)) {
+      const m = /(?:\bpara|\bpra|:|\bcomo)\s+(.+)$/i.exec(cru);
+      return { acao: 'tk_renomear', canal, nome: m ? m[1].trim() : '' };
+    }
+    if (alvo && t('\\b(?:remove|remover|tira|tirar|retira|retirar|expulsa|expulsar)\\b', f)) return { acao: 'tk_rem', alvo, canal };
+    if (alvo && t('\\b(?:adiciona|adicionar|coloca|colocar|poe|puxa|chama|convida|bota|inclui|incluir|bota)\\b', f)) return { acao: 'tk_add', alvo, canal };
+    if (t('\\b(?:fecha|fechar|encerra|encerrar|finaliza|finalizar|termina|terminar)\\b', f)) {
+      const mot = /(?:motivo|porque|pq|:)\s*(.+)$/i.exec(cru);
+      return { acao: 'tk_fechar', canal, motivo: mot ? mot[1].trim() : '' };
+    }
+  }
+
+  // 5) sorteios
+  if (t('\\bsorteio', f) || t('sorteia de novo|sortear de novo|novo vencedor|outro vencedor', f)) {
+    const id = numeroDe(f);
+    if (t('\\b(?:rerola|rerolar|refaz|refazer)\\b|de novo|novo vencedor|outro vencedor', f)) return { acao: 'sorteio_rerolar', id };
+    if (t('\\b(?:encerra|encerrar|termina|terminar|finaliza|finalizar|acaba|acabar|fecha|fechar)\\b', f) && id) return { acao: 'sorteio_encerrar', id };
+    if (t(`\\b${CRIAR}\\b`, f) || t('\\bsorteio de\\b', f)) {
+      let resto = aposVerbo(cru, f, 'sorteio');
+      let ms = (tm ? tm.s : 86400) * 1000;
+      const vv = /(\d{1,2})\s*(?:vencedores|vencedor|ganhadores|ganhador)/i.exec(fold(resto));
+      if (vv) resto = resto.replace(new RegExp(vv[0].replace(/\s+/g, '\\s*'), 'i'), ' ');
+      resto = limpa(tiraTempo(resto).replace(/\b(?:para|pra)\s+\d.*$/i, ' ')).replace(/^(?:(?:de|do|da|com|valendo|premio|:)\s+)+/i, '').trim();
+      return { acao: 'sorteio_criar', canal, premio: resto, ms, vencedores: vv ? parseInt(vv[1], 10) : 1 };
+    }
+  }
+
+  // 6) eventos
+  if (t('\\bevento\\b', f) && t(`\\b${CRIAR}\\b`, f)) {
+    let resto = aposVerbo(cru, f, '\\bevento\\b');
+    resto = limpa(tiraTempo(resto).replace(/\b(?:que )?(?:comeca|começa)\b/gi, ' ')).replace(/^(?:chamado|chamada|de nome|nome|:)\s*/i, '').trim();
+    return { acao: 'evento_criar', canal, titulo: resto, ms: (tm ? tm.s : 86400) * 1000 };
+  }
+
+  // 7) canais movimentados (isentos do vigia de flood)
+  if (t('movimentad|\\blivres?\\b|lotad|bombad', f) && (t('\\bcanal|\\bcanais', f) || canal)) {
+    if (t('\\bquais\\b|\\blista|\\bmostra', f)) return { acao: 'canais_livres_ver' };
+    if (canal && t('\\b(?:tira|tirar|remove|remover|desmarca|desmarcar|nao e mais|deixa de ser)\\b', f)) return { acao: 'canal_livre_tirar', canal };
+    if (canal) return { acao: 'canal_livre', canal };
+  }
+
+  // 8) canais
+  if (t('\\bcanal\\b', f)) {
+    if (t('\\b(?:apaga|apagar|deleta|deletar|exclui|excluir|remove|remover|destroi)\\b', f) && !t('mensage|msg', f)) return { acao: 'canal_apagar', canal };
+    if (t('\\b(?:renomeia|renomear|muda o nome|mudar o nome|troca o nome|trocar o nome)\\b', f)) {
+      const m = /(?:\bpara|\bpra|:|\bcomo)\s+(.+)$/i.exec(cru);
+      return { acao: 'canal_renomear', canal, nome: m ? m[1].trim() : '' };
+    }
+    if (t('\\b(?:cria|criar|crie|faz|fazer|monta|bota|poe|quero|preciso de)\\b', f) || t('\\b(?:abre|abrir)\\b.*\\b(?:um|uma|novo|nova|chamado)\\b', f)) {
+      const voz = t('\\bvoz\\b|\\bcall\\b', f);
+      const m = /(?:chamado|chamada|com o nome|de nome|nome|:)\s+(.+)$/i.exec(cru);
+      const nome = m ? m[1] : limpa(aposVerbo(cru, f, '\\bcanal\\b').replace(/\b(?:de|do)\s+(?:texto|voz)\b/gi, ' ').replace(/\b(?:texto|voz|novo|nova)\b/gi, ' '));
+      return { acao: 'canal_criar', nome: nome.trim(), voz };
+    }
+  }
+
+  // 9) consultas
+  if (alvo && t('\\b(?:quem e|info|informacoes|ficha|perfil|dados|historico|investiga|stalkeia)\\b', f)) return { acao: 'membro_info', alvo };
+  if (t('\\b(?:resumo|resume|me atualiza|relatorio|novidades)\\b|o que (?:rolou|aconteceu)', f)) return { acao: 'resumo', dias: t('semana|7 dias', f) ? 7 : t('\\bmes\\b|30 dias', f) ? 30 : 1 };
+  if (t('\\bconselhos?\\b|analisa o servidor|analise do servidor|como (?:esta|ta) o servidor|checa o servidor', f)) return { acao: 'conselho' };
+  if (t('^\\s*status\\s*$|status d[aoe] (?:sub ?dona|atlas|modo)|como (?:esta|ta) a sub ?dona|situacao d[aoe] (?:sub ?dona|atlas)', f)) return { acao: 'status_sd' };
+  if (t('\\b(?:caixa|extrato)\\b|quanto (?:eu )?(?:recebi|entrou|ganhei)|sonhos recebidos', f)) return { acao: 'caixa_ver' };
+  if (t('\\brecados\\b|quem me procurou|quem me chamou', f)) return { acao: 'recados_ver' };
+  if (t('\\bdiario\\b|o que (?:voce|vc) (?:ja )?fez', f)) return { acao: 'diario_ver' };
+
+  // 10) ausência
+  if (t('vou (?:ficar )?(?:ausente|fora|viajar|sumir)|fico ausente|to ausente|estou ausente|modo ausente|me ausent', f)) {
+    const mot = /(?:motivo|porque|pq|:)\s*(.+)$/i.exec(cru);
+    return { acao: 'ausentar', horas: tm ? Math.max(1, Math.round(tm.s / 3600)) : null, motivo: mot ? mot[1].trim().slice(0, 150) : '' };
+  }
+  if (t('\\b(?:voltei|to de volta|estou de volta|voltando)\\b', f)) return { acao: 'voltar_ordem' };
+  return null;
 }
 
-// A frase parece uma ordem? (a conversa usa isso para não responder "não entendi" a uma ordem)
-const parece = (bruto) => require('./interprete2').parece(bruto) || ORDENS.some((o) => o.rx.test(sem(String(bruto).replace(/<[@#&!]+\d+>/g, ' ').replace(/^\s*atlas[\s,:;!-]*/i, ''))));
+const parece = (bruto) => Boolean(entender({ bruto }));
 
-module.exports = { entender, parece, tempo, sem };
+module.exports = { entender, parece };
