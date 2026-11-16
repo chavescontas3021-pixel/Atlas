@@ -97,7 +97,8 @@ async function aoMensagem(client, msg) {
     await msg.delete().catch(() => {});
     return await acionar({ ...base, poder: 'vigia_flood', acao: 'silenciar', params: { ...alvo, ms: 900000, motivo: 'Spam de menções' }, titulo: 'Spam de menções', descricao: `<@${uid}> marcou muita gente de uma vez em ${msg.channel}.` });
   }
-  // 3) flood (muitas mensagens rápidas) ou a mesma mensagem repetida
+  // 3) flood (muitas mensagens rápidas) ou a mesma mensagem repetida (não vale em canal movimentado)
+  if (N.canalLivre(msg.channelId, msg.channel && msg.channel.parentId)) return;
   const rapidas = h.filter((x) => agora - x.t < 8000).length;
   const iguais = texto.length >= 8 ? h.filter((x) => x.txt === h[h.length - 1].txt).length : 0;
   if (rapidas >= 6 || iguais >= 4) {
