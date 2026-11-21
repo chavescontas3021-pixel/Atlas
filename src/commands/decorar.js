@@ -161,9 +161,10 @@ async function coletar(interaction) {
 }
 
 module.exports = {
+  global: true, // funciona em qualquer servidor onde a Atlas estiver (veja deploy-commands.js)
   data: new SlashCommandBuilder()
     .setName('decorar')
-    .setDescription('Muda o nome de vários canais de uma vez (staff)')
+    .setDescription('Muda o nome de vários canais e categorias de uma vez (staff)')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((s) =>
       s
@@ -198,7 +199,7 @@ module.exports = {
 
       const dica =
         'Troque **só o nome depois do `|`** (não mexa no número) e apague as linhas que não quer mudar. ' +
-        'Os títulos de categoria não são renomeados. Depois use `/decorar aplicar`.';
+        'As categorias também entram (linha com número); linhas sem número, como "sem categoria", são ignoradas. Depois use `/decorar aplicar`.';
 
       if (interaction.options.getBoolean('arquivo')) {
         const arquivo = new AttachmentBuilder(Buffer.from(linhas.join('\n'), 'utf8'), { name: 'canais.txt' });
