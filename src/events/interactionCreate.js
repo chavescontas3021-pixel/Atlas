@@ -5,6 +5,12 @@ module.exports = {
   async execute(client, interaction) {
     if (!interaction.isChatInputCommand()) return;
 
+    // Modo administrativo: com ele desligado, só os comandos de construção (e os pessoais, do dono) funcionam.
+    try {
+      const recusa = await require('../modo/nucleo').checar(client, interaction);
+      if (recusa) return await interaction.reply({ ...UI.aviso(recusa), flags: UI.EPH }).catch(() => {});
+    } catch (e) { console.error('[Modo] checagem:', e); }
+
     const comando = client.commands.get(interaction.commandName);
     if (!comando) return;
 
