@@ -41,14 +41,14 @@ function montarLista(guild) {
   const grupos = [];
   if (porCategoria.has(null)) grupos.push({ titulo: '— sem categoria —', canais: porCategoria.get(null) });
   const categorias = [...guild.channels.cache.values()]
-    .filter((c) => c.type === ChannelType.GuildCategory && porCategoria.has(c.id))
+    .filter((c) => c.type === ChannelType.GuildCategory)
     .sort((a, b) => a.rawPosition - b.rawPosition);
-  for (const cat of categorias) grupos.push({ titulo: cat.name, canais: porCategoria.get(cat.id) });
+  for (const cat of categorias) grupos.push({ id: cat.id, titulo: cat.name, canais: porCategoria.get(cat.id) || [] });
 
   const linhas = [];
   for (const g of grupos) {
     if (linhas.length) linhas.push('');
-    linhas.push(g.titulo);
+    linhas.push(g.id ? `${g.id} | ${g.titulo}` : g.titulo); // categoria também entra, com ID
     for (const c of g.canais.sort(ordemCanais)) linhas.push(`${c.id} | ${c.name}`);
   }
   return { linhas, total: canais.length };
@@ -104,8 +104,8 @@ function interpretar(guild, texto) {
       problemas.push({ nome: id, motivo: 'canal não encontrado' });
       continue;
     }
-    if (canal.type === ChannelType.GuildCategory || canal.isThread()) {
-      problemas.push({ nome: canal.name, motivo: 'categorias e threads não são renomeadas' });
+    if (canal.isThread()) {
+      problemas.push({ nome: canal.name, motivo: 'threads não são renomeadas' });
       continue;
     }
     const alvo = normalizarNome(canal, nomeBruto);
