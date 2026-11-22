@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, MessageFlags, EmbedBuilder } = require('discord.js');
+const { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder, MessageFlags, EmbedBuilder } = require('discord.js');
 const Modo = require('../modo/nucleo');
 const D = require('../formsrv/dados');
 const F = require('../formsrv/fluxo');
@@ -8,6 +8,10 @@ const Entrada = require('../entrada/nucleo');
 module.exports = {
   global: true,
   data: new SlashCommandBuilder().setName('forms').setDescription('Pedidos de servidor e servidores da Atlas (só o dono)')
+    // Instalado no servidor OU na conta da pessoa (app de usuário), igual ao /formulario
+    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+    // Servidor, privado com o Atlas e qualquer DM/grupo
+    .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel)
     .addSubcommand((s) => s.setName('servidor').setDescription('Manda o formulário de pedido de servidor na DM de alguém')
       .addUserOption((o) => o.setName('usuario').setDescription('Quem vai preencher').setRequired(true)))
     .addSubcommand((s) => s.setName('lista').setDescription('Painel com todos os pedidos'))
@@ -17,7 +21,8 @@ module.exports = {
 
   async execute(interaction, client) {
     client = client || interaction.client;
-    const flags = interaction.inGuild() ? { flags: MessageFlags.Ephemeral } : {};
+    // sempre só para o dono ver, inclusive numa DM com outra pessoa
+    const flags = { flags: MessageFlags.Ephemeral };
     const resp = (x) => interaction.reply({ ...(typeof x === 'string' ? { content: x } : x), ...flags });
     if (!(await Modo.ehDono(client, interaction.user.id))) return resp('Só o dono usa este comando.');
     const sub = interaction.options.getSubcommand();
