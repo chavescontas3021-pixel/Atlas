@@ -1,5 +1,3 @@
-// Enquetes do Atlas: votação por botão, com barras ao vivo.
-// Fica salva no banco, então continua funcionando depois que o bot reinicia.
 const db = require('../db');
 const UI = require('../ui/componentes');
 const { S, barra, corta } = require('../ui/tema');
@@ -52,7 +50,6 @@ function criar(msgId, dados) {
 const buscar = (msgId) => db.get(chave(msgId), null);
 const salvar = (msgId, e) => db.set(chave(msgId), e);
 
-// Clicar na mesma opção de novo tira o voto; clicar em outra troca.
 function votar(msgId, userId, indice) {
   const e = buscar(msgId);
   if (!e || e.encerrada || indice < 0 || indice >= e.opcoes.length) return null;

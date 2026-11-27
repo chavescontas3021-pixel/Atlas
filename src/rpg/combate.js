@@ -1,14 +1,12 @@
-// Combate por turnos (monstros) e simulação de duelos.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { CLASSES, ITENS, MONSTROS } = require('./dados');
 const N = require('./nucleo');
 const B = require('../personagem/batalha');
 const Pers = require('../personagem/nucleo');
 
-// Visual do golpe de cada classe no GIF
 const VISUAL = { guerreiro: 'cruz', mago: 'explosao', arqueiro: 'flechas', curandeiro: 'luz', ladino: 'furtivo' };
 
-const ativos = new Map(); // userId -> estado do combate
+const ativos = new Map();
 const EXPIRA = 10 * 60 * 1000;
 
 const rolar = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -104,7 +102,6 @@ function agir(e, j, tipo) {
     return { fim: 'vitoria' };
   }
 
-  // Turno do monstro
   if (Math.random() * 100 < N.esquiva(j)) {
     linhas.push(`💨 Você desviou do ataque de ${m.nome}!`);
     reg({ por: 'b', tipo: 'atq', visual: 'corte', esq: true });
@@ -163,7 +160,6 @@ function embedCombate(e, j) {
     .setFooter({ text: e.cdHab > 0 ? `${cl.hab.nome}: recarga ${e.cdHab} turno(s)` : `${cl.hab.nome}: pronta! · ${cl.hab.desc}` });
 }
 
-// GIF da cena do turno (fim: 'vitoria' | 'derrota' | 'fuga' | undefined). Devolve a lista de arquivos para a mensagem.
 function arquivos(e, j, fim) {
   if (fim === 'fuga') return [];
   const m = e.monstro;
@@ -204,7 +200,6 @@ function botoes(userId, desativar = false) {
   )];
 }
 
-// Duelo: ambos com vida cheia, simulado automaticamente.
 function simularDuelo(a, b) {
   const mk = (j) => ({ j, hp: j.hpMax, cd: 0 });
   const A = mk(a);
@@ -241,4 +236,3 @@ function simularDuelo(a, b) {
 }
 
 module.exports = { iniciar, obterAtivo, agir, finalizar, embedCombate, embedFim, arquivos, botoes, simularDuelo };
-// fim do arquivo

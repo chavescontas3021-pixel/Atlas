@@ -60,7 +60,6 @@ module.exports = {
       return interaction.editReply(`✅ Destaque entregue a <@${r.uid}> (${r.n} mensagens)${r.deu ? '' : ' — mas não consegui dar o cargo (confira se o cargo do Atlas está acima dele).'}`);
     }
 
-    // ---------- config ----------
     const cargo = interaction.options.getRole('cargo');
     const canal = interaction.options.getChannel('canal');
     const minimo = interaction.options.getInteger('minimo');

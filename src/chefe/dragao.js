@@ -1,12 +1,9 @@
-// Dragão preto e vermelho em pixel art, com 2 quadros (asa e fogo mexendo).
-// O GIF é montado aqui mesmo, sem precisar de nenhuma biblioteca extra.
 const { AttachmentBuilder } = require('discord.js');
 
-const ESCALA = 8; // cada pixel vira 8x8
-const ATRASO = 50; // 50 centésimos de segundo = 0,5 s por quadro
+const ESCALA = 8;
+const ATRASO = 50;
 const NOME = 'dragao.gif';
 
-// Cores: 0 fundo · 1 preto · 2 cinza escuro · 3 vermelho · 4 vermelho escuro · 5 laranja · 6 amarelo · 7 branco · 8 estrela
 const PALETA = [
   [27, 21, 34],
   [11, 10, 16],
@@ -19,7 +16,6 @@ const PALETA = [
   [107, 95, 128],
 ];
 
-// Cada letra é um pixel (número = cor da paleta). 48 colunas x 32 linhas.
 const QUADROS = [
   [
     '000000000000000000000000000000000000000000000000',
@@ -91,7 +87,6 @@ const QUADROS = [
   ],
 ];
 
-// Compressão LZW usada pelo formato GIF
 function lzw(indices, minCode) {
   const clear = 1 << minCode;
   const eoi = clear + 1;
@@ -144,9 +139,9 @@ function montarGif() {
   const alt = QUADROS[0].length * ESCALA;
   const out = [];
   out.push(...Buffer.from('GIF89a'));
-  out.push(...u16(larg), ...u16(alt), 0xf3, 0, 0); // tabela global de 16 cores
+  out.push(...u16(larg), ...u16(alt), 0xf3, 0, 0);
   for (let i = 0; i < 16; i++) out.push(...(PALETA[i] || [0, 0, 0]));
-  out.push(0x21, 0xff, 0x0b, ...Buffer.from('NETSCAPE2.0'), 0x03, 0x01, 0, 0, 0); // repete para sempre
+  out.push(0x21, 0xff, 0x0b, ...Buffer.from('NETSCAPE2.0'), 0x03, 0x01, 0, 0, 0);
   for (const quadro of QUADROS) {
     const pixels = [];
     for (const linha of quadro) {

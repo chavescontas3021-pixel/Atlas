@@ -3,9 +3,6 @@ const F = require('../formularios/fluxo');
 
 const EPH = MessageFlags.Ephemeral;
 
-// Botões e janelas dos formulários:
-//   form:...     -> quem está respondendo (funciona no privado com o Atlas)
-//   formadm:...  -> staff vendo os formulários entregues
 module.exports = {
   name: 'interactionCreate',
   async execute(client, interaction) {

@@ -1,4 +1,3 @@
-// Sub dona: vigia entradas em massa (raid) e dá os cargos de entrada das rotinas.
 const Vigia = require('../subdona/vigia');
 const Rotinas = require('../subdona/rotinas');
 

@@ -1,25 +1,21 @@
-// Cenas de batalha em pixel art (GIF): herói contra monstro ou herói contra herói.
-// Cada turno vira um GIF com o golpe, o número de dano, o tremor do alvo e as barras de vida.
 const { AttachmentBuilder } = require('discord.js');
 const { montar } = require('../extras/pixelgif');
 const A = require('./arte');
-const { ESPECIAIS } = require('./especiais');
 const M = require('./monstros');
 const Cen = require('./cenarios');
 const Efx = require('./efeitos');
-const MM = require('./monstros-masmorra'); // registra os monstros e cenários das masmorras
+const MM = require('./monstros-masmorra');
 const CHEFES = new Set(MM.CHEFES.map((c) => c[0]));
 
 const W = 84;
 const H = 56;
-const CHAO = 51; // linha dos pés
-const D = CHAO - 47; // deslocamento do cenário
+const CHAO = 51;
+const D = CHAO - 47;
 const ESCALA = 5;
-const CX = { e: 20, d: 61 }; // centro de cada lado
+const CX = { e: 20, d: 61 };
 const K = '#0d0912';
 const ARQUIVO = 'batalha.gif';
 
-// ---------- utilitários ----------
 const toRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const toHex = (c) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 const mistura = (a, b, f) => { const x = toRgb(a); const y = toRgb(b); return toHex(x.map((v, i) => v + (y[i] - v) * f)); };
@@ -42,16 +38,14 @@ function anel(g, cx, cy, r, c, espessura = 1) {
   }
 }
 
-// ---------- sprites ----------
 const cacheHeroi = new Map();
 function gradeHeroi(app, t) {
   const a = A.normalizar(app);
   const chave = `${JSON.stringify(a)}:${t % 4}`;
   if (!cacheHeroi.has(chave)) {
     if (cacheHeroi.size > 120) cacheHeroi.delete(cacheHeroi.keys().next().value);
-    const esp = a.especial && ESPECIAIS[a.especial] && ESPECIAIS[a.especial].sprite ? ESPECIAIS[a.especial] : null;
-    const letras = esp ? esp.sprite(a, esp.quadros[t % 4]) : A.desenharPersonagem(a, A.QUADROS[t % 4]);
-    const cores = esp ? esp.cores(a) : A.coresDe(a);
+    const letras = A.desenharPersonagem(a, A.QUADROS[t % 4]);
+    const cores = A.coresDe(a);
     cacheHeroi.set(chave, letras.map((l) => l.map((c) => (c === '.' ? null : cores[c] || null))));
   }
   return cacheHeroi.get(chave);
@@ -64,12 +58,11 @@ function dissolver(g, p) {
   return g.map((l, y) => l.map((c, x) => {
     if (!c) return c;
     const h = ((x * 37 + y * 17) % 23) / 23;
-    const sobe = 1 - y / alt; // as partes de cima somem primeiro
+    const sobe = 1 - y / alt;
     return h * 0.7 + (1 - sobe) * 0.3 < p ? null : c;
   }));
 }
 
-// ---------- cenário ----------
 const CEU = ['#0a0716', '#0f0b24', '#150e30', '#1d1342', '#281a56', '#331f66'];
 const ESTRELAS = [[3, 2], [9, 6], [15, 1], [22, 4], [29, 2], [38, 5], [44, 3], [53, 8], [60, 2], [6, 12], [19, 10], [33, 9], [26, 14], [47, 13], [58, 15], [12, 16], [41, 10], [66, 5], [74, 3], [80, 9], [70, 18], [78, 14], [64, 14]];
 const cacheFundo = [];
@@ -92,7 +85,6 @@ function fundo(t) {
   for (const [x, y, w, h] of [[1, 24 + D, 4, 16], [6, 28 + D, 3, 12], [10, 21 + D, 4, 19], [3, 34 + D, 8, 6], [15, 32 + D, 3, 8]]) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) g[j][i] = cor;
   for (const [x, y] of [[1, 23], [3, 23], [6, 27], [8, 27], [10, 20], [12, 20], [13, 20]]) g[y + D][x] = cor;
   g[26 + D][2] = t % 2 ? '#f2c15a' : '#b8892f'; g[25 + D][12] = '#f2c15a'; g[32 + D][7] = '#b8892f';
-  // segundo castelo, à direita, bem longe
   for (const [x, y, w, h] of [[76, 30 + D, 4, 10], [80, 33 + D, 3, 7]]) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) g[j][i] = cor;
   for (let y = CHAO - 2; y < H; y++) for (let x = 0; x < W; x++) g[y][x] = y === CHAO - 2 ? '#3a3050' : y === CHAO - 1 ? '#2a2238' : '#1c1628';
   for (let y = CHAO; y < H; y++) for (let x = 0; x < W; x++) if ((x + y * 3) % 12 === 0) g[y][x] = '#2e2644';
@@ -101,7 +93,6 @@ function fundo(t) {
   return g.map((l) => l.slice());
 }
 
-// ---------- números de dano (fonte 3x5) ----------
 const FONTE = { 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001', 5: '111100111001111', 6: '111100111101111', 7: '111001001001001', 8: '111101111101111', 9: '111101111001111', '+': '000010111010000', '!': '010010010000010' };
 function numero(g, cx, y, txt, cor) {
   const larg = txt.length * 4 - 1;
@@ -112,7 +103,6 @@ function numero(g, cx, y, txt, cor) {
   for (const [x, yy] of pontos) px(g, x, yy, cor);
 }
 
-// ---------- efeitos de golpe ----------
 function corte(g, x, y, prog, s, cor, esp = 2) {
   const x0 = x - 6 * s; const y0 = y - 7; const x1 = x + 6 * s; const y1 = y + 7;
   lin(g, x0, y0, x0 + (x1 - x0) * prog, y0 + (y1 - y0) * prog, cor, esp);
@@ -129,7 +119,6 @@ function brilhos(g, x, y, t, cor) {
   pts.forEach(([a, b], i) => { const yy = y + b - ((t * 2 + i) % 5); px(g, x + a, yy, i % 2 ? '#ffffff' : cor); if (i % 2 === 0) { px(g, x + a - 1, yy, cor); px(g, x + a + 1, yy, cor); px(g, x + a, yy - 1, cor); px(g, x + a, yy + 1, cor); } });
 }
 
-// visual: corte | cruz | explosao | flechas | luz | furtivo
 function efeito(g, ev, i, de, para, s) {
   const crit = ev.crit;
   const alvoY = para.y;
@@ -190,7 +179,6 @@ function barras(g, hp, max) {
   desenhar(W - 33, 30, hp.b, max.b, hp.b / max.b > 0.3 ? '#e0455a' : '#ff2b3b');
 }
 
-// ---------- montagem do quadro ----------
 function poe(g, spr, cx, dx, dy, bola) {
   if (!spr) return;
   const w = spr[0].length; const h = spr.length;
@@ -205,7 +193,6 @@ function sombra(g, cx, w) {
 }
 
 function quadro(cfg, o) {
-  // Monstros das masmorras lutam no cenário da própria masmorra
   const tema = cfg.dir.tipo === 'monstro' ? Cen.temaDe(cfg.dir.nome) : null;
   let g = (tema && Cen.fundo(tema, o.t)) || fundo(o.t);
   const sprs = { e: gradeAtor(cfg.esq, o.t), d: gradeAtor(cfg.dir, o.t) };
@@ -218,7 +205,6 @@ function quadro(cfg, o) {
     if (est.dissolve) spr = dissolver(spr, est.dissolve);
     est.sprite = spr;
   }
-  // Aura do nível, atrás de cada herói
   for (const l of ['e', 'd']) {
     const ator = cfg[l === 'e' ? 'esq' : 'dir'];
     if (ator.tipo === 'heroi' && ator.app) {
@@ -237,14 +223,13 @@ function quadro(cfg, o) {
     const de = info[o.ev.por === 'a' ? 'e' : 'd'];
     const para = info[o.ev.por === 'a' ? 'd' : 'e'];
     const s = o.ev.por === 'a' ? 1 : -1;
-    // Monstros usam o ataque do seu tipo (garra, fogo, veneno...); o golpe devastador do Boss tem efeito próprio
     const atk = o.ev.por === 'b' && cfg.dir.tipo === 'monstro' ? Efx.ataqueDe(cfg.dir.nome, o.ev) : null;
     Efx.efeito(g, o.ev, o.i, de, para, s, atk);
     if (o.ev.aviso && cfg.dir.tipo === 'monstro' && o.i >= 2) {
       Efx.avisoBoss(g, o.i, info.d);
       if (o.i === 3) numero(g, info.d.x, Math.max(8, info.d.topo - 8), '!', '#ff4040');
     }
-    g = Efx.tremor(g, o.ev, o.i); // a tela treme no impacto (as barras de vida ficam paradas)
+    g = Efx.tremor(g, o.ev, o.i);
     if (o.i >= 2 && !o.ev.esq && o.ev.tipo !== 'def') {
       const rise = o.i === 2 ? 0 : 3;
       if (o.ev.tipo === 'poc') numero(g, de.x, Math.max(8, de.topo - 7 - rise), `+${o.ev.cura || 0}`, '#6dff7a');
@@ -265,8 +250,6 @@ function quadro(cfg, o) {
 
 const ATRASOS = [9, 7, 11, 18];
 
-// O GIF aceita no máximo 256 cores. Se uma cena passar disso (herói colorido + cenário detalhado + efeitos),
-// arredonda as cores aos poucos até caber, em vez de dar erro.
 function montarSeguro(quadros, atraso) {
   const tentar = (qs) => montar(qs, { escala: ESCALA, atraso });
   const demais = (e) => /Cores demais/.test(e.message);
@@ -324,4 +307,3 @@ function gif(cfg) {
 const anexo = (cfg) => new AttachmentBuilder(gif(cfg), { name: ARQUIVO });
 
 module.exports = { ARQUIVO, W, H, gif, quadro, anexo, gradeHeroi, efeito, numero, mistura, tintar, dissolver, px, ret, elip, lin, anel, K };
-// fim do arquivo

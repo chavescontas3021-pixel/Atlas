@@ -34,23 +34,17 @@ module.exports = {
       }
 
       if (interaction.isButton()) {
-        if (acao === 'esp') {
-          if (!P.desbloqueios(uid).includes(parte)) return await interaction.reply({ content: 'Esse personagem não está liberado para você.', flags: EPH });
-          app.especial = app.especial === parte ? '' : parte;
-          P.salvar(uid, app);
-          return await interaction.update(P.painel(uid, 'cabelo', app.especial ? `${P.ESPECIAIS[parte].emoji} Personagem único ligado!` : 'Voltou ao visual montado.'));
-        }
         if (acao === 'equip') {
-          app.mostrarEquip = app.mostrarEquip === false; // liga/desliga o equipamento e a aura no desenho
+          app.mostrarEquip = app.mostrarEquip === false;
           P.salvar(uid, app);
           return await interaction.update(P.painel(uid, parte && A.CATALOGO[parte] ? parte : 'cabelo', app.mostrarEquip ? '⚔️ Equipamento e aura aparecendo no desenho.' : '🙈 Equipamento e aura ocultos.'));
         }
         if (acao === 'rand') {
-          P.salvar(uid, { ...A.aleatoria(), especial: app.especial, mostrarEquip: app.mostrarEquip });
+          P.salvar(uid, { ...A.aleatoria(), mostrarEquip: app.mostrarEquip });
           return await interaction.update(P.painel(uid, parte && A.CATALOGO[parte] ? parte : 'cabelo', '🎲 Visual sorteado! Ajuste o que quiser.'));
         }
         if (acao === 'reset') {
-          P.salvar(uid, { ...A.PADRAO, especial: '', mostrarEquip: app.mostrarEquip });
+          P.salvar(uid, { ...A.PADRAO, mostrarEquip: app.mostrarEquip });
           return await interaction.update(P.painel(uid, parte && A.CATALOGO[parte] ? parte : 'cabelo', '↩️ Voltou ao visual padrão.'));
         }
         if (acao === 'fim') {
@@ -68,4 +62,3 @@ module.exports = {
     }
   },
 };
-// fim do arquivo

@@ -1,4 +1,3 @@
-// A cerimônia: o Atlas faz de padre, faz as perguntas e os noivos respondem pelos botões.
 const {
   ActionRowBuilder,
   ButtonBuilder,
@@ -14,11 +13,10 @@ const N = require('./nucleo');
 const EPH = MessageFlags.Ephemeral;
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const pausa = () => dormir(N.ajustes.pausa);
-const avancando = new Set(); // canais que estão trocando de passo agora
+const avancando = new Set();
 const TEMPO_OBJECAO = () => (N.ajustes.pausa === 0 ? 20 : 20000);
-const TEMPO_PADRINHOS = () => (N.ajustes.pausa === 0 ? 20 : 90000); // 90 segundos para as bênçãos
+const TEMPO_PADRINHOS = () => (N.ajustes.pausa === 0 ? 20 : 90000);
 
-// Os passos depois da abertura. "ambos" = os dois noivos precisam clicar.
 const PASSOS = [
   {
     id: 'vontade', tipo: 'ambos', titulo: '💍 Primeira pergunta',
@@ -31,7 +29,7 @@ const PASSOS = [
     texto: '{a}, você aceita {b} como seu amor, para estar ao lado dessa pessoa na alegria e na tristeza, nos dias fáceis e nos difíceis, cuidando e sendo cuidado(a)?\nE você, {b}, aceita {a} do mesmo jeito?',
     sim: 'Aceito!',
   },
-  { id: 'padrinhos', tipo: 'padrinhos' }, // só acontece se o casal escolheu padrinhos
+  { id: 'padrinhos', tipo: 'padrinhos' },
   { id: 'objecao', tipo: 'objecao' },
   { id: 'fim', tipo: 'fim' },
 ];
@@ -48,7 +46,6 @@ async function canalDe(client, c) {
   return client.channels.cache.get(c.canalId) || (await client.channels.fetch(c.canalId).catch(() => null));
 }
 
-// ---------- Começar ----------
 async function iniciar(client, c) {
   const canal = await canalDe(client, c);
   if (!canal) return { erro: 'Não encontrei o canal do casamento.' };
@@ -61,7 +58,7 @@ async function iniciar(client, c) {
   c.resp = {};
   c.votos = {};
   N.salvarCerimonia(c);
-  await N.travarConvidados(canal, c, true); // convidados só assistem até o fim
+  await N.travarConvidados(canal, c, true);
 
   const v = vars(c);
   const ping = { users: [c.a, c.b] };
@@ -79,7 +76,6 @@ async function iniciar(client, c) {
   return proximo(client, c.canalId);
 }
 
-// ---------- Passo a passo ----------
 async function proximo(client, canalId) {
   if (avancando.has(canalId)) return {};
   avancando.add(canalId);
@@ -89,7 +85,6 @@ async function proximo(client, canalId) {
     const canal = await canalDe(client, c);
     if (!canal) return {};
     c.passo++;
-    // pula o passo dos padrinhos se o casal não escolheu ninguém
     while (PASSOS[c.passo] && PASSOS[c.passo].tipo === 'padrinhos' && !(c.padrinhos || []).length) c.passo++;
     c.resp = {};
     c.bencaos = {};
@@ -204,7 +199,6 @@ async function finalizar(client, c, canal) {
     embeds: [embed('💋 Podem se beijar!', `Parabéns, ${v.a} e ${v.b}! 🎉🥂\nQue a vida de vocês seja cheia de carinho, risadas e muita cumplicidade.${padrinhosTxt}\n\n🎊 Convidados, a festa está liberada!`, `Casados desde ${new Date(casal.desde).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`)],
   });
 
-  // Aviso público (se a staff configurou um canal de anúncios)
   const anuncioId = N.cfg('anuncio');
   const anuncio = anuncioId && anuncioId !== canal.id && canal.guild && canal.guild.channels.cache.get(anuncioId);
   if (anuncio) {
@@ -213,7 +207,6 @@ async function finalizar(client, c, canal) {
       .catch(() => {});
   }
 
-  // Cargo de casado (se a staff configurou)
   const cargoId = N.cfg('cargo');
   if (cargoId && canal.guild) {
     for (const uid of [c.a, c.b]) {
@@ -223,7 +216,6 @@ async function finalizar(client, c, canal) {
   }
 }
 
-// ---------- Interações ----------
 function ehNoivoDaCerimonia(c, uid) {
   return N.ehNoivo(c, uid);
 }

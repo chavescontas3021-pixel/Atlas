@@ -1,14 +1,10 @@
-// Sistema de parcerias: quando alguém manda um convite de servidor no canal dedicado,
-// o Atlas posta a mensagem de parceria marcando o cargo (normal) ou @everyone.
 const { EmbedBuilder } = require('discord.js');
 const db = require('../db');
 
 const COR = 0xf5a3c7;
 
-// Variáveis aceitas nos textos (fonte única: comando e site mostram essa mesma lista)
 const VARIAVEIS = '{convite} {servidor_parceiro} {representante} {promotor} {pontos} {rank} {cargo} {servidor}';
 
-// Os dois tipos de parceria
 const TIPOS = {
   normal: { nome: 'Parceria (marca o cargo)', emoji: '🤝' },
   everyone: { nome: 'Parceria @everyone', emoji: '📢' },
@@ -38,7 +34,6 @@ const REGEX_CONVITE =
 
 const cfg = (tipo, chave, padrao) => db.get(`config.parceria.${tipo}.${chave}`, padrao);
 
-// Configuração completa de um tipo, já com os textos padrão
 function conf(tipo) {
   return {
     ativo: cfg(tipo, 'ativo', false) === true,
@@ -51,7 +46,6 @@ function conf(tipo) {
   };
 }
 
-// Acha o primeiro convite de servidor no texto (ou null)
 function acharConvite(texto) {
   const m = String(texto || '').match(REGEX_CONVITE);
   if (!m) return null;
@@ -68,8 +62,6 @@ function preencher(texto, vars) {
   return String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
 }
 
-// ---------- Pontos e rank dos promotores ----------
-// Cada parceria feita vale 1 ponto para o promotor. Guardado em parceria.pontos.<id do membro>.
 const pontosTodos = () => {
   const p = db.get('parceria.pontos', {});
   return p && typeof p === 'object' ? p : {};
@@ -84,7 +76,6 @@ function definirPontos(uid, n) {
 }
 const somarPonto = (uid, delta = 1) => definirPontos(uid, pontosDe(uid) + delta);
 
-// Lista ordenada (mais pontos primeiro; empate = ordem alfabética do id, só para ficar estável)
 function ranking(limite = 10) {
   return Object.keys(pontosTodos())
     .map((uid) => ({ uid, pontos: pontosDe(uid) }))
@@ -93,20 +84,17 @@ function ranking(limite = 10) {
     .slice(0, limite);
 }
 
-// Posição no rank (empatados dividem a mesma posição). Sem pontos = último + 1.
 function rankDe(uid) {
   const meus = pontosDe(uid);
   const todos = Object.keys(pontosTodos()).map(pontosDe).filter((n) => n > 0);
   return todos.filter((n) => n > meus).length + 1;
 }
 
-// ---------- Dados tirados da mensagem do convite ----------
 function codigoDoConvite(convite) {
   const m = String(convite || '').match(/\/([A-Za-z0-9-]{2,32})\/?$/);
   return m ? m[1] : null;
 }
 
-// Nome do servidor DO CONVITE (não o servidor onde ele foi postado). null se não achar.
 async function servidorDoConvite(client, convite) {
   const codigo = codigoDoConvite(convite);
   if (!codigo) return null;
@@ -114,11 +102,10 @@ async function servidorDoConvite(client, convite) {
     const inv = await client.fetchInvite(codigo);
     return (inv && inv.guild && inv.guild.name) || null;
   } catch {
-    return null; // convite expirado/inválido
+    return null;
   }
 }
 
-// Representante = primeira pessoa marcada na mensagem do promotor (ignora bots e o próprio promotor)
 function acharRepresentante(message) {
   const u = message.mentions && message.mentions.users;
   if (!u) return null;
@@ -126,7 +113,6 @@ function acharRepresentante(message) {
   return achado ? achado.id : null;
 }
 
-// Monta a mensagem de um tipo. "preview" = não marca ninguém de verdade.
 function montar(tipo, dados, { preview = false } = {}) {
   const { membroId, convite, servidor, servidorParceiro, representanteId, pontos, rank } = dados;
   const c = conf(tipo);
@@ -148,8 +134,6 @@ function montar(tipo, dados, { preview = false } = {}) {
   const banner = bannerValido(c.banner);
   if (banner) embed.setImage(banner);
 
-  // Só o cargo (parceria normal) ou o @everyone ficam fora do embed e notificam.
-  // Promotor e representante aparecem marcados dentro do embed.
   let content;
   let allowedMentions;
   if (tipo === 'everyone') {

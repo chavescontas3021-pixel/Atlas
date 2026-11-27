@@ -1,6 +1,3 @@
-// Painel da staff dentro do canal da recepção (botão "Staff"):
-// mostrar moldes, chamar o membro, ver detalhes, mostrar os passos, reiniciar, remover o nome,
-// apagar o canal e verificar manualmente.
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags,
 } = require('discord.js');
@@ -35,7 +32,6 @@ function botoesPainel(userId) {
       botao('sf-nome', userId, 'Remover nome', '🏷️'),
       botao('sf-apagar', userId, 'Apagar canal', '🗑️', ButtonStyle.Danger)
     ),
-    // Verificação manual: fluxo próprio (recepcao/manual.js), por isso o prefixo "recmanual"
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`recmanual:abrir:${userId}`).setLabel('Verificar manualmente').setEmoji('✅').setStyle(ButtonStyle.Success)
     ),
@@ -48,7 +44,6 @@ const AVISOS = {
   apagar: () => '🗑️ Apagar este canal da recepção?\nNão dá para desfazer.',
 };
 
-// Botão "Staff" da primeira mensagem: abre o painel só para quem é da staff
 async function abrirPainel(interaction, userId) {
   if (!F.ehStaffRecepcao(interaction)) {
     return interaction.reply({ content: '❌ Só a staff pode abrir esse painel.', flags: EPH });
@@ -58,7 +53,6 @@ async function abrirPainel(interaction, userId) {
   return interaction.reply({ embeds: [painelEmbed(userId, sessao)], components: botoesPainel(userId), flags: EPH });
 }
 
-// Zera os dados do personagem e volta para o passo 1 (mantém canal, teste, mensagem inicial e "assumido")
 function zerarPersonagem(userId, sessao) {
   const { personagem, molde, emoji, nick, pedido, proposta, avisouNome, avisouEmoji, ...resto } = sessao;
   db.set(chave(userId), { ...resto, etapa: 'personagem' });
@@ -77,8 +71,6 @@ async function mostrarMoldes(interaction, sessao) {
   return interaction.reply({ content: '✅ Moldes enviados no canal.', flags: EPH });
 }
 
-// Manda a mensagem de passos no canal. Os botões (Verificar / Trocar personagem) só vêm junto quando o
-// membro já está na etapa dos passos, porque antes disso eles não funcionariam.
 async function mostrarPassos(interaction, userId, sessao) {
   const carga = {
     content: `<@${userId}>`,
@@ -161,13 +153,11 @@ async function reiniciar(interaction, userId, sessao) {
 async function apagar(interaction, userId) {
   const canal = interaction.channel;
   db.remover(chave(userId));
-  // Lembra que a staff encerrou: sem isso a recepção voltava a abrir sozinha depois de um tempo
   db.set(`recepcao.dispensados.${userId}`, Date.now());
   await interaction.update({ content: '🗑️ Apagando o canal...', embeds: [], components: [] });
   setTimeout(() => canal.delete(`Recepção apagada por ${interaction.user.username}`).catch(() => {}), 1500);
 }
 
-// Todos os botões "sf-..." e "sfc-..." (a checagem de staff é feita aqui)
 async function tratar(interaction, acao, userId) {
   if (!F.ehStaffRecepcao(interaction)) {
     return interaction.reply({ content: '❌ Só a staff pode usar isso.', flags: EPH });

@@ -1,5 +1,3 @@
-// Dá ou tira cargos de um membro, respeitando a hierarquia do servidor.
-// acao: 'add' ou 'remover'. Retorna um texto com o resultado de cada cargo.
 async function alterarCargos(executor, alvo, cargos, acao) {
   const guild = alvo.guild;
   const eu = guild.members.me ?? (await guild.members.fetchMe());

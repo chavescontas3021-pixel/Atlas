@@ -1,6 +1,3 @@
-// Efeitos de batalha em pixel art: arcos de golpe, faíscas, bola de fogo, chuva de flechas, pilar de luz,
-// ataques próprios dos monstros (garra, mordida, fogo, veneno, sombra), tremor de tela e a queda do Boss.
-// Cada golpe tem 4 quadros: 0 preparo, 1 ataque, 2 impacto, 3 efeito se dissipando.
 const W = 84;
 const H = 56;
 const CHAO = 51;
@@ -22,7 +19,6 @@ function aro(g, cx, cy, rx, ry, c) {
   for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2; px(g, cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, c); }
 }
 
-// ---------- Paletas ----------
 const HEROI = { claro: '#ffffff', medio: '#ffe9a8', forte: '#ffb347', sombra: '#a8731a' };
 const MONSTRO = { claro: '#ffffff', medio: '#ff9a9a', forte: '#e0455a', sombra: '#7a1a2a' };
 const FOGO = ['#fff4b8', '#ffd24a', '#ff7a1c', '#c8340f', '#4a4058'];
@@ -30,8 +26,6 @@ const VENENO = ['#e8ffd0', '#9aff6a', '#4cd964', '#1f7a3a'];
 const SOMBRA = ['#f0e6ff', '#c8b8ff', '#8a52d8', '#47246e'];
 const LUZ = ['#ffffff', '#fff4b8', '#f2c230', '#a8731a'];
 
-// ---------- Peças reutilizáveis ----------
-// Arco em forma de lua crescente, afinando nas pontas (p = quanto do arco já foi desenhado)
 function arco(g, cx, cy, r, a0, a1, p, s, esp, cor, nucleo, rot = 0) {
   const n = Math.max(10, Math.round(Math.abs(a1 - a0) * r * 1.6));
   const fim = Math.floor(n * p);
@@ -64,11 +58,10 @@ function onda(g, x, y, i, cor, ry = 1, grande = 1) {
   if (i < 2) return;
   aro(g, x, y, (i === 2 ? 5 : 10) * grande, (i === 2 ? 5 : 10) * grande * ry, cor);
 }
-// "Clarão": um flash por tramado (não cria cores novas)
 function clarao(g, x, y, r, cor = '#ffffff') {
   for (let yy = Math.floor(y - r); yy <= Math.ceil(y + r); yy++) for (let xx = Math.floor(x - r); xx <= Math.ceil(x + r); xx++) {
     const d = Math.hypot(xx - x, (yy - y) * 1.1) / r;
-    if (d < 1 && d > 0.55 && (xx + yy) % 2 === 0) px(g, xx, yy, cor); // só a borda: o monstro continua visível
+    if (d < 1 && d > 0.55 && (xx + yy) % 2 === 0) px(g, xx, yy, cor);
   }
 }
 function rastro(g, x0, y0, x1, y1, cor) {
@@ -84,7 +77,6 @@ function espiral(g, x, y, i, cor, cor2, n = 6) {
   }
 }
 
-// ---------- Golpes dos heróis ----------
 function golpeCorte(g, i, para, s, P, crit, rot = 0.3) {
   const cx = para.x - s * 9; const cy = para.y;
   if (i === 1) arco(g, cx, cy, 12, -1.05, 1.05, 0.55, s, 3.4, P.forte, P.medio, rot);
@@ -164,7 +156,6 @@ function golpeFurtivo(g, i, de, para, s) {
   }
 }
 
-// ---------- Ataques dos monstros ----------
 function ataqueGarra(g, i, para, s) {
   for (let k = 0; k < 3; k++) {
     const ox = k * 4 * s; const oy = (k - 1) * 3;
@@ -236,7 +227,6 @@ function ataqueSombra(g, i, de, para, s) {
   }
   if (i === 3) { aro(g, para.x, para.y, 9, 9, SOMBRA[2]); for (let k = 0; k < 6; k++) px(g, para.x - 7 + k * 2.8, para.y - 3 + ((k * 3) % 6), SOMBRA[k % 2 ? 1 : 3]); }
 }
-// O golpe devastador do Boss: arcos enormes, onda de choque no chão e rachaduras
 function ataqueDevastador(g, i, para, s) {
   const cx = para.x - s * 10; const cy = para.y;
   if (i === 1) arco(g, cx, cy, 15, -1.15, 1.15, 0.55, s, 6, MONSTRO.forte, MONSTRO.medio, 0.5);
@@ -252,7 +242,6 @@ function ataqueDevastador(g, i, para, s) {
   }
 }
 
-// Que tipo de ataque o monstro usa (pelo nome)
 function ataqueDe(nome, ev) {
   if (ev && ev.forte) return 'devastador';
   const n = String(nome || '');
@@ -265,7 +254,6 @@ function ataqueDe(nome, ev) {
   return 'corte';
 }
 
-// ---------- Ponto de entrada ----------
 function efeito(g, ev, i, de, para, s, ataque) {
   const crit = !!ev.crit;
   if (ev.tipo === 'def') {
@@ -301,11 +289,9 @@ function efeito(g, ev, i, de, para, s, ataque) {
   else if (v === 'devastador') ataqueDevastador(g, i, para, s);
   else golpeCorte(g, i, para, s, P, crit);
   if (ev.cura && i >= 1) espiral(g, de.x, de.y, i, v === 'luz' ? '#ffe14a' : '#5cff6a', '#ffffff');
-  // clarão no impacto de críticos e do golpe devastador
   if (i === 2 && (crit || ev.forte)) clarao(g, para.x, para.y, ev.forte ? 20 : 13, '#ffffff');
 }
 
-// Aviso do Boss: um "!" vermelho e uma aura pulsando em cima dele, no fim do turno em que ele se prepara
 function avisoBoss(g, i, info) {
   if (i < 2) return;
   const cor = i % 2 ? '#ff4040' : '#ff9a9a';
@@ -313,7 +299,6 @@ function avisoBoss(g, i, info) {
   if (i === 3) aro(g, info.x, info.y, info.w * 0.72, info.h * 0.66, '#e0455a');
 }
 
-// Tremor de tela: desloca a cena inteira (as barras de vida são desenhadas depois, então ficam paradas)
 function tremor(g, ev, i) {
   if (!ev || ev.esq || ev.tipo === 'poc' || ev.tipo === 'def' || ev.dano == null) return g;
   const amp = [0, 0, ev.forte ? 3 : ev.crit ? 2 : 1, ev.forte ? 2 : ev.crit ? 1 : 0][i];
@@ -324,7 +309,6 @@ function tremor(g, ev, i) {
   return out;
 }
 
-// Queda de quem perdeu: almas subindo; o Boss solta ondas de choque e deixa moedas
 function fim(g, k, info, boss) {
   if (!info) return;
   for (let j = 0; j < 7; j++) {
@@ -349,7 +333,6 @@ function tremorFim(g, k, boss) {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) out[y][x] = g[Math.max(0, Math.min(H - 1, y - dy))][Math.max(0, Math.min(W - 1, x - dx))];
   return out;
 }
-// Quem venceu comemora com estrelinhas piscando
 function vitoria(g, k, info) {
   if (!info || k < 1) return;
   for (const [dx, dy, ph] of [[-8, -4, 0], [9, -8, 1], [0, -14, 2]]) {
@@ -359,4 +342,3 @@ function vitoria(g, k, info) {
 }
 
 module.exports = { efeito, ataqueDe, avisoBoss, tremor, tremorFim, fim, vitoria, clarao, estrela };
-// fim do arquivo

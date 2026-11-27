@@ -1,6 +1,3 @@
-// Gerador de GIF animado em pixel art, sem bibliotecas: usado pelos personagens e (depois) pelos combates.
-// Cada quadro é uma grade de cores "#rrggbb"; o GIF é ampliado pela escala (pixels grandes e nítidos).
-
 function lzw(indices, minCode) {
   const clear = 1 << minCode;
   const eoi = clear + 1;
@@ -49,8 +46,6 @@ function lzw(indices, minCode) {
 const u16 = (n) => [n & 255, (n >> 8) & 255];
 const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
 
-// quadros: [grade, grade, ...] onde grade = array de linhas, cada linha = array de "#rrggbb"
-// atraso em centésimos de segundo (ex.: 40 = 0,4 s)
 function montar(quadros, { escala = 6, atraso = 40 } = {}) {
   const alt = quadros[0].length;
   const larg = quadros[0][0].length;
@@ -75,7 +70,7 @@ function montar(quadros, { escala = 6, atraso = 40 } = {}) {
   out.push(...Buffer.from('GIF89a'));
   out.push(...u16(W), ...u16(H), 0x80 | ((bits - 1) << 4) | (bits - 1), 0, 0);
   for (let i = 0; i < 1 << bits; i++) out.push(...(paleta[i] ? rgb(paleta[i]) : [0, 0, 0]));
-  out.push(0x21, 0xff, 0x0b, ...Buffer.from('NETSCAPE2.0'), 0x03, 0x01, 0, 0, 0); // repete para sempre
+  out.push(0x21, 0xff, 0x0b, ...Buffer.from('NETSCAPE2.0'), 0x03, 0x01, 0, 0, 0);
   for (const g of quadros) {
     const pixels = new Array(W * H);
     let p = 0;
@@ -102,4 +97,3 @@ function montar(quadros, { escala = 6, atraso = 40 } = {}) {
 }
 
 module.exports = { montar, rgb };
-// fim do arquivo

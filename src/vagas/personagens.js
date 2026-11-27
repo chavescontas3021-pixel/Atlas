@@ -1,10 +1,8 @@
-// Busca de personagens no AniList (gratuito, sem chave) para o /vaga pedir.
-// Cobre animes e mangás. Obras de fora entram pelo pedido manual (campo "obra").
 const URL_API = 'https://graphql.anilist.co';
 const TTL = 10 * 60 * 1000;
 
-const buscas = new Map(); // texto normalizado -> { quando, itens }
-const detalhes = new Map(); // id -> { nome, obra, foto }
+const buscas = new Map();
+const detalhes = new Map();
 
 const BUSCA = `query($s:String){Page(perPage:20){characters(search:$s,sort:SEARCH_MATCH){id name{full} image{medium} media(perPage:1,sort:POPULARITY_DESC){nodes{title{romaji english}}}}}}`;
 const POR_ID = `query($id:Int){Character(id:$id){id name{full} image{medium} media(perPage:1,sort:POPULARITY_DESC){nodes{title{romaji english}}}}}`;
@@ -35,7 +33,6 @@ async function consulta(query, variables, ms) {
   return j.data;
 }
 
-// Lista de personagens que combinam com o texto. Nunca lança erro: devolve [] se o AniList não responder.
 async function buscar(texto, ms = 2000) {
   const chave = limpar(texto);
   if (chave.length < 2) return [];
@@ -52,7 +49,6 @@ async function buscar(texto, ms = 2000) {
   }
 }
 
-// Detalhes de um personagem pelo id (usa o que a busca já guardou; senão pergunta ao AniList)
 async function porId(id, ms = 6000) {
   const g = detalhes.get(String(id));
   if (g) return g;
@@ -65,4 +61,3 @@ async function porId(id, ms = 6000) {
 }
 
 module.exports = { buscar, porId, limpar };
-// fim do arquivo

@@ -1,11 +1,8 @@
-// Monstros das masmorras (pixel art, 4 quadros cada) e a ligação deles com os cenários.
-// Os que reaproveitam o desenho de um monstro comum só ganham um nome novo (alias).
 const M = require('./monstros');
 const Cen = require('./cenarios');
 
 const { K, nova, px, ret, elip, lin, poli, corpo, contorno } = M;
 
-// ---------- Catacumbas ----------
 function rato(t) {
   const g = nova(30, 18);
   const pel = ['#4a3d3a', '#8a7a72', '#cfc0b4'];
@@ -57,8 +54,6 @@ function zumbi(t) {
   return contorno(g);
 }
 
-// ---------- Ninho da Aranha ----------
-// Aranha vista de lado: abdômen à direita, cabeça à esquerda, oito patas que se alternam
 function aranhaBase(t, c) {
   const g = nova(c.w, c.h);
   const chao = c.h - 1;
@@ -108,12 +103,10 @@ function escorpiao(t) {
   for (let i = 0; i < 4; i++) { const x = 12 + i * 4; lin(g, x, 17, x - 2 + (i + t) % 2 * 2, 23, pal[0], 1); lin(g, x + 1, 17, x + 3 + (i + t) % 2, 23, pal[1], 1); }
   corpo(g, 20, 16, 9, 4.6, pal);
   for (const x of [15, 19, 23, 27]) ret(g, x, 12, 1, 8, pal[0]);
-  // cauda curvada com ferrão
   const cauda = [[27, 14], [32, 11], [34, 6], [31, 2 + (t % 2)], [27, 3 + (t % 2)]];
   for (let i = 0; i < cauda.length - 1; i++) lin(g, cauda[i][0], cauda[i][1], cauda[i + 1][0], cauda[i + 1][1], pal[1], 3);
   poli(g, [[27, 1 + (t % 2)], [27, 6 + (t % 2)], [23, 4 + (t % 2)]], '#d8d0f0');
   px(g, 24, 8 + (t % 2) * 2, '#7dff6a');
-  // pinças
   const ab2 = ab ? 2 : 0;
   lin(g, 11, 14, 5, 12 - ab2, pal[1], 2); lin(g, 11, 17, 5, 18 + ab2, pal[1], 2);
   poli(g, [[5, 11 - ab2], [0, 12 - ab2], [5, 14]], pal[2]); poli(g, [[5, 17], [0, 17 + ab2], [5, 19 + ab2]], pal[2]);
@@ -122,24 +115,18 @@ function escorpiao(t) {
   return contorno(g);
 }
 
-// ---------- Fortaleza do Rei Caído ----------
 function soldado(t) {
   const g = nova(26, 36);
   const m = t % 2;
   const ferro = ['#3a3e4e', '#7a8094', '#b8bfd4'];
-  // lança para frente (esquerda)
   const lx = t === 1 || t === 2 ? 0 : 2;
   ret(g, lx, 17, 14, 1, '#6b4426'); poli(g, [[lx - 1, 15], [lx - 1, 20], [lx - 5 < 0 ? 0 : lx - 3, 17.5]], '#d4dbef');
-  // pernas
   ret(g, 9, 26, 4, 9, '#2a2434'); ret(g, 14, 26, 4, 9, '#2a2434'); ret(g, 8 - m, 33, 5, 3, '#3a2a1e'); ret(g, 14 + m, 33, 5, 3, '#3a2a1e');
-  // capa esfarrapada
   poli(g, [[18, 14], [24, 20 + m], [22, 32], [17, 26]], '#6e1a30');
   corpo(g, 13, 20, 5.6, 7, ferro);
   ret(g, 9, 24, 8, 1, '#3a2418');
-  // escudo redondo
   elip(g, 16, 21, 4.4, 5.4, '#5a3a24'); elip(g, 16, 21, 3.2, 4.2, '#8a5a34'); px(g, 16, 21, '#d4a830');
   lin(g, 10, 15, lx + 8, 17, ferro[1], 2);
-  // capacete e rosto de caveira
   corpo(g, 12, 9, 5, 5, ferro);
   ret(g, 8, 8, 8, 5, '#1a1624'); ret(g, 9, 9, 2, 2, '#7dff9a'); ret(g, 13, 9, 2, 2, '#7dff9a'); ret(g, 10, 12, 5, 1, '#d8d2c0');
   ret(g, 11, 3, 2, 3, '#a01830');
@@ -149,17 +136,13 @@ function armadura(t) {
   const g = nova(28, 38);
   const fer = ['#2a2e44', '#5a6488', '#9aa6cc'];
   const fl = t % 2;
-  // chamas azuis na base (não tem pernas)
   for (let i = 0; i < 6; i++) { const x = 6 + i * 3; const a = 4 + ((i + t) % 3); poli(g, [[x, 37], [x + 1.5, 37 - a], [x + 3, 37]], i % 2 ? '#4ab8ff' : '#2a78e0'); }
   ret(g, 9, 28, 10, 5, fer[0]);
   corpo(g, 14, 22, 7, 8, fer);
   ret(g, 12, 16, 4, 12, fer[0]); ret(g, 13, 19, 2, 6, '#2a78e0');
-  // ombreiras
   elip(g, 6, 15, 4, 3.4, fer[1]); elip(g, 22, 15, 4, 3.4, fer[1]); px(g, 5, 14, fer[2]); px(g, 21, 14, fer[2]);
-  // braços e espada
   lin(g, 5, 17, 2, 25, fer[1], 3); lin(g, 23, 17, 25, 25, fer[1], 3);
   ret(g, 1, 8 + fl, 2, 20, '#c8d0e8'); ret(g, 1, 8 + fl, 1, 20, '#ffffff'); ret(g, 0, 28 + fl, 4, 1, '#c9a227');
-  // elmo vazio com olhos de chama
   corpo(g, 14, 8, 5.6, 6, fer);
   ret(g, 10, 7, 9, 5, '#05060c'); ret(g, 11, 8, 2, 2, '#6ad0ff'); ret(g, 16, 8, 2, 2, '#6ad0ff'); px(g, 11, 7, '#ffffff'); px(g, 16, 7, '#ffffff');
   poli(g, [[11, 3], [14, 0 - fl], [17, 3]], '#4ab8ff');
@@ -171,11 +154,10 @@ function arqueiro(t) {
   const m = t % 2;
   const puxa = t === 2 || t === 3;
   ret(g, 9, 26, 3, 9, osso[1]); ret(g, 14, 26, 3, 9, osso[1]); ret(g, 8 - m, 34, 5, 2, osso[0]); ret(g, 14 + m, 34, 5, 2, osso[0]);
-  ret(g, 17, 6, 4, 14, '#5a3a24'); ret(g, 18, 4, 1, 3, '#c9a227'); px(g, 19, 3, '#c9a227'); // aljava
+  ret(g, 17, 6, 4, 14, '#5a3a24'); ret(g, 18, 4, 1, 3, '#c9a227'); px(g, 19, 3, '#c9a227');
   corpo(g, 13, 19, 4.4, 7, osso);
   for (const y of [15, 18, 21]) ret(g, 10, y, 7, 1, '#2a2434');
   ret(g, 12, 13, 2, 14, osso[0]);
-  // arco
   for (let y = 6; y <= 28; y++) { const x = 2 + Math.round(2.6 * Math.sin(((y - 6) / 22) * Math.PI)); px(g, x, y, '#6b4426'); px(g, x + 1, y, '#8a5a34'); }
   lin(g, 2, 6, puxa ? 11 : 4, 17, '#e8e0cc', 1); lin(g, 2, 28, puxa ? 11 : 4, 17, '#e8e0cc', 1);
   lin(g, 9, 14, 3, 17, osso[1], 2);
@@ -186,7 +168,6 @@ function arqueiro(t) {
   return contorno(g);
 }
 
-// ---------- Covil do Dragão Negro ----------
 function dragonete(t) {
   const g = nova(38, 28);
   const es = ['#2a0a10', '#7a1a1c', '#d8452a'];
@@ -212,7 +193,6 @@ function cultista(t) {
   poli(g, [[6, 14], [10, 14], [6, 36 - fl], [2, 36 - fl]], rob[0]);
   for (const x of [8, 13, 18]) ret(g, x, 22, 1, 13, rob[2]);
   ret(g, 8, 20, 11, 2, '#c9a227');
-  // braços erguidos com bola de fogo
   lin(g, 7, 17, 2, 12, rob[1], 3); lin(g, 19, 17, 23, 12, rob[1], 3);
   const r = 3 + fl;
   elip(g, 1, 7, r, r, '#ff7a1c'); elip(g, 1, 7, r - 1.4, r - 1.4, '#ffd24a'); px(g, 1, 7, '#ffffff');
@@ -232,7 +212,6 @@ function guardiao(t) {
   corpo(g, 19, 23, 8, 9, es);
   for (let y = 16; y < 30; y += 3) for (let x = 13; x < 25; x += 3) px(g, x + ((y / 3) % 2), y, es[2]);
   ret(g, 13, 29, 12, 2, '#c9a227');
-  // escudo grande e espada
   poli(g, [[3, 15], [13, 15], [13, 30], [8, 36], [3, 30]], '#5a3a24'); poli(g, [[4.5, 16.5], [11.5, 16.5], [11.5, 29], [8, 33], [4.5, 29]], '#d8452a'); ret(g, 7, 20, 2, 7, '#ffd24a'); ret(g, 5, 23, 6, 2, '#ffd24a');
   lin(g, 26, 18, 31, 8 - m, '#c8d0e8', 2); ret(g, 29, 14, 4, 1, '#c9a227'); px(g, 31, 6 - m, '#ffffff');
   corpo(g, 17, 10, 6, 5.6, es);
@@ -243,22 +222,18 @@ function guardiao(t) {
   return contorno(g);
 }
 
-// ---------- Registro ----------
-// [nome novo, tema, desenho]
 const NOVOS = [
   ['Rato das Catacumbas', 'catacumbas', rato], ['Morcego Sombrio', 'catacumbas', morcego], ['Zumbi Podre', 'catacumbas', zumbi],
   ['Aranha Tecelã', 'ninho', aranhaTecela], ['Escorpião das Sombras', 'ninho', escorpiao], ['Aranha Caçadora', 'ninho', aranhaCacadora], ['Viúva Sombria', 'ninho', viuva],
   ['Soldado Caído', 'fortaleza', soldado], ['Armadura Assombrada', 'fortaleza', armadura], ['Arqueiro Esquelético', 'fortaleza', arqueiro],
   ['Dragonete de Brasa', 'covil', dragonete], ['Cultista do Dragão', 'covil', cultista], ['Guardião Draconiano', 'covil', guardiao],
 ];
-// Monstros comuns que ganham um nome da masmorra (mesmo desenho)
 const ALIAS = [
   ['Esqueleto da Cripta', 'catacumbas', 'Esqueleto Guerreiro'], ['Orc Carcereiro', 'catacumbas', 'Orc Brutamontes'],
   ['Golem de Teia', 'ninho', 'Golem de Pedra'],
   ['Lich Cortesão', 'fortaleza', 'Lich Ancião'], ['Cavaleiro Real Maldito', 'fortaleza', 'Cavaleiro das Trevas'],
   ['Hidra das Brasas', 'covil', 'Hidra Abissal'], ['Espectro de Cinzas', 'covil', 'Devorador de Almas'],
 ];
-// Os chefes combatem no cenário da própria masmorra
 const CHEFES = [['Lobo Infernal', 'catacumbas'], ['Aranha Gigante', 'ninho'], ['Rei Esqueleto', 'fortaleza'], ['Dragão Negro', 'covil']];
 
 for (const [nome, tema, fn] of NOVOS) { M.registrar(nome, fn); Cen.registrarTema(nome, tema); }
@@ -266,4 +241,3 @@ for (const [nome, tema, de] of ALIAS) { M.registrar(nome, (t) => M.ARTE[de](t));
 for (const [nome, tema] of CHEFES) Cen.registrarTema(nome, tema);
 
 module.exports = { NOVOS, ALIAS, CHEFES };
-// fim do arquivo

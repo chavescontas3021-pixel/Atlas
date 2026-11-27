@@ -1,7 +1,7 @@
 {
   "name": "atlas-bot",
   "version": "1.0.0",
-  "description": "Atlas - bot da house",
+  "description": "Atlas - bot de gestão de servidores do Discord",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

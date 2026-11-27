@@ -1,8 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-//  ATLAS · peças prontas de interface
-//  Use estas funções em vez de montar EmbedBuilder / ButtonBuilder na mão.
-//  Assim o bot inteiro fica com o mesmo jeito de falar e de aparecer.
-// ─────────────────────────────────────────────────────────────
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags,
   StringSelectMenuBuilder,
@@ -11,13 +6,6 @@ const { COR, S, E, trilha, corta, tirarEmoji } = require('./tema');
 
 const EPH = MessageFlags.Ephemeral;
 
-// ── Painel (o "embed" do Atlas) ──────────────────────────────
-// painel({
-//   trilha: ['Ajuda', 'Membros'],   → "ATLAS  /  Ajuda  /  Membros" no topo
-//   titulo, descricao,
-//   campos: [{ nome, valor, lado }], → lado:true deixa lado a lado
-//   rodape, imagem, thumb, perigo
-// })
 function painel({
   trilha: caminho = [], titulo, descricao, campos, rodape, imagem, thumb, perigo,
 } = {}) {
@@ -38,14 +26,9 @@ function painel({
   return e;
 }
 
-// ── Botão ────────────────────────────────────────────────────
-// O Discord NÃO deixa pintar botão de preto/branco: só existem 4 cores.
-// O estilo "secundário" é o mais próximo: cinza-escuro no tema escuro e
-// cinza-claro no tema claro. Por isso TODO botão do Atlas é secundário,
-// e as outras cores ficam só para o que realmente importa (confirmar / perigo).
 const ESTILO = {
   neutro: ButtonStyle.Secondary,
-  destaque: ButtonStyle.Primary, // use com muita moderação
+  destaque: ButtonStyle.Primary,
   perigo: ButtonStyle.Danger,
   confirmar: ButtonStyle.Success,
 };
@@ -66,11 +49,8 @@ function botao({
 
 const linha = (...itens) => new ActionRowBuilder().addComponents(...itens.flat().filter(Boolean));
 
-// Atalho: linha só de botões. botoes([{id,label}, {id,label}])
 const botoes = (lista) => linha(lista.map(botao));
 
-// ── Menu de seleção ──────────────────────────────────────────
-// menu({ id, placeholder, opcoes:[{ valor, nome, desc, padrao }] })
 function menu({
   id, placeholder = 'Escolha uma opção', opcoes, min = 1, max = 1, desabilitado = false,
 }) {
@@ -90,9 +70,6 @@ function menu({
   return linha(m);
 }
 
-// ── Paginação ────────────────────────────────────────────────
-//   «   ‹   2 / 5   ›   »
-// Os ids ficam `${base}:${pagina}` (a página vai no fim, fácil de ler no handler).
 function paginacao(base, pagina, total) {
   if (total <= 1) return null;
   const p = Math.min(Math.max(0, pagina), total - 1);
@@ -105,9 +82,6 @@ function paginacao(base, pagina, total) {
   );
 }
 
-// ── Respostas rápidas (curtas, só para quem usou) ────────────
-// nota('Salvo.')            → ● Salvo.
-// nota('Não achei', 'erro') → ○ Não achei
 function nota(texto, tipo = 'ok', { publica = false } = {}) {
   const simbolo = tipo === 'ok' ? S.ponto : S.vazio;
   const e = new EmbedBuilder()
@@ -121,29 +95,22 @@ const ok = (texto, opts) => nota(texto, 'ok', opts);
 const erro = (texto, opts) => nota(texto, 'erro', opts);
 const aviso = (texto, opts) => nota(texto, 'aviso', opts);
 
-// Converte textos antigos ("✅ Salvo", "❌ Não deu") no formato novo, sem precisar reescrever a frase.
 function auto(texto, opts) {
   const t = String(texto ?? '');
   const ehErro = /^\s*(❌|⚠️|🚫)/u.test(t);
   return nota(tirarEmoji(t) || t, ehErro ? 'erro' : 'ok', opts);
 }
 
-// Para usar em interaction.editReply / update: tira o flag "só para mim" (que só vale ao criar a mensagem).
 function edicao(payload) {
   const { flags, ...resto } = payload;
   return { components: [], ...resto };
 }
 
-// Responde ou edita, o que for possível naquele momento
 async function responder(interaction, payload) {
   if (interaction.replied || interaction.deferred) return interaction.followUp(payload);
   return interaction.reply(payload);
 }
 
-// ── Confirmação antes de ações pesadas ───────────────────────
-// Mostra o painel com [Confirmar] [Cancelar] só para quem usou o comando.
-// Devolve true se confirmou (a resposta fica "pendente": use interaction.editReply depois)
-// e false se cancelou ou o tempo acabou (aí a mensagem já foi atualizada).
 async function confirmar(interaction, {
   painel: embed, sim = 'Confirmar', nao = 'Cancelar', perigo = false, tempo = 30000,
 }) {

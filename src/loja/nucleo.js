@@ -1,14 +1,11 @@
-// Loja de itens exclusivos da house (a staff cria os itens; compra com stars).
 const db = require('../db');
 const UI = require('../ui/componentes');
 const T = require('../ui/tema');
 const R = require('../rpg/nucleo');
 const S = require('../extras/stars');
 
-
 const norm = (t) => String(t || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[_*~`|]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
-// ---------- Banco ----------
 const itens = () => Object.values(db.get('loja.itens', {}) || {}).sort((a, b) => Number(a.id) - Number(b.id));
 const obter = (id) => db.get(`loja.itens.${id}`, null);
 const salvar = (i) => db.set(`loja.itens.${i.id}`, i);
@@ -30,7 +27,6 @@ const quantasCompras = (uid, itemId) => comprasDe(uid).filter((c) => c.itemId ==
 const pedido = (id) => db.get(`loja.pedidos.${id}`, null);
 const canalPedidos = () => db.get('config.loja.canalPedidos', null);
 
-// ---------- Visual ----------
 const disponivel = (i) => i.estoque === null || i.estoque > 0;
 
 function embedLoja() {
@@ -52,7 +48,6 @@ function embedLoja() {
   });
 }
 
-// Menu de compra: só mostra o que ainda tem estoque
 function menuLoja() {
   const lista = itens().filter(disponivel).slice(0, 25);
   if (!lista.length) return null;
@@ -82,8 +77,6 @@ function embedPedido(p, estado) {
   return UI.painel({ trilha: ['Loja', 'Pedido'], titulo: p.nome, campos, rodape: `Pedido #${p.id}` });
 }
 
-// ---------- Comprar ----------
-// Retorna { erro } ou { ok, item, manual }
 async function comprar(guild, uid, item) {
   if (!R.obter(uid)) return { erro: S.SEM_RPG };
   if (item.estoque !== null && item.estoque <= 0) return { erro: 'Esse item está esgotado.' };
@@ -109,7 +102,7 @@ async function comprar(guild, uid, item) {
     try {
       await membro.roles.add(item.cargoId);
     } catch {
-      S.ganhar(uid, item.preco); // devolve
+      S.ganhar(uid, item.preco);
       return { erro: 'Não consegui dar o cargo (o cargo do bot precisa estar acima dele). Suas stars foram devolvidas.' };
     }
   }
@@ -126,7 +119,7 @@ async function comprar(guild, uid, item) {
       const msg = await canal.send({ embeds: [embedPedido(p)], components: [botaoEntrega(p.id)], allowedMentions: { parse: [] } });
       p.canalId = canal.id;
       p.msgId = msg.id;
-    } catch { /* o pedido fica salvo mesmo assim */ }
+    } catch {}
     db.set(`loja.pedidos.${p.id}`, p);
   }
   return { ok: true, item, manual: item.tipo === 'manual' };

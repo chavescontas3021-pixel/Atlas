@@ -6,7 +6,6 @@ const P = require('../vagas/personagens');
 const EPH = MessageFlags.Ephemeral;
 const ehStaff = (i) => !!(i.memberPermissions && i.memberPermissions.has(PermissionFlagsBits.ManageGuild));
 
-// Sugestões do /vaga pedir: vagas cadastradas livres + personagens do AniList (🟢 livre / 🔴 ocupado)
 async function autocompletarPedido(interaction) {
   const texto = String(interaction.options.getFocused() || '').trim();
   const foco = N.norm(texto);
@@ -64,7 +63,6 @@ async function decidir(interaction, aprovar) {
   const id = interaction.customId.split(':')[2];
   const p = N.pedido(id);
   if (!p) return interaction.update({ content: 'Esse pedido já foi resolvido.', components: [] });
-  // vaga já cadastrada, ou (pedido novo) a vaga que talvez já exista com o mesmo personagem
   let vaga = p.vagaId ? N.obter(p.vagaId) : (p.novo ? N.acharPorChave(p.chave, p.novo.nome, p.novo.grupo) : null);
 
   if (aprovar) {
@@ -114,8 +112,7 @@ module.exports = {
           if (interaction.deferred || interaction.replied) await interaction.editReply(msg);
           else await interaction.reply({ content: msg, flags: EPH });
         }
-      } catch { /* ignora */ }
+      } catch {}
     }
   },
 };
-// fim do arquivo

@@ -1,12 +1,7 @@
-// Controle de vagas da house: lista de vagas, quem ocupa, pedidos e painel.
-// (Versão em arquivo único: já inclui a correção da vaga ocupada contada como livre.)
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const db = require('../db');
 const P = require('./personagens');
 const O = require('./obras');
-
-// ===== util =====
-// Utilidades do sistema de vagas: cor, textos padrão, configuração e normalização de texto.
 
 const COR = 0xf5a3c7;
 
@@ -33,9 +28,6 @@ function norm(txt) {
     .trim();
 }
 
-// ===== banco =====
-// Leitura e gravação das vagas e dos pedidos no banco.
-
 const todas = () => Object.values(db.get('vagas.lista', {}) || {}).sort((a, b) => Number(a.id) - Number(b.id));
 const obter = (id) => db.get(`vagas.lista.${id}`, null);
 const salvar = (v) => db.set(`vagas.lista.${v.id}`, v);
@@ -57,24 +49,14 @@ function proximoPedido() {
   return String(n);
 }
 
-// Acha pelo id ou pelo nome exato (usado pelos comandos que recebem o id do autocomplete)
 function acharVaga(ref) {
   if (!ref) return null;
   const r = norm(ref);
   return todas().find((v) => v.id === String(ref) || norm(v.nome) === r) || null;
 }
 
-// ===== identidade =====
-// Quem é "o mesmo personagem". É aqui que mora a correção do bug da vaga ocupada contada como livre.
-//
-// Antes, a recepção cadastrava por nome (sem obra) e o /vaga pedir por AniList (nome + obra).
-// Os dois nunca se reconheciam: a vaga ocupada ficava invisível e o personagem aparecia como livre.
-// Agora todo mundo usa mesmoPersonagem(), que ignora ordem das palavras, acento e obra em branco.
-
-// Chave estável de um personagem: AniList (al:123) ou manual (m:nome|obra)
 const chaveManual = (nome, obra) => `m:${norm(nome)}|${norm(obra)}`;
 
-// "Naruto Uzumaki" e "Uzumaki Naruto" viram a mesma coisa
 const cacheBase = new Map();
 function nomeBase(nome) {
   const k = String(nome || '');
@@ -87,13 +69,11 @@ function nomeBase(nome) {
   return b;
 }
 
-// a e b são { ext, nome, grupo }. Na dúvida (obra em branco) trata como o mesmo personagem:
-// é melhor mostrar "ocupado" por engano do que entregar um personagem que já tem dono.
 function mesmoPersonagem(a, b) {
   if (!a || !b) return false;
   if (a.ext && b.ext) {
     if (a.ext === b.ext) return true;
-    if (a.ext.startsWith('al:') && b.ext.startsWith('al:')) return false; // ids diferentes no AniList = personagens diferentes
+    if (a.ext.startsWith('al:') && b.ext.startsWith('al:')) return false;
   }
   const nome = nomeBase(a.nome);
   if (!nome || nome !== nomeBase(b.nome)) return false;
@@ -104,13 +84,11 @@ function mesmoPersonagem(a, b) {
 
 const acharTodos = (alvo) => todas().filter((v) => mesmoPersonagem(v, alvo));
 
-// Se existir mais de uma entrada do personagem, devolve a OCUPADA primeiro.
 function acharPorChave(chave, nome, grupo) {
   const iguais = acharTodos({ ext: chave, nome, grupo });
   return iguais.find((v) => v.ocupanteId) || iguais[0] || null;
 }
 
-// Livre de verdade: sem dono e sem nenhuma entrada gêmea ocupada
 function estaLivre(vaga) {
   if (vaga.ocupanteId) return false;
   return !acharTodos(vaga).some((v) => v.ocupanteId);
@@ -122,19 +100,14 @@ function livres() {
   return lista.filter((v) => !v.ocupanteId && !ocupadas.some((o) => mesmoPersonagem(o, v)));
 }
 
-// ===== painel =====
-// Painel fixo de vagas (embeds paginados que se atualizam sozinhos).
-
 const LIMITE_PAGINA = 3600;
 
-// Entradas que aparecem no painel: some a entrada "livre" que é gêmea de uma ocupada
 function listaDoPainel() {
   const lista = todas();
   const ocupadas = lista.filter((v) => v.ocupanteId);
   return lista.filter((v) => v.ocupanteId || !ocupadas.some((o) => mesmoPersonagem(o, v)));
 }
 
-// Divide a lista em páginas de texto: um bloco por obra, com o placar "ocupadas/total"
 function paginasPainel(lista) {
   const ordenada = lista.slice().sort((a, b) => norm(a.grupo || 'geral').localeCompare(norm(b.grupo || 'geral')) || norm(a.nome).localeCompare(norm(b.nome)));
   const tot = new Map();
@@ -168,14 +141,12 @@ function paginasPainel(lista) {
   return paginas;
 }
 
-// Contagem geral (usada no painel, no /vaga lista e no /vaga buscar)
 function resumo() {
   const lista = listaDoPainel();
   const ocupadas = lista.filter((v) => v.ocupanteId).length;
   return { ocupadas, livres: lista.length - ocupadas, total: lista.length };
 }
 
-// Lista de embeds do painel (cada uma vira uma mensagem; o limite do Discord é por mensagem)
 function embedsPainel() {
   const m = mensagem('painel');
   const lista = listaDoPainel();
@@ -228,7 +199,6 @@ async function atualizarPainel(guild) {
   return true;
 }
 
-// Procura personagens pelo nome ou obra (para o /vaga buscar). Esconde cópias livres de uma ocupada.
 function buscar(texto) {
   const q = norm(texto);
   if (q.length < 2) return [];
@@ -244,12 +214,9 @@ function buscar(texto) {
   return achados.sort((a, b) => Number(a.livre) - Number(b.livre)).slice(0, 10);
 }
 
-// ---------- Organização em massa ----------
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
 const semObra = () => todas().filter((v) => !v.grupo);
 
-// Procura no AniList a obra das vagas que estão sem obra. Só aceita quando o nome bate inteiro e
-// existe um único personagem com ele; o resto vai para a lista manual. aplicar=false só mostra.
 async function organizarAuto({ aplicar = false, max = 120 } = {}) {
   const pendentes = semObra();
   const rel = { total: pendentes.length, lidas: 0, certas: [], ambiguas: [], sem: [] };
@@ -274,19 +241,17 @@ async function organizarAuto({ aplicar = false, max = 120 } = {}) {
     } else {
       rel.sem.push(v);
     }
-    await dorme(650); // respeita o limite do AniList
+    await dorme(650);
   }
   return rel;
 }
 
-// Texto "Nome = Obra" (uma por linha) -> preenche a obra das vagas com esse nome.
-// Cada obra é conferida (anime, mangá, filme, série, jogo...) e trocada pelo título oficial quando achada.
 async function definirObras(texto) {
   const rel = { feitas: 0, naoAchadas: [], invalidas: 0, naoConfirmadas: [], padronizadas: 0 };
   const conferidas = new Map();
   for (const linha of String(texto || '').split(/\r?\n/)) {
     const t = linha.trim();
-    if (!t || /[=|;]\s*$/.test(t)) continue; // linha ainda sem obra: ignora
+    if (!t || /[=|;]\s*$/.test(t)) continue;
     const m = /^(.+?)\s*[=|;]\s*(.+)$/.exec(t);
     if (!m) { rel.invalidas++; continue; }
     const achadas = todas().filter((v) => nomeBase(v.nome) === nomeBase(m[1]));
@@ -314,11 +279,8 @@ async function definirObras(texto) {
   return rel;
 }
 
-// Vagas que têm obra mas a obra nunca foi confirmada
 const aConferir = () => todas().filter((v) => v.grupo && v.obraConfere !== true);
 
-// Confere as obras já registradas (uma vez por obra, não por vaga) e padroniza os títulos.
-// aplicar=false só mostra. aceitar=true também usa as sugestões e dá por conferidas as que não achou (a staff garante).
 async function conferirObras({ aplicar = false, aceitar = false, max = 40 } = {}) {
   const porObra = new Map();
   for (const v of aConferir()) {
@@ -350,9 +312,6 @@ async function conferirObras({ aplicar = false, aceitar = false, max = 40 } = {}
   return rel;
 }
 
-// ===== ocupacao =====
-// Ocupar e liberar vagas (e o cargo de ocupante).
-
 async function mexerCargo(guild, userId, dar) {
   const cargoId = cfg('cargo');
   if (!cargoId) return;
@@ -361,11 +320,10 @@ async function mexerCargo(guild, userId, dar) {
   if (dar) {
     await membro.roles.add(cargoId).catch(() => {});
   } else if (doUsuario(userId).length === 0) {
-    await membro.roles.remove(cargoId).catch(() => {}); // só tira se não sobrou nenhuma vaga
+    await membro.roles.remove(cargoId).catch(() => {});
   }
 }
 
-// Devolve { ok: true } ou { ok: false, por, vaga } quando o personagem já tem dono (nesta entrada ou numa gêmea).
 async function ocupar(guild, vaga, userId) {
   const atual = obter(vaga.id) || vaga;
   const dono = [atual, ...acharTodos(atual)].find((v) => v.ocupanteId && v.ocupanteId !== userId);
@@ -385,20 +343,16 @@ async function liberar(guild, vaga) {
   vaga.desde = null;
   salvar(vaga);
   if (antigo) await mexerCargo(guild, antigo, false);
-  if (vaga.auto) apagar(vaga.id); // vaga criada por pedido some quando fica livre
+  if (vaga.auto) apagar(vaga.id);
   await atualizarPainel(guild);
   return antigo;
 }
 
-// Registra o personagem que o membro fechou na recepção (não passa por pedido nem pelo limite).
-// Devolve { ok, vaga } ou { pulou: motivo }. Nunca tira um personagem de outra pessoa.
 async function registrarDaRecepcao(guild, userId, personagem) {
   const nome = String(personagem || '').trim();
   if (!nome) return { pulou: 'sem nome' };
-  // Obra que o membro informou na recepção (só vale se for o mesmo personagem da sessão)
   const sessao = db.get(`recepcao.sessoes.${userId}`);
   const obra = sessao && sessao.obra && nomeBase(sessao.personagem) === nomeBase(nome) ? String(sessao.obra).trim().slice(0, 40) : '';
-  // Nome já ocupado bloqueia mesmo que a obra digitada seja outra (erro de digitação não pode burlar a vaga)
   const mesmoNome = todas().filter((v) => nomeBase(v.nome) === nomeBase(nome));
   if (mesmoNome.some((v) => v.ocupanteId === userId)) return { pulou: 'ja-registrado' };
   const ocupada = mesmoNome.find((v) => v.ocupanteId);
@@ -417,9 +371,6 @@ async function registrarDaRecepcao(guild, userId, personagem) {
   return r.ok ? { ok: true, vaga } : { pulou: 'ocupado', vaga: r.vaga };
 }
 
-// ===== pedidos =====
-// Pedidos de vaga: botões, cartão do pedido e busca de pedido repetido.
-
 function botoesPedido(id, desligados) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`vaga:aprovar:${id}`).setLabel('Aprovar').setEmoji('✅').setStyle(ButtonStyle.Success).setDisabled(!!desligados),
@@ -427,14 +378,12 @@ function botoesPedido(id, desligados) {
   );
 }
 
-// Nome, obra e foto do que está sendo pedido (vaga já cadastrada ou personagem novo)
 function infoPedido(p, vaga) {
   if (vaga) return { nome: vaga.nome, grupo: vaga.grupo || '', foto: vaga.foto || null };
   if (p.novo) return { nome: p.novo.nome, grupo: p.novo.grupo || '', foto: p.novo.foto || null };
   return { nome: '(removida)', grupo: '', foto: null };
 }
 
-// Procura outro pedido em aberto pelo mesmo personagem (não só pela mesma chave)
 function pedidoPendente(alvo, chave) {
   return pedidos().find((p) => {
     if (chave && p.chave === chave) return true;
@@ -456,10 +405,6 @@ function embedPedido(p, vaga, estado) {
   return emb;
 }
 
-// ===== auditoria =====
-// Auditoria: acha personagens cadastrados em duplicidade (a origem do bug) e arruma o que for seguro.
-
-// Agrupa as entradas que são o mesmo personagem
 function grupos(lista) {
   const visto = new Set();
   const saida = [];
@@ -482,10 +427,6 @@ function grupos(lista) {
 
 const pontos = (v) => (v.ext && v.ext.startsWith('al:') ? 4 : 0) + (v.foto ? 2 : 0) + (v.grupo ? 1 : 0);
 
-// corrigir=false só relata. corrigir=true:
-//  - junta as entradas livres repetidas;
-//  - apaga a livre que é gêmea de uma ocupada (passando obra/foto/AniList para a ocupada);
-//  - NUNCA mexe quando duas pessoas diferentes ocupam o mesmo personagem (vira "conflito" para a staff decidir).
 function auditar({ corrigir = false } = {}) {
   const rel = { grupos: 0, removidas: [], conflitos: [] };
   for (const comp of grupos(todas())) {

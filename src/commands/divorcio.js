@@ -5,14 +5,12 @@ const N = require('../casamento/nucleo');
 const EPH = MessageFlags.Ephemeral;
 const responder = (i, content) => i.reply({ content, flags: EPH, allowedMentions: { parse: [] } });
 
-// Desfaz o casal: tira dos registros, do cargo de casado e libera para casar de novo
 async function desfazer(guild, casal) {
   db.remover(`casamento.casais.${casal.id}`);
   db.remover(`casamento.casalDe.${casal.a}`);
   db.remover(`casamento.casalDe.${casal.b}`);
-  db.remover(`casamento.mimos.${casal.id}`); // usado pelos mimos/ranking, se existirem
+  db.remover(`casamento.mimos.${casal.id}`);
 
-  // O registro da cerimônia antiga (já concluída) também sai, senão o casal não poderia casar de novo
   for (const c of Object.values(N.cerimonias())) {
     if (c.status === 'concluido' && [c.a, c.b].some((u) => u === casal.a || u === casal.b)) N.removerCerimonia(c.canalId);
   }
@@ -56,7 +54,6 @@ module.exports = {
     const juntos = tempoJuntos(casal.desde);
     await desfazer(interaction.guild, casal);
 
-    // Avisa a outra pessoa por mensagem privada (sem expor o divórcio em público)
     const outro = await interaction.client.users.fetch(ex).catch(() => null);
     if (outro && ex !== interaction.user.id) {
       outro

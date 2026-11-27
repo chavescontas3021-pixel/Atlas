@@ -1,5 +1,3 @@
-// ATLAS · sub dona · backup e restauração da configuração
-// Guarda só configuração (sub dona, conversa e rotinas). Nunca guarda tokens nem chaves: elas ficam no .env.
 const db = require('../db');
 const N = require('./nucleo');
 
@@ -16,7 +14,6 @@ function exportar() {
   return { atlas: 'backup', versao: 1, em: Date.now(), dados };
 }
 
-// Confere o formato e procura chaves perigosas em qualquer nível
 function limpo(v, nivel = 0) {
   if (nivel > 12) return false;
   if (Array.isArray(v)) return v.every((x) => limpo(x, nivel + 1));
@@ -34,7 +31,6 @@ function validar(texto) {
   return { backup: j };
 }
 
-// Guarda uma cópia interna (últimas 3)
 function guardar(rotulo) {
   const l = db.get('subdona.backups', []) || [];
   l.push({ ...exportar(), rotulo });
@@ -57,7 +53,6 @@ function resumoDe(backup) {
   return `Feito em <t:${Math.floor(backup.em / 1000)}:f>\n${rot} rotina(s)  ·  ${pod} poder(es) ajustado(s)  ·  ${d['config.conversa'] ? 'conversa incluída' : 'sem conversa'}`;
 }
 
-// Backup automático semanal (se ligado)
 function tick() {
   if (!N.cfg('backup_auto', false)) return;
   const ult = guardados().slice(-1)[0];

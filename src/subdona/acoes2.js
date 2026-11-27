@@ -1,5 +1,3 @@
-// ATLAS · sub dona · ordens extras 1: tickets, sorteios e eventos, canais, pânico, avisos
-// Instalado por acoes.js. Cada função devolve { ok, texto, desfazer } como as ações da parte 1.
 const UI = require('../ui/componentes');
 const { S, quando, corta } = require('../ui/tema');
 

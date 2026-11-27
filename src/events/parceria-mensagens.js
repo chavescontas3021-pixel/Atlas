@@ -9,7 +9,6 @@ module.exports = {
     const convite = N.acharConvite(message.content);
     if (!convite) return;
 
-    // Quais parcerias estão ligadas neste canal
     const tipos = Object.keys(N.TIPOS).filter((tipo) => {
       const c = N.conf(tipo);
       return c.ativo && c.canal && c.canal === message.channelId;
@@ -20,8 +19,6 @@ module.exports = {
     const representanteId = N.acharRepresentante(message);
     const servidorParceiro = await N.servidorDoConvite(client, convite);
 
-    // O ponto vale uma vez por mensagem (mesmo que as duas parcerias estejam neste canal).
-    // Soma antes de enviar para a mensagem já mostrar o total novo; se nada for enviado, desfaz.
     const pontos = N.somarPonto(promotorId);
     const rank = N.rankDe(promotorId);
 
@@ -52,7 +49,6 @@ module.exports = {
       return;
     }
 
-    // Guarda o convite para o vigia conferir depois (se falhar, a parceria não é afetada)
     try {
       C.registrar({
         codigo: C.codigoDe(convite),

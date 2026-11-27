@@ -2,7 +2,6 @@ const { SlashCommandBuilder } = require('discord.js');
 const UI = require('../ui/componentes');
 const { S } = require('../ui/tema');
 
-// 24h → "2d 3h 10min"
 function duracao(ms) {
   const s = Math.floor(ms / 1000);
   const d = Math.floor(s / 86400);

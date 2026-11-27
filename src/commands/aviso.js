@@ -5,7 +5,6 @@ const { S, barra, corta, quando } = require('../ui/tema');
 
 const SEM_PING = { parse: [] };
 
-// Painel com a lista de avisos + menu para remover um deles
 function telaAvisos(user, lista) {
   const linhas = lista.map((a, i) => {
     let l = `**${i + 1}**  ${S.sep}  ${quando(a.data, 'd')}  ${S.sep}  por <@${a.por}>\n${S.filho} ${a.motivo}`;
@@ -84,7 +83,6 @@ module.exports = {
       }
 
       await interaction.deferReply({ flags: UI.EPH });
-      // No canal de divergências a advertência sai no próprio canal (sem DM) e ganha um tópico
       const idCanal = N.canalAdvertencia();
       const noCanalCerto = !!idCanal && interaction.channelId === idCanal;
       const r = await N.darAviso(interaction.guild, interaction.user, membro, motivo, regra, {

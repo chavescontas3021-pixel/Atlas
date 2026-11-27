@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Mantém o Atlas sempre ligado: se o processo parar (queda, troca para o reserva...), sobe de novo em 5 segundos.
 cd "$(dirname "$0")" || exit 1
 command -v termux-wake-lock >/dev/null 2>&1 && termux-wake-lock
 while true; do

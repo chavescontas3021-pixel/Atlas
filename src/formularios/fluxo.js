@@ -1,6 +1,3 @@
-// Formulários de staff:
-//  - candidato: /formulario {área} (funciona em qualquer conversa privada) -> botão -> janelas com as perguntas
-//  - staff: /formularios entregues -> escolhe a área e o formulário -> aprova ou reprova (o candidato recebe a decisão por mensagem privada)
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags, ModalBuilder,
   StringSelectMenuBuilder, TextInputBuilder, TextInputStyle,
@@ -13,7 +10,6 @@ const EPH = MessageFlags.Ephemeral;
 const eph = (interaction) => (interaction.inGuild() ? { flags: EPH } : {});
 const servidor = (client) => client.guilds.cache.get(process.env.GUILD_ID) || client.guilds.cache.first() || null;
 
-// ---------- Armazenamento ----------
 const todos = () => {
   const o = db.get('formularios.entregues', {});
   return o && typeof o === 'object' ? o : {};
@@ -29,11 +25,6 @@ const doTipo = (tipo) => Object.values(todos()).filter((f) => f.tipo === tipo);
 const chaveRascunho = (uid) => `formularios.rascunhos.${uid}`;
 const STATUS = { pendente: 'Pendente', aprovado: 'Aprovado', reprovado: 'Reprovado' };
 
-// ======================================================================
-// CANDIDATO
-// ======================================================================
-
-// Pode responder? Precisa estar no servidor e não ter um formulário igual em análise (ou já aprovado).
 async function podeResponder(client, user, tipo) {
   const guild = servidor(client);
   if (!guild) return { erro: 'Não encontrei o servidor. Avise a equipe.' };
@@ -52,7 +43,6 @@ async function podeResponder(client, user, tipo) {
 
 const contarPerguntas = (area) => area.paginas.reduce((n, p) => n + p.length, 0);
 
-// A mensagem do formulário, enviada na conversa
 function embedFormulario(tipo) {
   const area = M.AREAS[tipo];
   let numero = 0;
@@ -83,7 +73,6 @@ const botaoResponder = (tipo) =>
     new ButtonBuilder().setCustomId(`form:ini:${tipo}`).setLabel('Responder formulário').setStyle(ButtonStyle.Primary)
   );
 
-// /formulario {tipo}
 async function comando(interaction) {
   const tipo = interaction.options.getString('tipo');
   if (!M.AREAS[tipo]) return interaction.reply({ content: 'Área inválida.', ...eph(interaction) });
@@ -92,7 +81,6 @@ async function comando(interaction) {
   return interaction.reply({ embeds: [embedFormulario(tipo)], components: [botaoResponder(tipo)], ...eph(interaction) });
 }
 
-// Janela com as perguntas de uma parte
 function janela(tipo, n) {
   const area = M.AREAS[tipo];
   const pagina = area.paginas[n];
@@ -118,7 +106,6 @@ function janela(tipo, n) {
   return modal;
 }
 
-// Botão "Responder formulário": começa do zero
 async function iniciar(interaction, tipo) {
   if (!M.AREAS[tipo]) return interaction.reply({ content: 'Área inválida.', ...eph(interaction) });
   const p = await podeResponder(interaction.client, interaction.user, tipo);
@@ -127,7 +114,6 @@ async function iniciar(interaction, tipo) {
   return interaction.showModal(janela(tipo, 0));
 }
 
-// Botão "Continuar": abre a próxima parte
 async function continuar(interaction, tipo, n) {
   const rasc = db.get(chaveRascunho(interaction.user.id));
   if (!M.AREAS[tipo] || !rasc || rasc.tipo !== tipo || rasc.proxima !== n) {
@@ -136,9 +122,8 @@ async function continuar(interaction, tipo, n) {
   return interaction.showModal(janela(tipo, n));
 }
 
-const enviando = new Set(); // um envio por vez para cada pessoa
+const enviando = new Set();
 
-// Janela enviada: guarda a parte e segue; na última parte, entrega o formulário
 async function receberParte(interaction, tipo, n) {
   const resp = (content, extra = {}) => interaction.reply({ content, ...extra, ...eph(interaction) });
   const area = M.AREAS[tipo];
@@ -154,7 +139,6 @@ async function receberParte(interaction, tipo, n) {
   rasc.proxima = n + 1;
   db.set(chaveRascunho(uid), rasc);
 
-  // Ainda tem parte para responder
   if (n + 1 < area.paginas.length) {
     const botao = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`form:pag:${tipo}:${n + 1}`).setLabel(`Continuar (parte ${n + 2} de ${area.paginas.length})`).setStyle(ButtonStyle.Primary)
@@ -162,7 +146,6 @@ async function receberParte(interaction, tipo, n) {
     return resp(`Parte ${n + 1} de ${area.paginas.length} recebida. Clique no botão abaixo para continuar.`, { components: [botao] });
   }
 
-  // Última parte: entrega
   if (enviando.has(uid)) return resp('Já estou registrando o seu formulário. Aguarde um instante.');
   enviando.add(uid);
   try {
@@ -190,9 +173,6 @@ async function receberParte(interaction, tipo, n) {
   }
 }
 
-// ======================================================================
-// STAFF
-// ======================================================================
 const dataHora = (ms) => `<t:${Math.floor(ms / 1000)}:f>`;
 
 function contagem(tipo) {
@@ -202,7 +182,6 @@ function contagem(tipo) {
   return c;
 }
 
-// Tela inicial: quantos formulários de cada área
 function telaResumo() {
   const areas = Object.entries(M.AREAS);
   const linhas = areas.map(([tipo, area]) => {
@@ -224,11 +203,9 @@ function telaResumo() {
   return { content: '', embeds: [embed], components: [new ActionRowBuilder().addComponents(botoes)] };
 }
 
-// Lista de uma área: menu para escolher qual formulário abrir
 function telaLista(tipo) {
   const area = M.AREAS[tipo];
   const c = contagem(tipo);
-  // Pendentes primeiro; dentro de cada grupo, os mais recentes
   const ordem = { pendente: 0, aprovado: 1, reprovado: 2 };
   const lista = doTipo(tipo).sort((a, b) => ordem[a.status] - ordem[b.status] || b.enviadoEm - a.enviadoEm);
   const mostrados = lista.slice(0, 25);
@@ -262,7 +239,6 @@ function telaLista(tipo) {
   return { content: '', embeds: [embed], components: componentes };
 }
 
-// Divide as respostas em páginas que cabem em um embed
 function paginar(f) {
   const blocos = f.respostas.map((r, i) => `**${i + 1}. ${r.pergunta}**\n${r.resposta || '(sem resposta)'}`);
   const paginas = [];
@@ -279,7 +255,6 @@ function paginar(f) {
   return paginas.length ? paginas : ['(sem respostas)'];
 }
 
-// Um formulário aberto, com as respostas e os botões de decisão
 function telaFormulario(f, n = 0, aviso = '') {
   const area = M.AREAS[f.tipo];
   const paginas = paginar(f);
@@ -315,7 +290,6 @@ function telaFormulario(f, n = 0, aviso = '') {
   return { content: aviso, embeds: [embed], components: linhas };
 }
 
-// /formularios entregues
 async function comandoEntregues(interaction) {
   if (!interaction.inGuild()) return interaction.reply({ content: 'Use este comando no servidor.', flags: EPH });
   return interaction.reply({ ...telaResumo(), flags: EPH });
@@ -331,7 +305,6 @@ async function decidir(interaction, id, aprovar) {
   f.decididoEm = Date.now();
   salvar(f);
 
-  // Avisa o candidato por mensagem privada
   const area = M.AREAS[f.tipo];
   let enviou = true;
   try {
@@ -346,7 +319,6 @@ async function decidir(interaction, id, aprovar) {
   return interaction.update(telaFormulario(f, 0, aviso));
 }
 
-// Botões e menu "formadm:" (só a staff recebe essas mensagens, que são privadas)
 async function painelStaff(interaction) {
   if (!interaction.inGuild()) return interaction.reply({ content: 'Use este comando no servidor.', flags: EPH });
   const [, acao, a, b] = interaction.customId.split(':');

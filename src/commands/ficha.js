@@ -14,7 +14,6 @@ function ehStaff(interaction) {
   return !!(interaction.memberPermissions && interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild));
 }
 
-// Monta o formulário (com os valores atuais quando for edição)
 function montarModal(customId, titulo, campos, ficha) {
   const modal = new ModalBuilder().setCustomId(customId).setTitle(titulo);
   for (const c of campos) {
@@ -30,7 +29,6 @@ function montarModal(customId, titulo, campos, ficha) {
   return modal;
 }
 
-// Descobre qual ficha o comando quer mexer, já checando permissão
 function resolver(interaction) {
   const alvo = interaction.options.getUser('membro') || interaction.user;
   if (alvo.id !== interaction.user.id && !ehStaff(interaction)) {

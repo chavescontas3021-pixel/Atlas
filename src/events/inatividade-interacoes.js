@@ -56,7 +56,7 @@ module.exports = {
           if (interaction.deferred || interaction.replied) await interaction.editReply(msg);
           else await interaction.reply({ content: msg, flags: EPH });
         }
-      } catch { /* ignora */ }
+      } catch {}
     }
   },
 };

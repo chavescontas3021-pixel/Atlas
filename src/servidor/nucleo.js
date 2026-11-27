@@ -1,9 +1,3 @@
-// Desligar o servidor: esconde TODOS os canais (menos o canal da staff) e guarda como cada canal
-// estava, para o /servidor ligar devolver tudo igual. Nada é apagado.
-//
-// Como esconde: nega "Ver canal" para @everyone e transforma qualquer permissão explícita de
-// "Ver canal" (cargos e membros) em negação. Administradores continuam vendo (o Discord não permite
-// esconder nada deles). O bot ganha acesso próprio aos canais, para conseguir reabrir depois.
 const { PermissionFlagsBits: P } = require('discord.js');
 const db = require('../db');
 const L = require('../logs/nucleo');
@@ -13,7 +7,6 @@ const ADMIN = P.Administrator;
 const ESTADO = 'servidor.estado';
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Pedidos de confirmação (ficam só na memória, expiram em 5 minutos)
 const pendentes = new Map();
 let ocupado = false;
 
@@ -35,7 +28,6 @@ function negarVer(o) {
 const assinatura = (lista) =>
   JSON.stringify([...lista].map((o) => [o.id, o.type, String(o.allow), String(o.deny)]).sort());
 
-// Calcula as novas permissões de um canal. Devolve null se o canal já está escondido.
 function novasPermissoes(original, { guildId, botId, botAdmin, cargosAdmin }) {
   const novas = original.map((o) => ({ ...o }));
 
@@ -54,7 +46,6 @@ function novasPermissoes(original, { guildId, botId, botAdmin, cargosAdmin }) {
 
   if (assinatura(novas) === assinatura(original)) return null;
 
-  // O bot precisa continuar vendo o canal para conseguir reabrir
   if (!botAdmin) {
     let eu = novas.find((o) => o.id === botId);
     if (!eu) {
@@ -80,7 +71,6 @@ function pegarPedido(userId) {
 }
 const limparPedido = (userId) => pendentes.delete(userId);
 
-// ---------- Desligar ----------
 async function desligar(guild, { canalMantido, porId, pausarConvites }, progresso = async () => {}) {
   if (ocupado) throw new Error('Já existe uma operação em andamento.');
   ocupado = true;
@@ -93,7 +83,6 @@ async function desligar(guild, { canalMantido, porId, pausarConvites }, progress
       cargosAdmin: new Set(guild.roles.cache.filter((r) => r.permissions.has(ADMIN)).map((r) => r.id)),
     };
 
-    // Retoma uma operação interrompida ou começa uma nova
     let st = estado();
     if (!st) {
       st = {
@@ -116,14 +105,13 @@ async function desligar(guild, { canalMantido, porId, pausarConvites }, progress
     for (const canal of alvos) {
       feitos++;
       if (st.canais[canal.id]) {
-        r.fechados++; // já feito antes de uma interrupção
+        r.fechados++;
       } else {
         const original = [...canal.permissionOverwrites.cache.values()].map(comoTexto);
         const novas = novasPermissoes(original, ctx);
         if (!novas) {
           r.jaEscondidos++;
         } else {
-          // Guarda ANTES de mexer: se o bot cair no meio, dá para desfazer
           db.set(`${ESTADO}.canais.${canal.id}`, original);
           try {
             await canal.permissionOverwrites.set(novas, 'Servidor desligado');
@@ -136,7 +124,6 @@ async function desligar(guild, { canalMantido, porId, pausarConvites }, progress
         }
       }
 
-      // Tira da call quem estava conectado (administradores ficam)
       if (canal.members && canal.members.size && [2, 13].includes(canal.type)) {
         for (const m of canal.members.values()) {
           if (m.id === eu.id || m.permissions.has(ADMIN)) continue;
@@ -146,7 +133,6 @@ async function desligar(guild, { canalMantido, porId, pausarConvites }, progress
       if (feitos % 5 === 0) await progresso(feitos, alvos.length);
     }
 
-    // Pausa os convites, se o Discord/biblioteca permitir
     let convites = 'não pedido';
     if (pausarConvites) {
       const jaPausados = !!(guild.features && guild.features.includes('INVITES_DISABLED'));
@@ -182,7 +168,6 @@ async function desligar(guild, { canalMantido, porId, pausarConvites }, progress
   }
 }
 
-// ---------- Ligar ----------
 function filtrarCargosExistentes(guild, lista) {
   return lista.filter((o) => o.type !== 0 || guild.roles.cache.has(o.id) || o.id === guild.id);
 }
@@ -192,7 +177,6 @@ async function restaurarCanal(guild, canal, original) {
     await canal.permissionOverwrites.set(original, 'Servidor ligado');
     return;
   } catch (e) {
-    // Cargo ou membro que não existe mais: tenta de novo sem eles
     const limpo = [];
     for (const o of filtrarCargosExistentes(guild, original)) {
       if (o.type === 1) {

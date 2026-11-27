@@ -1,6 +1,5 @@
 const N = require('../missoes/nucleo');
 
-// Depois de qualquer ação do /rpg (comando ou botão), confere o que mudou no personagem
 module.exports = {
   name: 'interactionCreate',
   once: false,

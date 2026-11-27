@@ -1,11 +1,3 @@
-// Confere se uma obra existe (anime, mangá, filme, série, jogo, livro...) e devolve o título oficial.
-//   1) AniList: anime, mangá e light novel
-//   2) Wikidata (Wikipédia): filmes, séries, jogos, livros, quadrinhos etc., buscando em português e inglês
-// Resultado de verificar():
-//   { status: 'ok', titulo, tipo }        achou exatamente (já vem com o título padronizado)
-//   { status: 'sugestao', titulo, tipo }  não achou igual, mas tem algo parecido ("narutu" -> "Naruto")
-//   { status: 'nao' }                     não achou nada
-//   { status: 'erro' }                    os serviços não responderam: não dá para afirmar nada
 const ANILIST = 'https://graphql.anilist.co';
 const WIKIDATA = 'https://www.wikidata.org/w/api.php';
 const UA = 'AtlasBot/1.0 (bot de Discord; conferencia de obras)';
@@ -14,7 +6,6 @@ const LIMIAR = 0.72;
 
 const cache = new Map();
 
-// Compara sem acento, maiúscula ou pontuação ("Re:Zero" = "re zero")
 const limpo = (txt) => String(txt || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 function distancia(a, b) {
@@ -34,7 +25,7 @@ function distancia(a, b) {
 function parecido(q, t) {
   if (!q || !t) return 0;
   if (q === t) return 1;
-  if (q.length >= 4 && t.startsWith(q)) return 0.9; // "naruto" -> "naruto shippuuden"
+  if (q.length >= 4 && t.startsWith(q)) return 0.9;
   return 1 - distancia(q, t) / Math.max(q.length, t.length);
 }
 
@@ -44,11 +35,9 @@ async function pedir(url, opcoes = {}) {
   return r.json();
 }
 
-// ---- AniList ----
 const Q_ANILIST = 'query($s:String){Page(perPage:6){media(search:$s,sort:SEARCH_MATCH){type format title{romaji english native} synonyms}}}';
 const tipoAniList = (m) => (m.type === 'ANIME' ? 'Anime' : m.format === 'NOVEL' ? 'Light novel' : 'Mangá');
 
-// ---- Wikidata: só aceita itens cuja descrição indica uma obra (não pessoas, personagens, lugares) ----
 const OBRA = /\b(filmes?|longa|curta|films?|movie|s[eé]ries?|series|telenovela|novela|minis[eé]rie|televis[aã]o|television|anime|mang[aá]|manhwa|webtoon|jogos?|videogames?|video ?games?|games?|livros?|romances?|novels?|books?|quadrinhos|hq|comics?|desenhos?|anima[cç][aã]o|animated|franquia|franchise|sagas?|visual novel|podcast|musical|[oó]pera)\b/i;
 const NAO_OBRA = /^(personagem|character|fictional|pessoa|person|ator|atriz|actor|actress|cantor|singer|escritor|writer|banda|band|empresa|company)/i;
 
@@ -109,7 +98,7 @@ async function consultar(q, bruto) {
   }
 
   if (melhor) return { status: 'sugestao', titulo: melhor.titulo, tipo: melhor.tipo };
-  if (falhas > 0 || falhas === tentativas) return { status: 'erro' }; // não dá para afirmar que não existe
+  if (falhas > 0 || falhas === tentativas) return { status: 'erro' };
   return { status: 'nao' };
 }
 
@@ -128,4 +117,3 @@ async function verificar(texto) {
 }
 
 module.exports = { verificar, limpo };
-// fim do arquivo

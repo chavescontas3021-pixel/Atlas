@@ -18,7 +18,7 @@ async function verificar(client) {
       try {
         const user = await client.users.fetch(l.userId);
         await user.send(`⏰ Lembrete: **${l.texto}**`);
-      } catch { /* sem como avisar */ }
+      } catch {}
     }
   }
 }

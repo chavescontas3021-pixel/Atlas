@@ -65,7 +65,6 @@ module.exports = {
     const guild = interaction.guild;
     N.limparFantasmas(guild);
 
-    // ---------- Staff ----------
     if (['liberar', 'iniciar', 'encerrar', 'lista'].includes(sub) && !ehStaff(interaction)) {
       return responder(interaction, '❌ Só a staff pode usar este comando.');
     }
@@ -133,7 +132,6 @@ module.exports = {
       return responder(interaction, txt.slice(0, 1900));
     }
 
-    // ---------- Noivos ----------
     const eu = interaction.user.id;
     const c = N.cerimoniaDe(eu);
 

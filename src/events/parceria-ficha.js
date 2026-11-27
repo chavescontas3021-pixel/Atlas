@@ -5,11 +5,9 @@ module.exports = {
   name: 'interactionCreate',
   async execute(client, interaction) {
     try {
-      // 1) Clicou em Parceria ou Aliança: abre o formulário daquele tipo
       if (interaction.isButton() && interaction.customId.startsWith('pficha:abrir:')) {
         const [, , tipo, dono] = interaction.customId.split(':');
         if (!Ficha.tipoValido(tipo)) return;
-        // O painel é de quem usou o comando: outra pessoa na conversa não preenche por ele
         if (dono && interaction.user.id !== dono) {
           return interaction.reply({
             content: 'Esse painel é de outra pessoa. Use /parceriaficha para abrir o seu.',
@@ -21,7 +19,6 @@ module.exports = {
         return interaction.showModal(Ficha.formulario(tipo));
       }
 
-      // 2) Enviou o formulário: valida, publica e responde na conversa
       if (interaction.isModalSubmit() && interaction.customId.startsWith('pficha:modal:')) {
         const tipo = interaction.customId.split(':')[2];
         if (!Ficha.tipoValido(tipo)) return;

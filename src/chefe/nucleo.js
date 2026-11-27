@@ -1,4 +1,3 @@
-// Eventos de chefe: um monstro gigante que a house inteira ataca junto.
 const {
   ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder,
 } = require('discord.js');
@@ -11,8 +10,6 @@ const Pers = require('../personagem/nucleo');
 const Placar = require('../ranking/nucleo');
 
 const COR = 0xf5a3c7;
-// Tempo de espera entre ataques ao chefe, em segundos. Padrão: 8 s no ataque e 2 min no golpe forte.
-// Para mudar sem mexer no código: db config.chefe.cdAtaque / config.chefe.cdForte (em segundos).
 const segundos = (chave, padrao) => {
   const n = Number(db.get(`config.chefe.${chave}`, padrao));
   return Number.isFinite(n) && n >= 0 ? n : padrao;
@@ -54,7 +51,6 @@ function proximoId() {
 
 const rank = (a) => Object.entries(a.dano || {}).sort((x, y) => y[1] - x[1]);
 
-// ---------- Visual ----------
 function embedChefe(a) {
   const vars = { chefe: a.nome, emoji: a.emoji, hp: fmt(a.hpMax) };
   const m = mensagem('chamada');
@@ -87,7 +83,6 @@ function textoPlacar(a, max = 15) {
   return linhas.join('\n') || 'Ninguém atacou ainda.';
 }
 
-// ---------- Cena (GIF do grupo atacando o chefe) ----------
 const VISUAL = { guerreiro: 'cruz', mago: 'explosao', arqueiro: 'flechas', curandeiro: 'luz', ladino: 'furtivo' };
 const cacheCena = new Map();
 function anexoCena(a, fim) {
@@ -109,7 +104,6 @@ function anexoCena(a, fim) {
   return new AttachmentBuilder(buf, { name: Cena.ARQUIVO });
 }
 
-// ---------- Invocar ----------
 async function invocar(guild, cfg) {
   const canal = guild.channels.cache.get(cfg.canalId);
   if (!canal) return { erro: 'Canal não encontrado.' };
@@ -136,7 +130,6 @@ async function invocar(guild, cfg) {
   return { ok: true, a };
 }
 
-// ---------- Atacar ----------
 function dano(j, forte) {
   let d = R.ataque(j) * (0.8 + Math.random() * 0.4);
   const crit = Math.random() * 100 < R.critChance(j);
@@ -159,7 +152,6 @@ function atualizarDepois(client) {
   }, 4000));
 }
 
-// Retorna { erro } ou { dano, crit, hp, hpMax, derrotou }
 async function atacar(client, uid, forte) {
   const a = ativo();
   if (!a || a.finalizando) return { erro: 'Não há nenhum chefe para atacar agora.' };
@@ -190,7 +182,6 @@ async function atacar(client, uid, forte) {
   return { dano: r.dano, crit: r.crit, hp: a.hp, hpMax: a.hpMax, derrotou };
 }
 
-// ---------- Encerrar ----------
 async function finalizar(client, tipo, agora = Date.now()) {
   const a = ativo();
   if (!a || a.finalizando) return;
@@ -263,16 +254,15 @@ async function cancelar(client) {
   return true;
 }
 
-// ---------- Verificação periódica ----------
 async function tick(client, agora = Date.now()) {
   const a = ativo();
   if (a && !a.finalizando && agora >= a.fim) await finalizar(client, 'fuga', agora);
-  else if (a && a.finalizando) db.remover('chefe.ativo'); // sobrou de um reinício no meio do encerramento
+  else if (a && a.finalizando) db.remover('chefe.ativo');
 
   for (const ag of agenda()) {
     if (ag.quando > agora) continue;
     if (ativo()) {
-      db.set(`chefe.agenda.${ag.id}`, { ...ag, quando: agora + 10 * 60000 }); // espera o chefe atual terminar
+      db.set(`chefe.agenda.${ag.id}`, { ...ag, quando: agora + 10 * 60000 });
       continue;
     }
     const guild = client.guilds.cache.get(ag.guildId);
@@ -285,4 +275,3 @@ module.exports = {
   PADROES, cdAtaque, cdForte, mensagem, fmt, ativo, agenda, proximoId, rank,
   embedChefe, botoes, textoPlacar, invocar, atacar, finalizar, cancelar, tick,
 };
-// fim do arquivo

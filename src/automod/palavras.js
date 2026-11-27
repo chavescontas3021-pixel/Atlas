@@ -1,11 +1,4 @@
-// Listas do automod.
-// Escreva as palavras do jeito normal (com ou sem acento, minúsculas). O Atlas já entende sozinho:
-//   - números e símbolos no lugar de letras (n4z1sm0, b0qu3t4, p!ca, pr0n0)
-//   - letras separadas (p u t a r i a, p.u.t.a.r.i.a, p*u*t*a) e letras repetidas (puuuutaria)
-//   - letras de outros alfabetos que parecem as nossas (рorno com "р" russo) e letras "fofas" (𝐩𝐨𝐫𝐧𝐨)
-//   - o plural de cada palavra e jeitos diferentes de escrever o mesmo som (boquete / bokete)
 module.exports = {
-  // GRAVE: apaga a mensagem + dá advertência
   graves: {
     'conteúdo envolvendo menores': [
       'pedofilia', 'pedofilo', 'pedofila', 'pornografia infantil', 'porno infantil',
@@ -88,7 +81,6 @@ module.exports = {
     ],
   },
 
-  // LEVE: apaga a mensagem e avisa. Vira advertência só se repetir (ou conforme /automod leve)
   leves: {
     'conteúdo sexual': [
       'sexo', 'transar', 'transei', 'transando', 'transamos', 'sexshop', 'sex shop', 'tesao', 'tesuda', 'tesudo',
@@ -99,10 +91,7 @@ module.exports = {
     ],
   },
 
-  // Expressões do dia a dia que NÃO devem ser bloqueadas (são apagadas do texto antes da checagem).
-  // Escreva do jeito normal; o Atlas normaliza (acentos, maiúsculas) sozinho.
   inofensivas: [
-    // "te mato de rir", "vou explodir de raiva"... (jeito de falar, não ameaça)
     'te mato de rir', 'vou te matar de rir', 'vou matar de rir', 'matar de rir', 'mato de rir',
     'te mato de cocegas', 'vou te matar de cocegas', 'te mato de saudade', 'vou te matar de saudade',
     'te mato de amor', 'vou te matar de amor', 'te mato de vergonha', 'vou te matar de vergonha',
@@ -110,35 +99,28 @@ module.exports = {
     'vou explodir de rir', 'vou explodir de tanto rir', 'vou explodir de raiva', 'vou explodir de felicidade',
     'vou explodir de fofura', 'vou explodir de ansiedade', 'vou explodir de curiosidade', 'vou explodir de emocao',
     'vou explodir de tanto comer', 'vou explodir de tanto chorar', 'vou explodir de tanto',
-    // "gozar da cara de alguém" (zoar)
     'gozar da cara', 'gozando da cara', 'gozando da minha cara', 'gozando da sua cara', 'gozou da cara',
     'gozou da minha cara', 'gozaram da minha cara', 'gozei da cara', 'gozando de voce', 'gozando de mim',
     'gozar de voce', 'gozar de mim', 'gozar na boa', 'gozando com a cara', 'gozar com a cara',
-    // "pelada" de futebol
     'jogar pelada', 'jogando pelada', 'jogamos pelada', 'jogou pelada', 'jogo pelada', 'pelada de futebol', 'pelada de domingo',
-    // "sexo" como informação de ficha / bichinho
     'sexo do personagem', 'sexo da personagem', 'sexo do npc', 'sexo do oc', 'sexo da ficha', 'sexo do pet',
     'sexo do bichinho', 'sexo do bebe', 'sexo do filhote', 'sexo biologico', 'sexo masculino', 'sexo feminino',
     'qual o sexo', 'qual e o sexo',
-    // "estou vendo X" (assistindo), em vez de "vendo X" (à venda)
     'estou vendo', 'to vendo', 'tou vendo', 'ta vendo', 'esta vendo', 'estamos vendo', 'estao vendo',
     'estava vendo', 'estavam vendo', 'tava vendo', 'tavam vendo', 'ficou vendo', 'fiquei vendo',
     'ficamos vendo', 'continuo vendo', 'continua vendo', 'continuamos vendo',
   ],
 
-  // Pedaços de endereço de sites adultos (qualquer link que contenha isso é bloqueado)
   dominios: [
     'pornhub', 'xvideos', 'xnxx', 'xhamster', 'redtube', 'brazzers', 'onlyfans', 'fansly',
     'chaturbate', 'stripchat', 'bongacams', 'camsoda', 'spankbang', 'eporner', 'motherless',
     'erome', 'rule34', 'nhentai', 'hentai', 'porn', 'xxx',
   ],
 
-  // Emojis: um sozinho já conta, ou as combinações abaixo na mesma mensagem
   emojis: ['🔞'],
   emojiCombos: [['🍆', '💦'], ['🍆', '🍑'], ['🍑', '💦'], ['🍆', '👅'], ['🍑', '👅'], ['👉', '👌']],
 };
 
-// Lista ampliada (ódio, extremismo, ameaças, golpes, autolesão...): veja palavras-extra.js
 const EXTRA = require('./palavras-extra');
 for (const [categoria, termos] of Object.entries(EXTRA.graves)) {
   module.exports.graves[categoria] = [...(module.exports.graves[categoria] || []), ...termos];

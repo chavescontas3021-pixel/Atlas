@@ -1,4 +1,3 @@
-// Inatividade: justificativas, avisos e liberação automática de vagas.
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const db = require('../db');
 const V = require('../vagas/nucleo');
@@ -43,7 +42,6 @@ const avisoDias = () => Number(cfg('avisoDias', PADROES.avisoDias));
 const liberarDias = () => Number(cfg('liberarDias', PADROES.liberarDias));
 const maxDias = () => Number(cfg('maxDias', PADROES.maxDias));
 
-// "7", "7d", "7 dias", "2 semanas", "1 mês" -> número de dias
 function parseDias(txt) {
   const t = String(txt || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const m = t.match(/^(\d{1,3})\s*([a-z]*)$/);
@@ -57,31 +55,26 @@ function parseDias(txt) {
   return null;
 }
 
-// ---------- Estado ----------
 const justificativa = (uid) => db.get(`inatividade.just.${uid}`, null);
 const justificativas = () => Object.values(db.get('inatividade.just', {}) || {});
 const ultima = (uid) => db.get(`inatividade.ultima.${uid}`, 0);
 const fimUltimo = (uid) => db.get(`inatividade.fimUltimo.${uid}`, 0);
 
-// Momento a partir do qual contamos os dias sem aparecer
 function marco(uid, vagas) {
   const desde = Math.max(0, ...vagas.map((v) => v.desde || 0));
   return Math.max(ultima(uid), desde, fimUltimo(uid));
 }
 
-// ---------- Atividade (mensagens) ----------
 const ultimoRegistro = new Map();
 function registrarAtividade(uid) {
   const agora = Date.now();
   if (agora - (ultimoRegistro.get(uid) || 0) < 60 * 1000) return;
   ultimoRegistro.set(uid, agora);
-  if (V.doUsuario(uid).length === 0) return; // só importa para quem ocupa vaga
+  if (V.doUsuario(uid).length === 0) return;
   db.set(`inatividade.ultima.${uid}`, agora);
   db.remover(`inatividade.avisados.${uid}`);
 }
 
-// ---------- Justificar ----------
-// Retorna { erro } ou { j }
 async function justificar(guild, user, tempoTxt, motivo) {
   if (await Rep.uidSoRep(guild, user.id)) {
     return { erro: 'Você é rep de parceria/aliança, então não precisa justificar. 💜' };
@@ -118,7 +111,6 @@ function encerrarJustificativa(uid) {
   return true;
 }
 
-// ---------- Painel ----------
 async function publicarPainel(canal) {
   const m = mensagem('painel');
   const emb = new EmbedBuilder().setColor(COR).setTitle(m.titulo).setDescription(m.texto);
@@ -128,7 +120,6 @@ async function publicarPainel(canal) {
   return canal.send({ embeds: [emb], components: [linha] });
 }
 
-// ---------- Avisos ----------
 async function avisar(client, guild, uid, tipo, vars) {
   const m = mensagem(tipo);
   const emb = new EmbedBuilder().setColor(COR).setTitle(m.titulo).setDescription(preencher(m.texto, vars));
@@ -138,7 +129,6 @@ async function avisar(client, guild, uid, tipo, vars) {
   if (canal) await canal.send({ content: `<@${uid}>`, embeds: [emb], allowedMentions: { users: [uid] } }).catch(() => {});
 }
 
-// Quem ficou sem nenhuma vaga perde o cargo de verificado e volta a ser "sem vaga"
 async function trocarCargos(guild, uid) {
   if (cfg('trocarCargos', true) === false) return;
   if (V.doUsuario(uid).length > 0) return;
@@ -150,8 +140,6 @@ async function trocarCargos(guild, uid) {
   if (semVaga && !membro.roles.cache.has(semVaga)) await membro.roles.add(semVaga, 'Vaga liberada por inatividade').catch(() => {});
 }
 
-// ---------- Verificação periódica ----------
-
 async function tick(client, agora = Date.now()) {
   if (!cfg('ativo', false)) return;
   for (const guild of client.guilds.cache.values()) {
@@ -162,10 +150,10 @@ async function tick(client, agora = Date.now()) {
       porUsuario.get(v.ocupanteId).push(v);
     }
     for (const [uid, vagas] of porUsuario) {
-      if (await Rep.uidSoRep(guild, uid)) continue; // só rep de parceria/aliança: não entra na inatividade
+      if (await Rep.uidSoRep(guild, uid)) continue;
       const j = justificativa(uid);
       if (j) {
-        if (j.fim > agora) continue; // justificativa em andamento: vaga guardada
+        if (j.fim > agora) continue;
         db.remover(`inatividade.just.${uid}`);
         db.set(`inatividade.fimUltimo.${uid}`, j.fim);
         const user = await client.users.fetch(uid).catch(() => null);
@@ -195,4 +183,3 @@ module.exports = {
   justificativa, justificativas, ultima, marco, registrarAtividade,
   justificar, encerrarJustificativa, publicarPainel, tick,
 };
-// fim do arquivo

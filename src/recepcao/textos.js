@@ -1,11 +1,7 @@
-// Textos e opções das funções novas da recepção:
-// confirmação do personagem, "sou apenas representante" e avisos de assumir/devolver.
-// Tudo pode ser editado no site (config.recepcao.mensagens.<tipo>).
 const db = require('../db');
 
 const PADROES = {
   mensagens: {
-    // Primeira mensagem do canal da recepção: texto simples (sem embed e sem banner)
     inicio: {
       texto: 'Seja Bem vindo(a)! Diga-me **apenas** o nome e sobrenome do personagem para mim verificar se está disponível.',
     },
@@ -58,13 +54,10 @@ function preencher(texto, vars) {
   return String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
 }
 
-// Pedir confirmação antes de aceitar o nome do personagem (padrão: ligado)
 const confirmarLigado = () => cfg('confirmarPersonagem', true) !== false;
 
-// Canais mostrados para quem é apenas representante
 const canais = () => ({ parceria: cfg('rep.canalParceria', null), alianca: cfg('rep.canalAlianca', null) });
 
-// O botão "Sou apenas representante" só aparece se estiver ligado e tiver pelo menos um canal
 const repDisponivel = () => {
   const c = canais();
   return cfg('rep.ativo', true) !== false && !!(c.parceria || c.alianca);

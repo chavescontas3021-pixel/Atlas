@@ -2,13 +2,11 @@ const { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder 
 const Ficha = require('../parceria/ficha');
 
 module.exports = {
-  global: true, // comando global: funciona em qualquer lugar (veja deploy-commands.js)
+  global: true,
   data: new SlashCommandBuilder()
     .setName('parceriaficha')
     .setDescription('Preencha a ficha de parceria ou aliança')
-    // Instalado no servidor OU na conta da pessoa (app de usuário)
     .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-    // Servidor, privado com o Atlas e qualquer DM/grupo
     .setContexts(
       InteractionContextType.Guild,
       InteractionContextType.BotDM,
@@ -16,7 +14,7 @@ module.exports = {
     ),
 
   async execute(interaction, client) {
-    await interaction.deferReply(); // mensagem pública, todos na conversa veem
+    await interaction.deferReply();
     const painel = await Ficha.painel(client, interaction.user.id);
     return interaction.editReply(painel);
   },

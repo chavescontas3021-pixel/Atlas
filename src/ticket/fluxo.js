@@ -23,14 +23,11 @@ function campo(id, label, estilo, max, { min, obrigatorio = true } = {}) {
   return new ActionRowBuilder().addComponents(t);
 }
 
-// Remove da lista tickets cujo canal foi apagado na mão
 function limparFantasmas(guild, userId) {
   for (const t of N.ticketsDoUsuario(userId)) {
     if (!guild.channels.cache.has(t.canalId)) db.remover(`ticket.abertos.${t.canalId}`);
   }
 }
-
-// ---------- Abrir ----------
 
 async function abrirModal(interaction, tipoId) {
   const tipo = N.acharTipo(tipoId);
@@ -69,9 +66,6 @@ async function criarCanal(guild, member, numero, painel) {
     jaTem.add(id);
   }
 
-  // Cargos com Administrador/Gerenciar Servidor e o dono recebem acesso EXPLÍCITO ao canal.
-  // Sem isso, com "Mostrar todos os canais" desligado, o ticket some da barra lateral deles
-  // assim que saem do canal (Administrador não conta como acesso explícito).
   for (const role of guild.roles.cache.values()) {
     if (role.id === guild.roles.everyone.id || jaTem.has(role.id)) continue;
     if (role.permissions.has(P.Administrator) || role.permissions.has(P.ManageGuild)) {
@@ -158,8 +152,6 @@ async function criarTicket(interaction, tipoId) {
   return interaction.editReply(UI.edicao(UI.ok(`Ticket aberto: ${canal}`)));
 }
 
-// ---------- Assumir ----------
-
 async function assumir(interaction) {
   const canal = interaction.channel;
   const t = N.ticketDoCanal(canal.id);
@@ -175,7 +167,6 @@ async function assumir(interaction) {
   t.assumidoPor = liberando ? null : interaction.user.id;
   db.set(`ticket.abertos.${canal.id}`, t);
 
-  // Garante que o canal continue aparecendo na lista de quem assumiu, mesmo depois de sair dele
   if (!liberando) {
     await canal.permissionOverwrites
       .edit(interaction.user.id, {
@@ -201,8 +192,6 @@ async function assumir(interaction) {
     )
     .catch(() => {});
 }
-
-// ---------- Fechar ----------
 
 function podeFechar(member, t) {
   return N.ehStaff(member, t);
@@ -237,7 +226,6 @@ function formatarDuracao(ms) {
   return min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}min` : `${min} min`;
 }
 
-// Gera a transcrição, manda para o log e para quem abriu, e apaga o canal
 async function encerrar(guild, canal, executor, motivo) {
   const t = N.ticketDoCanal(canal.id);
   if (!t || fechando.has(canal.id)) return;
@@ -302,8 +290,6 @@ async function encerrar(guild, canal, executor, motivo) {
     await canal.send(UI.nota('Deu erro ao fechar o ticket. Tente de novo ou chame a staff.', 'erro', { publica: true })).catch(() => {});
   }
 }
-
-// ---------- Ações da staff dentro do ticket ----------
 
 async function adicionar(interaction, user) {
   await interaction.channel.permissionOverwrites.edit(user.id, {

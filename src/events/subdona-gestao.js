@@ -1,4 +1,3 @@
-// Sub dona: botões do /gestao (confirmar ou cancelar a restauração de backup)
 const N = require('../subdona/nucleo');
 const Backup = require('../subdona/backup');
 const UI = require('../ui/componentes');
@@ -8,7 +7,7 @@ module.exports = {
   async execute(client, interaction) {
     try {
       if (!interaction.isButton() || !interaction.customId.startsWith('sdg:')) return;
-      if (!(await N.podeMandar(client, interaction.user.id))) return await interaction.reply(UI.erro('Só o pai e os delegados fazem isso.'));
+      if (!(await N.podeMandar(client, interaction.user.id))) return await interaction.reply(UI.erro('Só o responsável e os delegados fazem isso.'));
       const [, acao, token] = interaction.customId.split(':');
       const p = N.pegarPendente(token);
       if (!p || p.tipo !== 'backup' || p.uid !== interaction.user.id) return await interaction.update({ ...UI.edicao(UI.aviso('Esse pedido expirou. Rode `/gestao restaurar` de novo.')), components: [] });

@@ -3,7 +3,6 @@ const N = require('../vagas/nucleo');
 
 const EPH = MessageFlags.Ephemeral;
 
-// Modal do /vagaadmin obras: linhas "Nome = Obra"
 async function modalObras(interaction) {
   try {
     if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
@@ -20,7 +19,7 @@ async function modalObras(interaction) {
     return interaction.editReply(txt);
   } catch (err) {
     console.error('[Vagas] obras:', err);
-    try { await interaction.editReply('Deu erro ao salvar as obras.'); } catch { /* ignora */ }
+    try { await interaction.editReply('Deu erro ao salvar as obras.'); } catch {}
   }
 }
 
@@ -55,8 +54,8 @@ module.exports = {
       return interaction.editReply(txt);
     } catch (err) {
       console.error('[Vagas] lote:', err);
-      try { await interaction.editReply('Deu erro ao criar as vagas.'); } catch { /* ignora */ }
+      try { await interaction.editReply('Deu erro ao criar as vagas.'); } catch {}
     }
   },
 };
-                                                                                                              
+

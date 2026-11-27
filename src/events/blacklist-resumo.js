@@ -1,4 +1,3 @@
-// Resumo diário do que os membros vigiados fizeram + limpeza das observações vencidas.
 const db = require('../db');
 const B = require('../blacklist/nucleo');
 const L = require('../logs/nucleo');
@@ -8,7 +7,6 @@ module.exports = {
   once: true,
   execute(client) {
     async function verificar() {
-      // Observações vencidas somem sozinhas ao serem consultadas
       B.listaObservados();
 
       const hora = B.resumoHora();
@@ -17,7 +15,6 @@ module.exports = {
       if (db.get('config.blacklist.ultimoResumo') === hoje) return;
       if (B.horaLocal() < hora) return;
 
-      // Marca antes de enviar, para nunca mandar duas vezes no mesmo dia
       db.set('config.blacklist.ultimoResumo', hoje);
 
       const ontem = B.diaLocal(-1);

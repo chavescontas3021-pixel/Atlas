@@ -25,73 +25,13 @@ function status(interaction) {
         `Banner: ${N.bannerValido(c.banner) ? 'sim' : 'não'}`,
     });
   }
-  const lista = N.ranking(1000);
-  const total = lista.reduce((soma, x) => soma + x.pontos, 0);
-  embed.setFooter({ text: `${lista.length} promotor(es) • ${total} parceria(s) no total` });
   return interaction.reply({ embeds: [embed], flags: EPH });
-}
-
-// Posição de cada item da lista (empatados dividem a mesma posição, igual ao {rank} da mensagem)
-function posicoes(lista) {
-  return lista.map((x) => lista.findIndex((y) => y.pontos === x.pontos) + 1);
-}
-
-function ranking(interaction) {
-  const qtd = interaction.options.getInteger('quantidade') || 10;
-  const lista = N.ranking(qtd);
-  if (!lista.length) return responder(interaction, 'Ainda não há parcerias registradas. 🤝');
-  const pos = posicoes(lista);
-  const medalha = (n) => (n === 1 ? '🥇' : n === 2 ? '🥈' : n === 3 ? '🥉' : `**#${n}**`);
-  const linhas = lista.map((x, i) => `${medalha(pos[i])} <@${x.uid}> — ${x.pontos} parceria(s)`);
-  const embed = new EmbedBuilder()
-    .setColor(0xf5a3c7)
-    .setTitle('🏆 Rank de promotores')
-    .setDescription(linhas.join('\n').slice(0, 4000));
-  return interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
-}
-
-function pontos(interaction) {
-  const membro = interaction.options.getUser('membro');
-  const acao = interaction.options.getString('acao');
-  const qtd = interaction.options.getInteger('quantidade');
-  if (membro.bot) return responder(interaction, '❌ Bots não fazem parcerias.');
-
-  const resumo = (titulo) =>
-    `${titulo}\n${membro}: **${N.pontosDe(membro.id)}** parceria(s) • rank **#${N.rankDe(membro.id)}**`;
-
-  if (acao === 'ver') return interaction.reply({ content: resumo('📊 Pontos de promotor'), flags: EPH, allowedMentions: { parse: [] } });
-
-  if (qtd === null) return responder(interaction, '❌ Informe a `quantidade`.');
-  const antes = N.pontosDe(membro.id);
-  if (acao === 'definir') N.definirPontos(membro.id, qtd);
-  if (acao === 'adicionar') N.somarPonto(membro.id, qtd);
-  if (acao === 'remover') N.somarPonto(membro.id, -qtd);
-  return interaction.reply({
-    content: resumo(`✅ Pontos atualizados (antes: ${antes}).`),
-    flags: EPH,
-    allowedMentions: { parse: [] },
-  });
-}
-
-function variaveis(interaction) {
-  return responder(
-    interaction,
-    '**Variáveis das mensagens de parceria**\n' +
-      '`{convite}` — link do convite\n' +
-      '`{servidor_parceiro}` — nome do servidor do convite\n' +
-      '`{representante}` — pessoa marcada junto do convite (ou "não informado")\n' +
-      '`{promotor}` — quem fez a parceria (`{membro}` também funciona)\n' +
-      '`{pontos}` — parcerias já feitas pelo promotor (contando esta)\n' +
-      '`{rank}` — posição do promotor no rank\n' +
-      '`{cargo}` — cargo de notificação\n' +
-      '`{servidor}` — servidor onde o convite foi postado'
-  );
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('parceria')
-    .setDescription('Parcerias: mensagens, pontos e rank (staff)')
+    .setDescription('Configura as mensagens automáticas de parceria (staff)')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((s) => s.setName('status').setDescription('Mostra a configuração das duas parcerias'))
     .addSubcommand((s) =>
@@ -127,32 +67,6 @@ module.exports = {
         .addStringOption((o) => o.setName('link').setDescription('Link direto da imagem (https://...)').setMaxLength(500))
     )
     .addSubcommand((s) =>
-      s
-        .setName('ranking')
-        .setDescription('Mostra o rank de promotores')
-        .addIntegerOption((o) => o.setName('quantidade').setDescription('Quantos mostrar (padrão 10)').setMinValue(3).setMaxValue(25))
-    )
-    .addSubcommand((s) =>
-      s
-        .setName('pontos')
-        .setDescription('Vê ou ajusta os pontos de um promotor')
-        .addUserOption((o) => o.setName('membro').setDescription('O promotor').setRequired(true))
-        .addStringOption((o) =>
-          o
-            .setName('acao')
-            .setDescription('O que fazer')
-            .setRequired(true)
-            .addChoices(
-              { name: 'Ver', value: 'ver' },
-              { name: 'Definir o total', value: 'definir' },
-              { name: 'Adicionar', value: 'adicionar' },
-              { name: 'Remover', value: 'remover' }
-            )
-        )
-        .addIntegerOption((o) => o.setName('quantidade').setDescription('Quantidade (não precisa para "Ver")').setMinValue(0).setMaxValue(100000))
-    )
-    .addSubcommand((s) => s.setName('variaveis').setDescription('Lista as variáveis das mensagens'))
-    .addSubcommand((s) =>
       s.setName('testar').setDescription('Mostra uma prévia (sem marcar ninguém)').addStringOption(tipoOpt)
     ),
 
@@ -161,9 +75,6 @@ module.exports = {
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'status') return status(interaction);
-    if (sub === 'ranking') return ranking(interaction);
-    if (sub === 'pontos') return pontos(interaction);
-    if (sub === 'variaveis') return variaveis(interaction);
 
     if (sub === 'ativar') {
       const tipo = interaction.options.getString('tipo');
@@ -220,13 +131,7 @@ module.exports = {
       const tipo = interaction.options.getString('tipo');
       const msg = N.montar(
         tipo,
-        {
-          membroId: interaction.user.id,
-          convite: 'https://discord.gg/exemplo',
-          servidor: interaction.guild.name,
-          servidorParceiro: 'Servidor Exemplo',
-          representanteId: interaction.user.id,
-        },
+        { membroId: interaction.user.id, convite: 'https://discord.gg/exemplo', servidor: interaction.guild.name },
         { preview: true }
       );
       return interaction.reply({ ...msg, flags: EPH });
@@ -251,7 +156,7 @@ module.exports = {
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
               .setCustomId('texto')
-              .setLabel('Texto (veja /parceria variaveis)')
+              .setLabel('Texto ({convite} {membro} {servidor} {cargo})')
               .setStyle(TextInputStyle.Paragraph)
               .setMaxLength(2000)
               .setRequired(true)

@@ -10,4 +10,3 @@ module.exports = {
     console.log('[Ranking] placar fixo iniciado');
   },
 };
-// fim do arquivo

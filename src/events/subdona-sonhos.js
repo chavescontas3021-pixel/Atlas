@@ -1,4 +1,3 @@
-// Sub dona: reconhece pagamentos de sonhos (Loritta) feitos ao pai.
 const Sonhos = require('../subdona/sonhos');
 
 module.exports = {

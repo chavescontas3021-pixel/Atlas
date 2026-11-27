@@ -6,7 +6,6 @@ const T = require('../ui/tema');
 const db = require('../db');
 const Acesso = require('../utils/acesso');
 
-// Tudo em preto do Atlas; vermelho só para banimento.
 const COR = { aviso: T.COR.base, ban: T.COR.perigo, kick: T.COR.base, ok: T.COR.base };
 
 const PADROES = {
@@ -64,7 +63,6 @@ function proximoId() {
   return n;
 }
 
-// Retorna um texto de erro, ou null se pode agir
 function checarHierarquia(executor, alvo) {
   const guild = alvo.guild;
   if (alvo.id === executor.id) return 'Você não pode fazer isso consigo mesmo.';
@@ -96,7 +94,6 @@ function varsBase(guild, motivo) {
   return { servidor: guild.name, motivo, regra: 'não informada', avisos: '', limite: String(limite()) };
 }
 
-// Manda um registro no canal de log
 async function registrar(guild, { titulo, cor, alvo, executor, motivo, extras = [] }) {
   const id = cfg('canalLog');
   if (!id) return;
@@ -153,15 +150,11 @@ async function desbanir(guild, executor, id, motivo) {
   }
 }
 
-// ---------- Advertência no canal de divergências ----------
-// Canal onde a advertência vira mensagem pública + tópico (/moderacao canaladvertencia)
 const canalAdvertencia = () => cfg('canalAdvertencia', null);
 
-// Staff do tópico: quem pode avisar membros (Moderar Membros) ou é staff do Atlas
 const ehStaffTopico = (membro) =>
   !!membro && (Acesso.ehStaff(membro) || (membro.permissions && membro.permissions.has(PermissionFlagsBits.ModerateMembers)));
 
-// Mensagem no canal: marca o membro, mostra o motivo e manda questionar no tópico logo abaixo
 async function anunciarNoCanal(canal, membro, motivo, regraTexto, total, lim) {
   const campos = [{ nome: 'Motivo', valor: motivo }];
   if (regraTexto) campos.push({ nome: 'Regra', valor: regraTexto });
@@ -179,7 +172,6 @@ async function anunciarNoCanal(canal, membro, motivo, regraTexto, total, lim) {
   });
 }
 
-// Tópico logo abaixo da mensagem: só o membro e a staff escrevem (o resto é apagado pelo Atlas)
 async function criarTopico(msg, executor, membro) {
   const nome = `Advertência · ${membro.user.username}`.slice(0, 100);
   const motivo = `Advertência de ${membro.user.tag} por ${executor.tag}`.slice(0, 500);
@@ -195,7 +187,6 @@ async function criarTopico(msg, executor, membro) {
   return topico;
 }
 
-// opcoes.canal: se vier, a advertência sai nesse canal (sem DM) e ganha um tópico
 async function darAviso(guild, executor, membro, motivo, numeroRegra, opcoes = {}) {
   const todas = regras();
   const regraTexto = numeroRegra && todas[numeroRegra - 1] ? `${numeroRegra}. ${todas[numeroRegra - 1]}` : null;
@@ -219,7 +210,6 @@ async function darAviso(guild, executor, membro, motivo, numeroRegra, opcoes = {
     try {
       noCanal = { msg: await anunciarNoCanal(opcoes.canal, membro, motivo, regraTexto, total, lim) };
     } catch (e) {
-      // Não deu para postar no canal: avisa por DM para o membro não ficar sem saber
       console.error('[Moderação] advertência no canal:', e.message);
       noCanal = { erro: e.message };
       dm = await enviarDM(membro.user, 'dmAviso', vars);
@@ -248,7 +238,6 @@ async function darAviso(guild, executor, membro, motivo, numeroRegra, opcoes = {
       banido = await banir(guild, executor, membro.user, membro, motivoBan, 0);
     }
   }
-  // Tópico só faz sentido se o membro continua no servidor
   if (noCanal && noCanal.msg && !(banido && banido.ok)) {
     try {
       noCanal.topico = await criarTopico(noCanal.msg, executor, membro);
@@ -260,7 +249,6 @@ async function darAviso(guild, executor, membro, motivo, numeroRegra, opcoes = {
   return { total, limite: lim, dm, banido, noCanal };
 }
 
-// Janela para editar as mensagens de DM (usada pelo comando e pelos botões do painel)
 function modalMensagem(tipo) {
   const atual = mensagem(tipo);
   return new ModalBuilder()

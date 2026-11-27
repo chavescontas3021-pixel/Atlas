@@ -1,4 +1,3 @@
-// Fluxo de compra: confirma com botões e depois paga. Usado pelo /loja comprar e pelo menu da loja.
 const N = require('./nucleo');
 const UI = require('../ui/componentes');
 const { S } = require('../ui/tema');

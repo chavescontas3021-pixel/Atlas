@@ -1,5 +1,3 @@
-// Monstros em pixel art (dark fantasy), desenhados por código. Todos olham para a ESQUERDA (para o herói).
-// Cada monstro vira uma grade de cores (null = vazio) com 4 quadros de animação.
 const K = '#0d0912';
 
 const nova = (w, h) => Array.from({ length: h }, () => Array(w).fill(null));
@@ -23,7 +21,6 @@ function lin(g, x0, y0, x1, y1, c, esp = 1) {
     for (let a = 0; a < esp; a++) for (let b = 0; b < esp; b++) px(g, x + a - (esp > 2 ? 1 : 0), y + b - (esp > 2 ? 1 : 0), c);
   }
 }
-// polígono preenchido (varredura por linhas)
 function poli(g, pts, c) {
   const ys = pts.map((p) => p[1]);
   for (let y = Math.floor(Math.min(...ys)); y <= Math.ceil(Math.max(...ys)); y++) {
@@ -37,13 +34,11 @@ function poli(g, pts, c) {
     for (let i = 0; i + 1 < xs.length; i += 2) for (let x = Math.round(xs[i]); x <= Math.round(xs[i + 1]); x++) px(g, x, y, c);
   }
 }
-// corpo redondo com sombreamento: sombra, tom médio e luz deslocada para cima/esquerda
 function corpo(g, cx, cy, rx, ry, [esc, med, luz]) {
   elip(g, cx, cy, rx, ry, esc);
   elip(g, cx - rx * 0.1, cy - ry * 0.12, rx * 0.88, ry * 0.88, med);
   elip(g, cx - rx * 0.3, cy - ry * 0.38, rx * 0.46, ry * 0.4, luz);
 }
-// contorno escuro ao redor de tudo
 function contorno(g) {
   const base = g.map((l) => l.slice());
   for (let y = 0; y < g.length; y++) {
@@ -55,7 +50,6 @@ function contorno(g) {
   return g;
 }
 
-// ---------- Slime Verde ----------
 function slime(t) {
   const g = nova(24, 16);
   const h = [6.4, 7, 6.6, 6][t];
@@ -71,7 +65,6 @@ function slime(t) {
   return contorno(g);
 }
 
-// ---------- Lobo Selvagem ----------
 function lobo(t) {
   const g = nova(32, 20);
   const pel = ['#3c3f4e', '#7d8190', '#c4c8d8'];
@@ -94,7 +87,6 @@ function lobo(t) {
   return contorno(g);
 }
 
-// ---------- Goblin Saqueador ----------
 function goblin(t) {
   const g = nova(22, 28);
   const pele = ['#3a7430', '#68a84c', '#a8df7a'];
@@ -114,7 +106,6 @@ function goblin(t) {
   return contorno(g);
 }
 
-// ---------- Esqueleto Guerreiro ----------
 function esqueleto(t) {
   const g = nova(22, 30);
   const osso = ['#8f8870', '#e4dec6', '#fffdf0'];
@@ -137,7 +128,6 @@ function esqueleto(t) {
   return contorno(g);
 }
 
-// ---------- Orc Brutamontes ----------
 function orc(t) {
   const g = nova(30, 34);
   const pele = ['#27501e', '#4a8832', '#86c45e'];
@@ -164,7 +154,6 @@ function orc(t) {
   return contorno(g);
 }
 
-// ---------- Golem de Pedra ----------
 function golem(t) {
   const g = nova(34, 36);
   const ped = ['#464656', '#7a7b8c', '#b2b4c6'];
@@ -188,7 +177,6 @@ function golem(t) {
   return contorno(g);
 }
 
-// ---------- Dragão Jovem ----------
 const DRAGAO_VERMELHO = { esc: ['#6e1220', '#b01e2e', '#ee5a64'], mem: '#5a0e1c', osso: '#e8d9a0', costela: '#8a1a2a', ventre: '#e0b060', listra: '#b8843c', olho: '#ffe14a', fogo: '#ffb040' };
 function dragao(t, pal = DRAGAO_VERMELHO) {
   const g = nova(44, 34);
@@ -219,8 +207,6 @@ function dragao(t, pal = DRAGAO_VERMELHO) {
   return contorno(g);
 }
 
-
-// ---------- Lobo Infernal (chefe) ----------
 function loboInfernal(t) {
   const g = nova(44, 30);
   const pel = ['#1c0f1a', '#3e1a2a', '#8a3040'];
@@ -248,7 +234,6 @@ function loboInfernal(t) {
   return contorno(g);
 }
 
-// ---------- Aranha Gigante (chefe) ----------
 function aranha(t) {
   const g = nova(48, 34);
   const per = ['#3d2260', '#9a6ad0'];
@@ -275,7 +260,6 @@ function aranha(t) {
   return contorno(g);
 }
 
-// ---------- Rei Esqueleto (chefe) ----------
 function reiEsqueleto(t) {
   const g = nova(34, 44);
   const osso = ['#8f8870', '#e4dec6', '#fffdf0'];
@@ -304,7 +288,6 @@ function reiEsqueleto(t) {
   return contorno(g);
 }
 
-// ---------- Lich Ancião ----------
 function lich(t) {
   const g = nova(28, 40);
   const rb = ['#220f3c', '#46267a', '#7a52b8'];
@@ -330,7 +313,6 @@ function lich(t) {
   return contorno(g);
 }
 
-// ---------- Cavaleiro das Trevas ----------
 function cavaleiro(t) {
   const g = nova(30, 42);
   const arm = ['#15121e', '#2b2838', '#5a5678'];
@@ -356,7 +338,6 @@ function cavaleiro(t) {
   return contorno(g);
 }
 
-// ---------- Hidra Abissal ----------
 function hidra(t) {
   const g = nova(46, 38);
   const esc = ['#0f3a34', '#1f7a6a', '#58d8b0'];
@@ -385,7 +366,6 @@ function hidra(t) {
   return contorno(g);
 }
 
-// ---------- Devorador de Almas ----------
 function devorador(t) {
   const g = nova(36, 42);
   const es = ['#14304a', '#2f6a9a', '#8fd6ff'];
@@ -410,7 +390,6 @@ function devorador(t) {
   return contorno(g);
 }
 
-// ---------- Sombra (monstro desconhecido) ----------
 function sombra(t) {
   const g = nova(24, 24);
   corpo(g, 12, 13, 9, 9, ['#1a1428', '#3a2d5a', '#6d5aa0']);
@@ -424,12 +403,10 @@ const ARTE = {
   'Slime Verde': slime, 'Lobo Selvagem': lobo, 'Goblin Saqueador': goblin, 'Esqueleto Guerreiro': esqueleto,
   'Orc Brutamontes': orc, 'Golem de Pedra': golem, 'Dragão Jovem': (t) => dragao(t), 'Lich Ancião': lich,
   'Cavaleiro das Trevas': cavaleiro, 'Hidra Abissal': hidra, 'Devorador de Almas': devorador,
-  // chefes
   'Dragão Negro': (t) => dragao(t, { esc: ['#08060c', '#221a2c', '#5a4668'], mem: '#7a0f22', osso: '#c9bfa8', costela: '#a01830', ventre: '#8a1428', listra: '#4a0a14', olho: '#ff3b3b', fogo: '#ff7a1c' }),
   'Lobo Infernal': loboInfernal, 'Aranha Gigante': aranha, 'Rei Esqueleto': reiEsqueleto,
 };
 
-// Registra um monstro novo (usado pelos chefes): nome -> função (t 0..3) que devolve uma grade
 function registrar(nome, fn) { ARTE[nome] = fn; }
 
 const cache = new Map();
@@ -440,4 +417,3 @@ function grade(nome, t = 0) {
 }
 
 module.exports = { grade, registrar, K, nova, px, ret, elip, lin, poli, corpo, contorno, ARTE };
-// fim do arquivo

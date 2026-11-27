@@ -1,4 +1,3 @@
-// Placar fixo: uma embed num canal que se atualiza sozinha (nível, stars, vitórias e MVPs).
 const { EmbedBuilder } = require('discord.js');
 const db = require('../db');
 const R = require('../rpg/nucleo');
@@ -9,7 +8,6 @@ const MEDALHAS = ['🥇', '🥈', '🥉'];
 const fmt = (n) => Number(n).toLocaleString('pt-BR');
 const cfg = () => db.get('config.ranking', null);
 
-// MVP de chefe: chamado quando um chefe é derrotado
 function registrarMvp(uid) {
   if (!uid) return;
   db.set(`ranking.mvps.${uid}`, db.get(`ranking.mvps.${uid}`, 0) + 1);
@@ -57,7 +55,6 @@ function montar() {
 
 let ultimo = '';
 
-// Edita a mensagem fixa (ou cria de novo se foi apagada). Retorna { ok } ou { erro }
 async function atualizar(client, forcar = false) {
   const c = cfg();
   if (!c || !c.canalId) return { erro: 'Placar não configurado.' };
@@ -81,4 +78,3 @@ async function atualizar(client, forcar = false) {
 }
 
 module.exports = { cfg, montar, atualizar, registrarMvp };
-// fim do arquivo

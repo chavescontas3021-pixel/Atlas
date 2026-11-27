@@ -1,28 +1,25 @@
-// Núcleo da blacklist: lista, observação automática, histórico, estatísticas e alertas.
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../db');
 const L = require('../logs/nucleo');
 
-const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar'); // não passa pelo editor de mensagens
+const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar');
 const FUSO = 'America/Sao_Paulo';
 const COR = { alerta: 0xe74c3c, obs: 0xf1c40f, info: 0x3498db, ok: 0x2ecc71 };
 const MAX_HISTORICO = 100;
 const MAX_AUTOMOD = 50;
-const DEDUPE_MS = 30 * 1000; // alertas iguais dentro de 30s viram um só
-const PING_MS = 5 * 60 * 1000; // no máximo 1 marcação de cargo a cada 5 min por membro
-const BLOQUEIOS_PARA_OBSERVAR = 4; // 4 bloqueios do automod em 24h colocam o membro em observação
+const DEDUPE_MS = 30 * 1000;
+const PING_MS = 5 * 60 * 1000;
+const BLOQUEIOS_PARA_OBSERVAR = 4;
 
-// ---------- Configurações ----------
 const cfg = (k, p) => db.get(`config.blacklist.${k}`, p);
 const modoCompleto = () => !!cfg('completo', false);
 const cargoId = () => cfg('cargo') || null;
-const canalId = () => cfg('canal') || L.canalId('moderacao') || null; // sem canal próprio, usa o de logs de moderação
+const canalId = () => cfg('canal') || L.canalId('moderacao') || null;
 const resumoHora = () => {
   const v = cfg('resumo', 9);
   return v === false || v === null || v === undefined ? null : Number(v);
 };
 
-// ---------- Datas (no fuso do Brasil) ----------
 function diaLocal(offsetDias = 0) {
   const d = new Date(Date.now() + offsetDias * 86400000);
   try {
@@ -40,7 +37,6 @@ function horaLocal() {
   }
 }
 
-// ---------- Lista (só ADM mexe) ----------
 function lista() {
   const o = db.get('blacklist.membros', {}) || {};
   return Object.entries(o).map(([id, d]) => ({ id, ...d }));
@@ -50,7 +46,7 @@ const esta = (id) => !!get(id);
 
 function adicionar(userId, motivo, porId) {
   db.set(`blacklist.membros.${userId}`, { motivo, por: porId, data: Date.now() });
-  db.remover(`blacklist.observacao.${userId}`); // quem entra na lista não precisa mais de observação
+  db.remover(`blacklist.observacao.${userId}`);
 }
 
 function remover(userId) {
@@ -60,7 +56,6 @@ function remover(userId) {
   db.remover(`blacklist.automod.${userId}`);
 }
 
-// ---------- Observação (automática, só gera alertas) ----------
 function observacao(id) {
   const o = db.get(`blacklist.observacao.${id}`) || null;
   if (!o) return null;
@@ -72,7 +67,6 @@ function observacao(id) {
 }
 const observando = (id) => !!observacao(id);
 
-// Quem está na lista OU em observação é vigiado
 const vigiado = (id) => esta(id) || observando(id);
 
 function listaObservados() {
@@ -82,7 +76,6 @@ function listaObservados() {
     .map(([id, d]) => ({ id, ...d }));
 }
 
-// Retorna true se o membro entrou agora em observação (false se já estava ou já está na blacklist)
 function observar(userId, motivo, dias = 7) {
   if (esta(userId)) return false;
   const jaEstava = observando(userId);
@@ -101,7 +94,6 @@ function soltar(userId) {
   return tinha;
 }
 
-// ---------- Histórico e estatísticas ----------
 function historico(userId) {
   const h = db.get(`blacklist.historico.${userId}`, []);
   return Array.isArray(h) ? [...h] : [];
@@ -123,7 +115,7 @@ function contar(userId, { total = 0, suspeitos = 0, automod = 0 } = {}) {
   h.suspeitos += suspeitos;
   h.automod += automod;
   todos[dia] = h;
-  for (const k of Object.keys(todos).sort().slice(0, -8)) delete todos[k]; // guarda só 8 dias
+  for (const k of Object.keys(todos).sort().slice(0, -8)) delete todos[k];
   db.set(base, todos);
 }
 
@@ -132,13 +124,11 @@ function estatisticas(userId, dia = diaLocal()) {
   return todos[dia] || { total: 0, suspeitos: 0, automod: 0 };
 }
 
-// ---------- Ocorrências do automod (de todos os membros) ----------
 function ocorrencias(userId) {
   const o = db.get(`blacklist.automod.${userId}`, []);
   return Array.isArray(o) ? [...o] : [];
 }
 
-// Chamada pelo automod toda vez que bloqueia algo. Se o membro bloquear muito, entra em observação.
 async function registrarOcorrencia(guild, userId, { categoria, grave }) {
   const lista = ocorrencias(userId);
   lista.push({ t: Date.now(), categoria, grave: !!grave });
@@ -153,7 +143,6 @@ async function registrarOcorrencia(guild, userId, { categoria, grave }) {
   return recentes;
 }
 
-// ---------- Envio ----------
 async function enviarCanal(guild, emb, extra = {}) {
   try {
     const id = canalId();
@@ -185,11 +174,10 @@ function botoes(userId) {
   );
 }
 
-const ultimoEnvio = new Map(); // "user|titulo" -> hora
-const suprimidos = new Map(); // "user|titulo" -> quantos alertas iguais foram cortados
-const ultimoPing = new Map(); // userId -> hora
+const ultimoEnvio = new Map();
+const suprimidos = new Map();
+const ultimoPing = new Map();
 
-// Anota no histórico e, se for suspeito (ou o modo completo/forçar estiver ligado), avisa no canal
 async function alertar(guild, userId, titulo, descricao, campos = [], { suspeito = true, forcar = false } = {}) {
   const dados = get(userId);
   const obs = dados ? null : observacao(userId);
@@ -199,7 +187,6 @@ async function alertar(guild, userId, titulo, descricao, campos = [], { suspeito
   contar(userId, { total: 1, suspeitos: suspeito ? 1 : 0 });
   if (!suspeito && !forcar && !modoCompleto()) return;
 
-  // Corta alertas repetidos
   const chave = `${userId}|${titulo}`;
   const agora = Date.now();
   if (agora - (ultimoEnvio.get(chave) || 0) < DEDUPE_MS) {
@@ -229,7 +216,6 @@ async function alertar(guild, userId, titulo, descricao, campos = [], { suspeito
   await enviarCanal(guild, emb, extra);
 }
 
-// ---------- Detecção de suspeitas em mensagens ----------
 const RE_CONVITE = /(?:discord\.gg|discord(?:app)?\.com\/invite)\/[\w-]+/i;
 const RE_LINK = /https?:\/\/[^\s]+/i;
 const RE_GOLPE = /free\s*nitro|nitro\s*gr[aá]tis|steam\s*gift|airdrop|clique\s+(?:aqui\s+)?(?:para|e)\s+(?:ganhar|resgatar)/i;
@@ -252,7 +238,7 @@ function motivosConteudo(msg) {
   return m;
 }
 
-const recentes = new Map(); // userId -> [{ t, texto }]
+const recentes = new Map();
 
 function motivosSpam(userId, texto) {
   const agora = Date.now();

@@ -80,7 +80,7 @@ module.exports = {
         if (r.erro) return responder(`❌ Trocar de profissão custa ⭐ ${CUSTO_TROCA}. ${r.erro}`);
       }
       novo.atual = id;
-      dadosDe(novo, id); // mantém o nível que você já tinha nela
+      dadosDe(novo, id);
       db.set(caminho(uid), novo);
       const p = PROFISSOES[id];
       return interaction.reply(`${p.emoji} Agora você é **${p.nome}**!${custo ? ` (⭐ -${custo})` : ''} Use \`/profissao trabalhar\`.`);

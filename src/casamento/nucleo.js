@@ -1,31 +1,26 @@
-// Casamento: dados das cerimônias e dos casais (a parte 31 usa os casais para ranking e mimos).
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const db = require('../db');
 
 const COR = 0xf5a3c7;
 const MAX_CONVIDADOS = 40;
-const MAX_PADRINHOS = 4; // MUDE AQUI: quantos padrinhos/madrinhas cada casal pode escolher (no total)
+const MAX_PADRINHOS = 4;
 const ATIVOS = ['agendado', 'andamento', 'interrompido', 'concluido'];
 
-// "pausa" entre as falas do Atlas (em milissegundos). Os testes colocam 0.
 const ajustes = { pausa: 2500 };
 
 const cfg = (chave, padrao) => db.get(`config.casamento.${chave}`, padrao);
 
-// ---------- Cerimônias ----------
 const cerimonias = () => db.get('casamento.cerimonias', {}) || {};
 const cerimoniaDoCanal = (canalId) => db.get(`casamento.cerimonias.${canalId}`, null);
 const salvarCerimonia = (c) => db.set(`casamento.cerimonias.${c.canalId}`, c);
 const removerCerimonia = (canalId) => db.remover(`casamento.cerimonias.${canalId}`);
 
-// Cerimônia em que a pessoa é um dos noivos
 function cerimoniaDe(uid) {
   return Object.values(cerimonias()).find((c) => ATIVOS.includes(c.status) && (c.a === uid || c.b === uid)) || null;
 }
 
 const ehNoivo = (c, uid) => !!c && (c.a === uid || c.b === uid);
 
-// ---------- Casais (quem já está casado) ----------
 const casais = () => db.get('casamento.casais', {}) || {};
 const casalDe = (uid) => {
   const id = db.get(`casamento.casalDe.${uid}`, null);
@@ -42,11 +37,9 @@ function registrarCasal(a, b, canalId, padrinhos) {
   return casal;
 }
 
-// ---------- Canal do casamento ----------
 const P = PermissionFlagsBits;
 const BASICO = [P.ViewChannel, P.ReadMessageHistory, P.SendMessages, P.AddReactions, P.AttachFiles, P.EmbedLinks];
 
-// Apaga do registro cerimônias cujo canal já não existe (apagado na mão)
 function limparFantasmas(guild) {
   for (const c of Object.values(cerimonias())) {
     if (!guild.channels.cache.has(c.canalId)) removerCerimonia(c.canalId);
@@ -77,7 +70,6 @@ async function criarCanal(guild, ua, ub, staffUserId) {
   return guild.channels.create(opcoes);
 }
 
-// Dá acesso ao canal para um convidado (durante a cerimônia ele só assiste)
 function darAcesso(canal, uid, podeFalar) {
   return canal.permissionOverwrites.edit(uid, {
     ViewChannel: true,
@@ -87,7 +79,6 @@ function darAcesso(canal, uid, podeFalar) {
   });
 }
 
-// Tranca (ou libera) a fala de todos os convidados
 async function travarConvidados(canal, c, travar) {
   for (const uid of c.convidados || []) {
     await canal.permissionOverwrites.edit(uid, { SendMessages: !travar }).catch(() => {});

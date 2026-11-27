@@ -1,4 +1,3 @@
-// Vigia os membros da blacklist e os que estão em observação: guarda tudo e avisa quando algo é suspeito.
 const { AuditLogEvent, PermissionFlagsBits: P } = require('discord.js');
 const B = require('../blacklist/nucleo');
 const L = require('../logs/nucleo');
@@ -21,7 +20,6 @@ module.exports = {
         Promise.resolve().then(() => fn(...args)).catch((e) => console.error(`[Blacklist] ${evento}:`, e))
       );
 
-    // ---------- Mensagens ----------
     on('messageCreate', async (msg) => {
       if (!msg.guild || !msg.author || msg.author.bot || msg.webhookId) return;
       if (!B.vigiado(msg.author.id)) return;
@@ -77,7 +75,6 @@ module.exports = {
       );
     });
 
-    // ---------- Entrada, saída e mudanças ----------
     on('guildMemberAdd', async (m) => {
       if (!B.vigiado(m.id)) return;
       await B.alertar(m.guild, m.id, '🚨 Membro vigiado entrou no servidor', 'Ele voltou (ou entrou pela primeira vez).', [
@@ -120,7 +117,6 @@ module.exports = {
       }
     });
 
-    // ---------- Voz (entrar numa call sempre avisa a staff) ----------
     on('voiceStateUpdate', async (antes, depois) => {
       const m = depois.member || antes.member;
       if (!m || m.user.bot || !B.vigiado(m.id)) return;
@@ -134,7 +130,6 @@ module.exports = {
       await B.alertar(m.guild, m.id, '🔊 Atividade na voz', texto, [], { suspeito: false, forcar: entrou });
     });
 
-    // ---------- Comandos e convites ----------
     on('interactionCreate', async (i) => {
       if (!i.guild || !i.isChatInputCommand() || !B.vigiado(i.user.id)) return;
       await B.alertar(i.guild, i.user.id, '⌨️ Usou um comando', `\`${L.corta(i.toString(), 200)}\``, [
@@ -149,7 +144,6 @@ module.exports = {
       ]);
     });
 
-    // ---------- Ações dele no servidor (registro de auditoria) ----------
     on('guildAuditLogEntryCreate', async (entry, guild) => {
       const id = entry.executorId;
       if (!id || !B.vigiado(id)) return;

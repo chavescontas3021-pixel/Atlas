@@ -1,4 +1,3 @@
-// ATLAS · sub dona · ronda (roda a cada 5 minutos): tickets parados, cobranças vencidas, rotinas, resumos e backup
 const UI = require('../ui/componentes');
 const N = require('./nucleo');
 const At = require('./atendente');
@@ -17,13 +16,11 @@ async function tickets(client) {
     const agora = Date.now();
     const ultima = t.ultima || t.aberto;
 
-    // 1) ninguém da staff apareceu: lembra a staff uma vez
     if (!t.assumidoPor && !t.humano && !t.lembrete && agora - t.aberto > 20 * MIN && At.ativoNeste()) {
       t.lembrete = agora; At.salvar(t);
       await At.chamarStaff(client, canal, t, `O ticket #${T.numeroFmt(t.numero)} está esperando atendimento há mais de 20 minutos.`);
       continue;
     }
-    // 2) parado há 48 h: pergunta se ainda precisa; 24 h depois fecha (se o poder permitir)
     if (agora - ultima > 48 * H && !t.avisoInativo) {
       t.avisoInativo = agora; At.salvar(t);
       await canal.send({ content: `<@${t.userId}>`, ...UI.nota('Esse ticket está parado há 2 dias. Ainda precisa dele?', 'aviso', { publica: true }), components: [UI.botoes([{ id: 'sdt:ainda', label: 'Ainda preciso' }, { id: 'sdt:fechar', label: 'Pode fechar' }])], allowedMentions: { users: [t.userId] } }).catch(() => {});
@@ -41,8 +38,8 @@ function cobrancas() {
 }
 
 async function tick(client) {
-  require('./backup').tick(); // backup semanal da configuração (se ligado)
-  require('./presenca').atualizar(client); // status do bot acompanha a ausência (inclusive quando ela expira)
+  require('./backup').tick();
+  require('./presenca').atualizar(client);
   if (!N.ativo()) return;
   await tickets(client).catch((e) => console.error('[Sub dona] ronda tickets:', e));
   cobrancas();

@@ -1,7 +1,6 @@
 const db = require('../db');
 const N = require('../moderacao/nucleo');
 
-// Tópico de advertência: só o membro advertido e a staff podem escrever. O resto é apagado.
 module.exports = {
   name: 'messageCreate',
   async execute(client, message) {

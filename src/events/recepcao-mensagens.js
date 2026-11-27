@@ -9,7 +9,6 @@ module.exports = {
     const sessao = db.get(`recepcao.sessoes.${message.author.id}`);
     if (!sessao || sessao.canalId !== message.channelId) return;
 
-    // A staff assumiu o atendimento: o Atlas não responde nada
     if (sessao.assumido) return;
 
     try {

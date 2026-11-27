@@ -1,12 +1,11 @@
-// Automod: apaga mensagens proibidas, dá advertência (ou só avisa, se for leve) e vigia nomes de membros.
 const A = require('../automod/nucleo');
 const N = require('../moderacao/nucleo');
 const B = require('../blacklist/nucleo');
 const L = require('../logs/nucleo');
 
-const ultimoAcerto = new Map(); // userId -> hora da última punição (evita várias advertências de uma vez)
-const leves = new Map(); // userId -> horas dos últimos acertos leves
-const LEVES_PARA_ADVERTIR = 3; // 3 mensagens leves em 1 hora viram 1 advertência
+const ultimoAcerto = new Map();
+const leves = new Map();
+const LEVES_PARA_ADVERTIR = 3;
 const JANELA_LEVE = 60 * 60 * 1000;
 
 module.exports = {
@@ -22,7 +21,6 @@ module.exports = {
       const membro = msg.member || (await msg.guild.members.fetch(msg.author.id).catch(() => null));
       if (!membro) return;
 
-      // Quem está na blacklist nunca é isento: o automod é mais duro com ele
       const vigiado = B.esta(msg.author.id);
       if (!vigiado && A.isento(membro)) return;
 
@@ -35,7 +33,6 @@ module.exports = {
       const repetido = agora - (ultimoAcerto.get(membro.id) || 0) < 5000;
       ultimoAcerto.set(membro.id, agora);
 
-      // Decide se isto vale advertência
       let advertir = achou.advertir;
       let faltamLeves = 0;
       if (!repetido && !advertir) {
@@ -67,7 +64,6 @@ module.exports = {
         ],
       });
 
-      // Conexão com a blacklist: guarda a ocorrência (4 em 24h = observação) e alerta se for vigiado
       await B.registrarOcorrencia(msg.guild, msg.author.id, { categoria: achou.categoria, grave: achou.advertir });
       await B.alertar(msg.guild, msg.author.id, '🚨 Falou algo proibido', `Categoria: **${achou.categoria}**`, [
         ['Canal', `<#${msg.channel.id}>`, true],
@@ -78,7 +74,6 @@ module.exports = {
 
       let texto;
       if (advertir) {
-        // Com o canal de divergências configurado, a advertência sai lá (sem DM) e ganha um tópico
         const idDiv = N.canalAdvertencia();
         const canalDiv = idDiv ? msg.guild.channels.cache.get(idDiv) : null;
         const r = await N.darAviso(msg.guild, client.user, membro, `Automod: ${achou.categoria}`, null, {
@@ -111,7 +106,6 @@ module.exports = {
       if (aviso) setTimeout(() => aviso.delete().catch(() => {}), 20000);
     }
 
-    // Nome ou apelido impróprio: troca o apelido (sem advertência)
     async function checarNome(membro) {
       if (!A.ativo() || !A.nomesAtivo() || membro.user.bot) return;
       if (!B.esta(membro.id) && A.isento(membro)) return;

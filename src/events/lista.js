@@ -1,5 +1,3 @@
-// Central de ajuda do Atlas.
-// Lê os comandos que o bot realmente tem e monta: tela inicial + categorias com menu e paginação.
 const UI = require('../ui/componentes');
 const { S, corta } = require('../ui/tema');
 
@@ -19,7 +17,6 @@ const DESCRICOES = {
 
 const ehSubStaff = (desc) => /staff/i.test(desc || '');
 
-// Achata um comando em { nome, desc, subs:[{caminho, nome, desc, staff}], staff }
 function descrever(json) {
   const subs = [];
   for (const o of json.options || []) {
@@ -35,7 +32,6 @@ function descrever(json) {
   return { nome: json.name, desc: json.description, subs, staff: staffCmd };
 }
 
-// "Esconde" a marca (staff) da descrição, porque o símbolo já mostra isso
 const limpaStaff = (d) => String(d || '').replace(/\s*\(\s*staff\s*\)\s*/gi, ' ').trim();
 
 function bloco(c) {
@@ -73,7 +69,6 @@ function paginas(client, tipo) {
   return { pags: pags.length ? pags : ['Nenhum comando nessa categoria.'], total: lista.length };
 }
 
-// Menu de categorias (aparece em todas as telas)
 function menuCategorias(atual) {
   return UI.menu({
     id: 'cmds:menu',

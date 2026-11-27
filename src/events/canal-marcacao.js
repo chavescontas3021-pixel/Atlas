@@ -1,6 +1,5 @@
 const N = require('../canalmarcacao/nucleo');
 
-// Mensagem nova: sem marcação de canal = apagada
 module.exports = {
   name: 'messageCreate',
   async execute(client, message) {

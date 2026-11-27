@@ -1,4 +1,3 @@
-// ATLAS · assistente de construção: lê listas com variáveis e cria canais, categorias e cargos
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 
 const TIPOS = {
@@ -15,7 +14,7 @@ const ALIAS = {
   palco: 'palco', stage: 'palco',
   midia: 'midia', media: 'midia',
 };
-const MINUSCULO = new Set(['texto', 'anuncio', 'forum', 'midia']); // o Discord põe esses em minúsculas com hífen
+const MINUSCULO = new Set(['texto', 'anuncio', 'forum', 'midia']);
 const sem = (t) => String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const comLimite = (p, ms) => { let t; return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error('TEMPO')), ms); })]).finally(() => clearTimeout(t)); };
@@ -33,8 +32,6 @@ function linhasDe(texto) {
   return String(texto || '').replace(/\r/g, '').replace(/```[a-zA-Z]*/g, '').split('\n').map((l) => l.replace(/^\s*[-*]\s+/, '').trim()).filter((l) => l && !l.startsWith('//'));
 }
 
-// ───────── Canais e categorias ─────────
-// "{categoria} ╭━ INFO ━╮" / "{voz} 🔊・Sala" / "📢・avisos" (sem marca = texto). Canais ficam na última categoria acima.
 function lerCanais(texto) {
   const itens = []; const problemas = []; let cat = null;
   for (const linha of linhasDe(texto)) {
@@ -56,7 +53,6 @@ function lerCanais(texto) {
   return { itens, problemas };
 }
 
-// Confere limites do Discord. Devolve { categorias, canais, erros[] }
 function conferir(guild, itens, baseId) {
   const cats = itens.filter((i) => i.tipo === 'categoria').length;
   const canais = itens.length - cats;
@@ -82,23 +78,21 @@ async function criarCanais(guild, itens, { baseId = null, motivo, aoProgredir } 
   const ok = []; const falhas = []; const ids = new Map(); let n = 0;
   for (let k = 0; k < itens.length; k++) {
     const it = itens[k]; n++;
-    let pai = null;
-    if (it.tipo !== 'categoria') pai = it.cat === null ? baseId : ids.get(it.cat) || 'FALHOU';
-    if (pai === 'FALHOU') falhas.push({ ...it, erro: 'a categoria não foi criada' });
+    let superior = null;
+    if (it.tipo !== 'categoria') superior = it.cat === null ? baseId : ids.get(it.cat) || 'FALHOU';
+    if (superior === 'FALHOU') falhas.push({ ...it, erro: 'a categoria não foi criada' });
     else {
       try {
-        const c = await comLimite(guild.channels.create({ name: it.nome, type: TIPOS[it.tipo], ...(pai ? { parent: pai } : {}), reason: motivo }), 20000);
+        const c = await comLimite(guild.channels.create({ name: it.nome, type: TIPOS[it.tipo], ...(superior ? { parent: superior } : {}), reason: motivo }), 20000);
         ids.set(k, c.id); ok.push(it);
       } catch (e) { falhas.push({ ...it, erro: motivoErro(e) }); }
     }
-    if (aoProgredir) { try { await aoProgredir(n, itens.length); } catch { /* só informativo */ } }
+    if (aoProgredir) { try { await aoProgredir(n, itens.length); } catch {} }
     await dormir(450);
   }
   return { ok, falhas };
 }
 
-// ───────── Cargos ─────────
-// "✦ Staff {#ff5ac8} {separado} {mencionavel} {admin}" — as marcas ficam em qualquer lugar da linha
 function lerCargos(texto) {
   const itens = []; const problemas = [];
   for (const linha of linhasDe(texto)) {
@@ -136,10 +130,9 @@ async function criarCargos(guild, itens, { motivo, aoProgredir } = {}) {
       }), 20000);
       ok.push({ ...it, role });
     } catch (e) { falhas.push({ ...it, erro: motivoErro(e) }); }
-    if (aoProgredir) { try { await aoProgredir(n, itens.length); } catch { /* só informativo */ } }
+    if (aoProgredir) { try { await aoProgredir(n, itens.length); } catch {} }
     await dormir(350);
   }
-  // 1º da lista = mais alto, logo abaixo do cargo mais alto da Atlas
   let ordenado = true;
   if (ok.length > 1) {
     try {

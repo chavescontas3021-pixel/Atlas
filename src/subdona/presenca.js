@@ -1,11 +1,8 @@
-// ATLAS · sub dona · status do bot acompanha a sua ausência
-// Com o pai ausente (e o modo sub dona ligado) o status vira "Pai ausente · sub dona no comando".
-// Quando o pai volta, o status de antes é restaurado.
 const { ActivityType } = require('discord.js');
 const N = require('./nucleo');
 
-let atual = null;   // 'ausente' | 'normal' (evita chamar o Discord à toa)
-let original = null; // status que o bot tinha antes
+let atual = null;
+let original = null;
 
 function guardarOriginal(client) {
   if (original) return;
@@ -25,7 +22,7 @@ function atualizar(client) {
     if (querAusente) {
       guardarOriginal(client);
       const aus = N.ausencia();
-      client.user.setPresence({ status: 'idle', activities: [{ name: 'Atlas', type: ActivityType.Custom, state: `👑 Pai ausente${aus.motivo ? ` (${aus.motivo})`.slice(0, 60) : ''} · sub dona no comando` }] });
+      client.user.setPresence({ status: 'idle', activities: [{ name: 'Atlas', type: ActivityType.Custom, state: `👑 Responsável ausente${aus.motivo ? ` (${aus.motivo})`.slice(0, 60) : ''} · sub dona no comando` }] });
     } else if (original) {
       client.user.setPresence(original);
     }
@@ -35,7 +32,7 @@ function atualizar(client) {
 
 function iniciar(client) {
   N.aoMudarAusencia(() => atualizar(client));
-  setTimeout(() => atualizar(client), 10000); // depois do ready.js definir o status normal
+  setTimeout(() => atualizar(client), 10000);
 }
 
 module.exports = { atualizar, iniciar };

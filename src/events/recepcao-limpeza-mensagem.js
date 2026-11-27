@@ -1,6 +1,5 @@
 const Limpeza = require('../recepcao/limpeza');
 
-// Qualquer mensagem (do membro ou da staff) numa recepção conta como atividade
 module.exports = {
   name: 'messageCreate',
   async execute(client, message) {

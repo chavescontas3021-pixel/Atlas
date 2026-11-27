@@ -1,7 +1,6 @@
 const db = require('../db');
 const N = require('../noturno/nucleo');
 
-// Durante o fechamento noturno, quem entrar numa call bloqueada é desconectado na hora
 module.exports = {
   name: 'voiceStateUpdate',
   async execute(client, antes, depois) {

@@ -1,12 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-//  ATLAS · sub dona · vigias
-//  Raid (muitas entradas), flood/spam e golpes (links falsos). Cada vigia tem um poder:
-//    off       → não faz nada
-//    confirma  → com o pai presente: avisa e espera o clique · com o pai ausente: age sozinha
-//    auto      → age sozinha sempre
-//  As ações são sempre leves e reversíveis (castigo, apagar spam, trancar canais).
-//  Nunca age contra staff, pai, delegados ou bots.
-// ─────────────────────────────────────────────────────────────
 const { PermissionFlagsBits: PF, ChannelType } = require('discord.js');
 const db = require('../db');
 const UI = require('../ui/componentes');
@@ -15,56 +6,52 @@ const A = require('./acoes');
 const Ordem = require('./ordem');
 
 const SEM_PING = { parse: [] };
-const frescos = new Map(); // quem já foi punido há pouco → não pune de novo
+const frescos = new Map();
 
-// ── Alertas ──────────────────────────────────────────────────
-async function alertar(client, guild, { titulo, descricao, componentes = [], pingarPai = false }) {
-  const pai = await N.paiId(client);
+async function alertar(client, guild, { titulo, descricao, componentes = [], pingarResponsavel = false }) {
+  const responsavel = await N.responsavelId(client);
   const payload = {
-    content: pingarPai && pai ? `<@${pai}>` : undefined,
+    content: pingarResponsavel && responsavel ? `<@${responsavel}>` : undefined,
     embeds: [UI.painel({ trilha: ['Sub dona', 'Alerta'], titulo, descricao, perigo: true }).setTimestamp()],
     components: componentes,
-    allowedMentions: { users: pingarPai && pai ? [pai] : [], parse: [] },
+    allowedMentions: { users: pingarResponsavel && responsavel ? [responsavel] : [], parse: [] },
   };
   const id = N.alertasCanal();
   const canal = id && guild.channels.cache.get(id);
   try {
     if (canal) return await canal.send(payload);
-    const dono = pai && (await client.users.fetch(pai));
+    const dono = responsavel && (await client.users.fetch(responsavel));
     if (dono) return await dono.send(payload);
   } catch (e) { console.error('[Sub dona] alerta:', e.message); }
   return null;
 }
 
-// Executa (ou propõe) uma ação conforme o poder do vigia
-async function acionar({ client, guild, canal, poder, acao, params, titulo, descricao, pingarPai = false }) {
+async function acionar({ client, guild, canal, poder, acao, params, titulo, descricao, pingarResponsavel = false }) {
   const modo = N.modoEfetivo(poder);
   if (modo === 'off') return null;
   const eu = guild.members.me;
-  const ctx = { client, guild, canal, executor: eu, executorUser: client.user, ehPai: false };
+  const ctx = { client, guild, canal, executor: eu, executorUser: client.user, ehResponsavel: false };
   if (modo === 'auto') {
     const payload = await Ordem.rodar(ctx, acao, params, 'auto');
     const texto = (payload.embeds && payload.embeds[0] && payload.embeds[0].d && payload.embeds[0].d.description) || '';
-    await alertar(client, guild, { titulo, descricao: `${descricao}\n\n${texto}`, componentes: payload.components || [], pingarPai });
+    await alertar(client, guild, { titulo, descricao: `${descricao}\n\n${texto}`, componentes: payload.components || [], pingarResponsavel });
     return { feito: true };
   }
   const token = N.guardarPendente({ acao, params: { ...params, canalAlvo: undefined, canalId: params.canalAlvo ? params.canalAlvo.id : null }, executor: 'auto', canalId: canal.id, guildId: guild.id, origem: 'auto' });
   await alertar(client, guild, {
-    titulo, descricao: `${descricao}\n\nQuer que eu faça isso? ${A.descrever(acao, params)}`, pingarPai,
+    titulo, descricao: `${descricao}\n\nQuer que eu faça isso? ${A.descrever(acao, params)}`, pingarResponsavel,
     componentes: [UI.linha(UI.botao({ id: `sd:ok:${token}`, label: 'Fazer' }), UI.botao({ id: `sd:no:${token}`, label: 'Ignorar' }))],
   });
   return { proposto: true };
 }
 
-// ── Quem não deve ser vigiado ────────────────────────────────
 async function isento(client, membro) {
   if (!membro || membro.user.bot) return true;
   const p = membro.permissions;
   if (p.has(PF.Administrator) || p.has(PF.ManageGuild) || p.has(PF.ManageMessages) || p.has(PF.ModerateMembers)) return true;
-  return N.ehDelegado(membro.id) || (await N.ehPai(client, membro.id));
+  return N.ehDelegado(membro.id) || (await N.ehResponsavel(client, membro.id));
 }
 
-// ── Flood, repetição, spam de menção e golpes ────────────────
 const hist = new Map();
 const GOLPE = /(discord(?:app)?\.gift|d[il1]sc[o0]rd?[-.]?(?:gift|nitro)|dlscord|discorcl|disc0rd|n[i1]tro[-.]?(?:free|gift|gratis)|free[-.]?nitro|steamcommunnity|steamcomunity|st[e3]amcommunlty|nitro gratis|ganhe nitro)/i;
 
@@ -85,30 +72,26 @@ async function aoMensagem(client, msg) {
   const alvo = { alvo: uid };
   const marcar = () => frescos.set(uid, agora);
 
-  // 1) golpe: apaga o link na hora (se o vigia estiver ligado) e castiga
   if (GOLPE.test(texto) && N.modoEfetivo('vigia_golpe') !== 'off') {
     marcar();
     await msg.delete().catch(() => {});
     return await acionar({ ...base, poder: 'vigia_golpe', acao: 'silenciar', params: { ...alvo, ms: 86400000, motivo: 'Link de golpe' }, titulo: 'Possível golpe apagado', descricao: `<@${uid}> postou um link suspeito em ${msg.channel}. Apaguei a mensagem.` });
   }
-  // 2) spam de menção
   if (msg.mentions.users.size >= 6 || msg.mentions.roles.size >= 3) {
     marcar();
     await msg.delete().catch(() => {});
     return await acionar({ ...base, poder: 'vigia_flood', acao: 'silenciar', params: { ...alvo, ms: 900000, motivo: 'Spam de menções' }, titulo: 'Spam de menções', descricao: `<@${uid}> marcou muita gente de uma vez em ${msg.channel}.` });
   }
-  // 3) flood (muitas mensagens rápidas) ou a mesma mensagem repetida (não vale em canal movimentado)
   if (N.canalLivre(msg.channelId, msg.channel && msg.channel.parentId)) return;
   const rapidas = h.filter((x) => agora - x.t < 8000).length;
   const iguais = texto.length >= 8 ? h.filter((x) => x.txt === h[h.length - 1].txt).length : 0;
   if (rapidas >= 6 || iguais >= 4) {
     marcar();
     return await acionar({ ...base, poder: 'vigia_flood', acao: 'silenciar', params: { ...alvo, ms: 600000, motivo: rapidas >= 6 ? 'Flood' : 'Mensagem repetida' }, titulo: rapidas >= 6 ? 'Flood' : 'Spam repetido', descricao: `<@${uid}> está ${rapidas >= 6 ? 'mandando mensagens rápido demais' : 'repetindo a mesma mensagem'} em ${msg.channel}.` })
-      .then(() => (N.modoEfetivo('vigia_flood') === 'auto' ? A.executar('limpar', { n: 15, alvo: uid }, { client, guild: msg.guild, canal: msg.channel, executor: msg.guild.members.me, executorUser: client.user, ehPai: false }) : null));
+      .then(() => (N.modoEfetivo('vigia_flood') === 'auto' ? A.executar('limpar', { n: 15, alvo: uid }, { client, guild: msg.guild, canal: msg.channel, executor: msg.guild.members.me, executorUser: client.user, ehResponsavel: false }) : null));
   }
 }
 
-// ── Raid ─────────────────────────────────────────────────────
 const entradas = [];
 let ultimoRaid = 0;
 const limiteRaid = () => Math.max(3, Number(N.cfg('raid_limite', 8)) || 8);
@@ -127,14 +110,13 @@ async function aoEntrar(client, membro) {
   if (modo === 'auto') {
     const r = await panico(guild, true);
     return await alertar(client, guild, {
-      titulo: 'Raid: servidor trancado', descricao: `${desc}\nTranquei **${r.trancados}** canais. Quando passar, use o botão ou \`/subdona panico\`.`, pingarPai: true,
+      titulo: 'Raid: servidor trancado', descricao: `${desc}\nTranquei **${r.trancados}** canais. Quando passar, use o botão ou \`/subdona panico\`.`, pingarResponsavel: true,
       componentes: [UI.linha(UI.botao({ id: 'sd:panico:off', label: 'Destrancar tudo' }))],
     });
   }
-  await alertar(client, guild, { titulo: 'Possível raid', descricao: `${desc}\nQuer que eu tranque todos os canais?`, pingarPai: true, componentes: [UI.linha(UI.botao({ id: 'sd:panico:on', label: 'Trancar tudo', estilo: 'perigo' }), UI.botao({ id: 'sd:panico:no', label: 'Ignorar' }))] });
+  await alertar(client, guild, { titulo: 'Possível raid', descricao: `${desc}\nQuer que eu tranque todos os canais?`, pingarResponsavel: true, componentes: [UI.linha(UI.botao({ id: 'sd:panico:on', label: 'Trancar tudo', estilo: 'perigo' }), UI.botao({ id: 'sd:panico:no', label: 'Ignorar' }))] });
 }
 
-// ── Pânico: tranca (ou destranca) todos os canais de texto ───
 const canaisTexto = (guild) => [...guild.channels.cache.values()].filter((c) => c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement);
 const estadoPanico = () => db.get('subdona.panico', null);
 
@@ -147,7 +129,7 @@ async function panico(guild, ligar) {
       const ow = c.permissionOverwrites.cache.get(todos.id);
       const era = ow ? (ow.allow.has(PF.SendMessages) ? true : ow.deny.has(PF.SendMessages) ? false : null) : null;
       if (era === false || c.id in salvo.canais) continue;
-      try { await c.permissionOverwrites.edit(todos, { SendMessages: false }, { reason: 'Atlas: modo pânico' }); salvo.canais[c.id] = era; trancados += 1; } catch { /* sem permissão neste canal */ }
+      try { await c.permissionOverwrites.edit(todos, { SendMessages: false }, { reason: 'Atlas: modo pânico' }); salvo.canais[c.id] = era; trancados += 1; } catch {}
     }
     db.set('subdona.panico', salvo);
     return { trancados };
@@ -158,7 +140,7 @@ async function panico(guild, ligar) {
     for (const [id, era] of Object.entries(salvo.canais)) {
       const c = guild.channels.cache.get(id);
       if (!c) continue;
-      try { await c.permissionOverwrites.edit(todos, { SendMessages: era }, { reason: 'Atlas: fim do modo pânico' }); abertos += 1; } catch { /* ignora */ }
+      try { await c.permissionOverwrites.edit(todos, { SendMessages: era }, { reason: 'Atlas: fim do modo pânico' }); abertos += 1; } catch {}
     }
   }
   db.set('subdona.panico', null);

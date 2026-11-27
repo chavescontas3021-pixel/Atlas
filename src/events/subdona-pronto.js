@@ -1,4 +1,3 @@
-// Sub dona: ronda periódica (tickets parados, cobranças vencidas).
 const Ronda = require('../subdona/ronda');
 
 module.exports = {

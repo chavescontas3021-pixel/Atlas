@@ -59,7 +59,6 @@ function slug(texto) {
   return s || 'livro';
 }
 
-// Cada linha escrita conta 1; linhas longas contam mais (a cada ~90 caracteres)
 function contarLinhas(texto) {
   let total = 0;
   for (const linha of String(texto).split(/\r?\n/)) {
@@ -80,7 +79,6 @@ const pegarLivro = (id) => db.get(`livraria.livros.${id}`, null);
 const salvarLivro = (livro) => db.set(`livraria.livros.${livro.id}`, livro);
 const removerLivro = (id) => db.remover(`livraria.livros.${id}`);
 
-// Procura um livro publicado pelo título (igual, ou parecido se só houver um parecido)
 function acharPorTitulo(titulo) {
   const alvo = normalizar(titulo);
   if (!alvo) return null;
@@ -100,7 +98,6 @@ function mediaDoLivro(livro) {
   return { media: notas.reduce((a, b) => a + b, 0) / notas.length, total: notas.length };
 }
 
-// Dois embeds: o de cima com a capa, o de baixo com a sinopse
 function embedsDoLivro(d) {
   const c = CLASSES[d.classe] || CLASSES.livre;
   const topo = new EmbedBuilder()

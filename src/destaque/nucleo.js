@@ -1,4 +1,3 @@
-// Destaque do mês: o membro que mais conversou no mês (usa as estatísticas) ganha um cargo temporário.
 const db = require('../db');
 const S = require('../stats/nucleo');
 
@@ -7,7 +6,7 @@ const COR = 0xf5c542;
 const MINIMO_PADRAO = 50;
 
 const cfg = () => db.get('config.destaque', {}) || {};
-const mesDe = (ts = Date.now()) => new Date(ts - BRT).toISOString().slice(0, 7).replace('-', ''); // AAAAMM
+const mesDe = (ts = Date.now()) => new Date(ts - BRT).toISOString().slice(0, 7).replace('-', '');
 const mesAnterior = (mes) => {
   let a = Number(mes.slice(0, 4));
   let m = Number(mes.slice(4)) - 1;
@@ -19,7 +18,6 @@ const nomeMes = (mes) => {
   return `${nomes[Number(mes.slice(4)) - 1]} de ${mes.slice(0, 4)}`;
 };
 
-// Soma as mensagens de cada membro durante o mês (AAAAMM)
 function totaisDoMes(mes) {
   S.flush();
   const mapa = new Map();
@@ -31,7 +29,6 @@ function totaisDoMes(mes) {
   return mapa;
 }
 
-// Ranking já sem bots e sem quem saiu do servidor
 async function ranking(guild, mes, limite = 10) {
   const ordem = [...totaisDoMes(mes).entries()].sort((a, b) => b[1] - a[1]);
   const lista = [];
@@ -47,7 +44,6 @@ async function ranking(guild, mes, limite = 10) {
 const mensagemPadrao = '🏆 **Destaque de {mes}!**\n{membro} foi quem mais agitou a house, com **{n} mensagens**. Parabéns! 🎉\nO cargo {cargo} é seu até o próximo mês.';
 const aplicar = (txt, v) => String(txt).replace(/\{(\w+)\}/g, (_, k) => (v[k] !== undefined ? v[k] : `{${k}}`));
 
-// Apura o mês indicado: tira o cargo do destaque anterior e entrega ao novo
 async function apurar(guild, mes) {
   const c = cfg();
   if (!c.cargo) return { ok: false, motivo: 'Configure o cargo primeiro (/destaque config cargo).' };
@@ -57,7 +53,6 @@ async function apurar(guild, mes) {
   const minimo = c.minimo ?? MINIMO_PADRAO;
   const [vencedor] = await ranking(guild, mes, 1);
 
-  // tira o cargo de quem tinha
   const antigos = db.get('destaque.atuais', []) || [];
   for (const uid of antigos) {
     const m = await guild.members.fetch(uid).catch(() => null);
@@ -85,7 +80,6 @@ async function apurar(guild, mes) {
   return { ok: true, uid: vencedor.uid, n: vencedor.n, deu, texto };
 }
 
-// Roda a cada poucos minutos: quando o mês vira, apura o mês que passou
 async function ciclo(client) {
   const c = cfg();
   if (!c.ativo || !c.cargo) return;
@@ -93,7 +87,7 @@ async function ciclo(client) {
   const alvo = mesAnterior(agora);
   const feito = db.get('destaque.ultimoMes', null);
   if (feito === alvo || feito === agora) return;
-  if (!feito) { // primeira vez: não apura retroativamente, só marca e espera a virada do mês
+  if (!feito) {
     db.set('destaque.ultimoMes', alvo);
     return;
   }
@@ -104,4 +98,3 @@ async function ciclo(client) {
 }
 
 module.exports = { COR, MINIMO_PADRAO, cfg, mesDe, mesAnterior, nomeMes, totaisDoMes, ranking, apurar, ciclo, mensagemPadrao };
-// fim do arquivo

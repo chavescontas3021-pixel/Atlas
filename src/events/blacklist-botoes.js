@@ -1,4 +1,3 @@
-// Botões dos alertas da blacklist: Advertir e Castigar 1h (só administradores).
 const { MessageFlags, PermissionFlagsBits } = require('discord.js');
 const N = require('../moderacao/nucleo');
 

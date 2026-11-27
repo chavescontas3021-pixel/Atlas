@@ -1,10 +1,8 @@
-// Fichas de personagem da house.
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const db = require('../db');
 
 const COR = 0xf5a3c7;
 
-// Primeiro formulário (5 campos, limite do Discord)
 const CAMPOS_A = [
   { id: 'nome', rotulo: 'Nome do personagem', estilo: 'curto', max: 60, obrigatorio: true },
   { id: 'obra', rotulo: 'Obra', estilo: 'curto', max: 80, obrigatorio: true },
@@ -13,7 +11,6 @@ const CAMPOS_A = [
   { id: 'historia', rotulo: 'História', estilo: 'longo', max: 1000, obrigatorio: false },
 ];
 
-// Segundo formulário (detalhes)
 const CAMPOS_B = [
   { id: 'aparencia', rotulo: 'Aparência', estilo: 'longo', max: 600, obrigatorio: false },
   { id: 'habilidades', rotulo: 'Habilidades e poderes', estilo: 'longo', max: 600, obrigatorio: false },
@@ -40,7 +37,6 @@ function norm(txt) {
     .trim();
 }
 
-// ---------- Banco ----------
 const todas = () => Object.values(db.get('fichas.lista', {}) || {});
 const obter = (id) => db.get(`fichas.lista.${id}`, null);
 const salvar = (f) => db.set(`fichas.lista.${f.id}`, f);
@@ -53,7 +49,6 @@ function proximoId() {
   return String(n);
 }
 
-// Acha a ficha pelo id ou nome. Sem referência: só funciona se a pessoa tiver exatamente uma.
 function acharFicha(uid, ref) {
   const lista = doUsuario(uid);
   if (!ref) return lista.length === 1 ? lista[0] : null;
@@ -66,7 +61,6 @@ function nomeEmUso(uid, nome, ignorarId) {
   return doUsuario(uid).some((f) => f.id !== ignorarId && norm(f.nome) === r);
 }
 
-// ---------- Visual ----------
 function embedFicha(f, usuario, imagemUrl) {
   const emb = new EmbedBuilder().setColor(COR).setTitle(`📖 ${f.nome}`).setFooter({ text: `Ficha #${f.id}` });
   const topo = [`**Obra:** ${f.obra}`];
@@ -84,7 +78,6 @@ function embedFicha(f, usuario, imagemUrl) {
 
 const linkDaMensagem = (guildId, f) => (f.canalId && f.msgId ? `https://discord.com/channels/${guildId}/${f.canalId}/${f.msgId}` : null);
 
-// ---------- Mensagem publicada no canal de fichas ----------
 async function buscarMensagem(guild, f) {
   if (!f.canalId || !f.msgId) return null;
   const canal = guild.channels.cache.get(f.canalId);
@@ -92,13 +85,12 @@ async function buscarMensagem(guild, f) {
   return canal.messages.fetch(f.msgId).catch(() => null);
 }
 
-// Cria ou atualiza a mensagem da ficha. `imagem` = { buffer, ext } quando há imagem nova.
 async function publicar(guild, f, usuario, imagem) {
   const canal = guild.channels.cache.get(cfg('canal'));
   if (!canal) throw new Error('Canal de fichas não definido.');
 
   let msg = await buscarMensagem(guild, f);
-  if (!msg && f.imagemNome && !imagem) f.imagemNome = null; // a mensagem (e a imagem) se perderam
+  if (!msg && f.imagemNome && !imagem) f.imagemNome = null;
 
   if (imagem) f.imagemNome = `ficha-${f.id}.${imagem.ext}`;
   const embed = embedFicha(f, usuario, f.imagemNome ? `attachment://${f.imagemNome}` : null);
@@ -116,7 +108,6 @@ async function publicar(guild, f, usuario, imagem) {
   return msg;
 }
 
-// URL "fresca" da imagem (as do Discord expiram, então buscamos de novo a cada vez)
 async function urlDaImagem(guild, f) {
   if (!f.imagemNome) return null;
   const msg = await buscarMensagem(guild, f);

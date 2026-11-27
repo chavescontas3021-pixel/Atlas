@@ -11,13 +11,11 @@ module.exports = {
       if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
       const [prefixo, acao, userId] = interaction.customId.split(':');
 
-      // Clique do próprio membro na recepção = atividade
       if (prefixo === 'recepcao') {
         if (interaction.user.id === userId) await Limpeza.registrarAtividade(client, userId);
         return;
       }
 
-      // Botões do aviso da staff
       if (prefixo !== 'reclimp' || !interaction.isButton()) return;
       if (!F.ehStaffRecepcao(interaction)) {
         return interaction.reply({ content: '❌ Só a staff pode usar isso.', flags: EPH });

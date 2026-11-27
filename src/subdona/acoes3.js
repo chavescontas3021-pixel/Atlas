@@ -1,5 +1,3 @@
-// ATLAS · sub dona · ordens extras 2: consultas e controles (sem confirmação; só pai e delegados chegam aqui)
-// Instalado por acoes.js. Devolvem { ok, texto } ou { ok, payload } (uma tela pronta).
 const UI = require('../ui/componentes');
 const { S, quando } = require('../ui/tema');
 const N = require('./nucleo');
@@ -29,8 +27,8 @@ function instalar({ falha, bom, membroDe }) {
     },
     async membro_info(ctx, p) {
       const m = await membroDe(ctx, p.alvo); if (!m) return falha('Marque de quem eu devo mostrar a ficha.');
-      let msgs = 0; try { msgs = require('../stats/nucleo').totalDoMembro(m.id); } catch { /* sem stats */ }
-      let lista = false; try { lista = require('../blacklist/nucleo').esta(m.id); } catch { /* sem blacklist */ }
+      let msgs = 0; try { msgs = require('../stats/nucleo').totalDoMembro(m.id); } catch {}
+      let lista = false; try { lista = require('../blacklist/nucleo').esta(m.id); } catch {}
       const avisos = require('../moderacao/nucleo').avisosDe(m.id).length;
       const cargos = m.roles.cache ? [...m.roles.cache.values()].filter((r) => r.id !== ctx.guild.id).sort((a, b) => b.position - a.position).slice(0, 6).map((r) => `<@&${r.id}>`).join(' ') : '';
       return tela({ embeds: [UI.painel({ trilha: ['Sub dona', 'Membro'], titulo: m.displayName, descricao: `<@${m.id}>`, campos: [

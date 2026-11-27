@@ -100,7 +100,6 @@ module.exports = {
       return interaction.reply({ embeds: [new EmbedBuilder().setColor(N.COR).setTitle('🏪 Loja').setDescription(txt).setFooter({ text: 'Use /rpg comprar' })] });
     }
 
-    // A partir daqui precisa de personagem
     const j = N.obter(id);
     if (!j) return interaction.reply({ content: 'Crie seu personagem com `/rpg criar`.', flags: EPH });
 
@@ -118,7 +117,7 @@ module.exports = {
       if (!e) return interaction.reply({ content: 'Você já está em um combate! Termine-o primeiro.', flags: EPH });
       N.definirCd(j, 'explorar', 20 * 1000);
       N.salvar(id, j);
-      await interaction.deferReply(); // desenhar o GIF leva um instante
+      await interaction.deferReply();
       return interaction.editReply({ embeds: [C.embedCombate(e, j)], components: C.botoes(id), files: C.arquivos(e, j) });
     }
 
@@ -254,4 +253,3 @@ module.exports = {
     }
   },
 };
-// fim do arquivo

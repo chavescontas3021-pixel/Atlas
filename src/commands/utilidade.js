@@ -68,7 +68,6 @@ module.exports = {
         autorId: interaction.user.id,
         autorNome: interaction.member?.displayName || interaction.user.username,
       };
-      // Mostra a enquete zerada, pega o id da mensagem e só então salva no banco
       await interaction.reply(Enquete.montar({ ...dados, votos: {}, encerrada: false }));
       const msg = await interaction.fetchReply();
       Enquete.criar(msg.id, dados);
@@ -104,5 +103,4 @@ module.exports = {
   },
 };
 
-// Usado também pelo comando de lembrete.
 module.exports.paraMs = paraMs;

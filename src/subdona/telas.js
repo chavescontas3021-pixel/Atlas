@@ -1,4 +1,3 @@
-// ATLAS · sub dona · telas (status, diário, recados)
 const UI = require('../ui/componentes');
 const { S, quando, corta } = require('../ui/tema');
 const N = require('./nucleo');
@@ -8,23 +7,23 @@ const POR_PAGINA = 6;
 const SEM_PING = { parse: [] };
 
 async function telaStatus(client) {
-  const pai = await N.paiId(client);
+  const responsavel = await N.responsavelId(client);
   const aus = N.ausencia();
   const poderes = Object.entries(N.PODERES).map(([id, p]) => `${N.modo(id) === 'auto' ? S.ponto : N.modo(id) === 'confirma' ? '◐' : S.vazio}  **${p.nome}**  ${S.sep}  ${N.MODOS[N.modo(id)]}`).join('\n');
   const dele = N.delegados();
   return {
     embeds: [UI.painel({
       trilha: ['Sub dona'],
-      titulo: !N.ativo() ? 'Modo sub dona DESLIGADO' : aus ? 'O pai está ausente. A sub dona está no comando.' : 'O pai está presente',
+      titulo: !N.ativo() ? 'Modo sub dona DESLIGADO' : aus ? 'O responsável está ausente. A sub dona está no comando.' : 'O responsável está presente',
       descricao: aus
         ? `${aus.motivo ? `Motivo: ${aus.motivo}\n` : ''}Desde ${quando(aus.desde)}${aus.ate ? `  ${S.sep}  volta ${quando(aus.ate)}` : ''}`
-        : 'A sub dona obedece ordens do pai e dos delegados, e tudo fica no diário.',
+        : 'A sub dona obedece ordens do responsável e dos delegados, e tudo fica no diário.',
       campos: [
-        { nome: 'Pai', valor: pai ? `<@${pai}>` : 'não encontrado', lado: true },
+        { nome: 'Responsável', valor: responsavel ? `<@${responsavel}>` : 'não encontrado', lado: true },
         { nome: 'Delegados', valor: dele.length ? dele.map((d) => `<@${d}>`).join(' ') : 'ninguém', lado: true },
         { nome: 'Recados', valor: String(N.recados().length), lado: true },
-        { nome: 'Tickets', valor: { sempre: 'atende sempre', ausente: 'atende com o pai ausente', off: 'desligado' }[N.ticketModo()], lado: true },
-        { nome: 'Alertas', valor: N.alertasCanal() ? `<#${N.alertasCanal()}>` : 'DM do pai', lado: true },
+        { nome: 'Tickets', valor: { sempre: 'atende sempre', ausente: 'atende com o responsável ausente', off: 'desligado' }[N.ticketModo()], lado: true },
+        { nome: 'Alertas', valor: N.alertasCanal() ? `<#${N.alertasCanal()}>` : 'DM do responsável', lado: true },
         { nome: 'Canais movimentados', valor: N.canaisLivres().length ? N.canaisLivres().map((c) => `<#${c}>`).join(' ') : 'nenhum', lado: true },
         { nome: 'Pânico', valor: require('./vigia').estadoPanico() ? 'ATIVO' : 'desligado', lado: true },
         { nome: 'Poderes', valor: `${S.ponto} automático  ◐ pede confirmação  ${S.vazio} desligado\n\n${poderes}` },

@@ -1,18 +1,10 @@
-// ─────────────────────────────────────────────────────────────
-//  ATLAS · sub dona · base
-//  Config, ausência do pai, cofre de poderes, delegados, diário e recados.
-//  Tudo fica no banco em  config.subdona.*  (configuração)  e  subdona.*  (registros).
-// ─────────────────────────────────────────────────────────────
 const crypto = require('crypto');
 const db = require('../db');
-const Conversa = require('../conversa/nucleo');
+const Dono = require('../utils/dono');
 
 const cfg = (k, p = null) => db.get(`config.subdona.${k}`, p);
 const setCfg = (k, v) => db.set(`config.subdona.${k}`, v);
 
-// ── Cofre de poderes ─────────────────────────────────────────
-// modo: 'off' (nunca faz) · 'confirma' (pede um clique de quem mandou) · 'auto' (faz direto)
-// perm: permissão do Discord que um DELEGADO precisa ter (o pai manda sem precisar)
 const PODERES = {
   advertir: { nome: 'Advertir', padrao: 'auto', perm: 'ModerateMembers', info: 'Dá aviso a um membro' },
   silenciar: { nome: 'Silenciar', padrao: 'auto', perm: 'ModerateMembers', info: 'Põe de castigo (timeout) e tira' },
@@ -26,15 +18,12 @@ const PODERES = {
   cargo: { nome: 'Cargos', padrao: 'confirma', perm: 'ManageRoles', info: 'Dá e tira cargos' },
   apelido: { nome: 'Apelidos', padrao: 'auto', perm: 'ManageNicknames', info: 'Muda o apelido de alguém' },
 };
-// Poderes dos vigias (ações automáticas). "Pede confirmação" aqui significa:
-// com você presente ela avisa e espera o clique; com você ausente ela age sozinha (e deixa o botão Desfazer).
 Object.assign(PODERES, {
   vigia_raid: { nome: 'Vigiar raids', padrao: 'confirma', vigia: true, info: 'Muitas entradas de uma vez: tranca o servidor' },
   vigia_flood: { nome: 'Vigiar flood e spam', padrao: 'confirma', vigia: true, info: 'Põe de castigo quem floda e apaga o spam' },
   vigia_golpe: { nome: 'Vigiar golpes', padrao: 'confirma', vigia: true, info: 'Apaga links de golpe e castiga quem postou' },
   ticket_fechar: { nome: 'Fechar tickets esquecidos', padrao: 'off', vigia: true, info: 'Fecha ticket parado há muito tempo' },
 });
-// Poderes das ordens extras (parte 4)
 Object.assign(PODERES, {
   ticket_gerir: { nome: 'Gerir tickets', padrao: 'auto', perm: 'ManageChannels', info: 'Fecha, renomeia e mexe em quem está no ticket' },
   sorteios: { nome: 'Sorteios e eventos', padrao: 'auto', perm: 'ManageGuild', info: 'Cria, encerra e refaz sorteios; cria eventos' },
@@ -43,7 +32,6 @@ Object.assign(PODERES, {
 });
 const MODOS = { off: 'desligado', confirma: 'pede confirmação', auto: 'automático' };
 
-// ── Interruptor mestre (só o pai mexe) ───────────────────────
 const ativo = () => cfg('ativo', true) !== false;
 const setAtivo = (v) => { setCfg('ativo', !!v); avisarMudanca(); };
 
@@ -52,30 +40,25 @@ const modo = (poder) => {
   return MODOS[m] ? m : (PODERES[poder] ? PODERES[poder].padrao : 'off');
 };
 const setModo = (poder, m) => setCfg(`poderes.${poder}`, m);
-// Para os vigias: "confirma" vira "auto" enquanto o pai está ausente
 const modoEfetivo = (poder) => (modo(poder) === 'confirma' && PODERES[poder] && PODERES[poder].vigia && ausencia() ? 'auto' : modo(poder));
 
-// ── Configurações da parte 2 ─────────────────────────────────
 const alertasCanal = () => cfg('alertas', null);
 const ticketModo = () => (['sempre', 'ausente', 'off'].includes(cfg('ticket', 'ausente')) ? cfg('ticket', 'ausente') : 'ausente');
 const lorittaId = () => cfg('loritta', '297153970613387264');
 
-// ── Canais movimentados: o vigia de flood não pune quem fala rápido ali ──
 const canaisLivres = () => cfg('canais_livres', []) || [];
 const setCanaisLivres = (l) => setCfg('canais_livres', [...new Set(l)].slice(0, 50));
 const canalLivre = (...ids) => ids.some((i) => i && canaisLivres().includes(i));
 
-// ── Perguntas (base de conhecimento): modo sempre | ausente | off e canais de dúvidas ──
 const perguntas = () => ({ modo: 'sempre', canais: [], ...(cfg('perguntas', {}) || {}) });
 const setPerguntas = (v) => setCfg('perguntas', { ...perguntas(), ...v });
 
-// ── Quem manda ───────────────────────────────────────────────
-const paiId = (client) => Conversa.paiId(client);
-const ehPai = (client, uid) => Conversa.ehPai(client, uid);
+const responsavelId = (client) => Dono.donoId(client);
+const ehResponsavel = async (client, uid) => !!uid && String(uid) === String(await Dono.donoId(client));
 const delegados = () => cfg('delegados', []);
 const ehDelegado = (uid) => delegados().includes(uid);
 async function podeMandar(client, uid) {
-  return (await ehPai(client, uid)) || ehDelegado(uid);
+  return (await ehResponsavel(client, uid)) || ehDelegado(uid);
 }
 function delegar(uid) {
   const l = delegados();
@@ -86,7 +69,6 @@ function tirarDelegado(uid) {
   setCfg('delegados', delegados().filter((x) => x !== uid));
 }
 
-// ── Ausência ─────────────────────────────────────────────────
 function ausencia() {
   const a = cfg('ausente', null);
   if (!a) return null;
@@ -96,13 +78,12 @@ function ausencia() {
   }
   return a;
 }
-let ouvinteAusencia = null; // presenca.js usa isto para trocar o status do bot quando você sai ou volta
+let ouvinteAusencia = null;
 const aoMudarAusencia = (f) => { ouvinteAusencia = f; };
 const avisarMudanca = () => { try { if (ouvinteAusencia) ouvinteAusencia(); } catch (e) { console.error('[Sub dona] presença:', e.message); } };
 const ausentar = ({ motivo, horas }) => { setCfg('ausente', { desde: Date.now(), ate: horas ? Date.now() + horas * 3600 * 1000 : null, motivo: motivo || '' }); avisarMudanca(); };
 const voltar = () => { setCfg('ausente', null); avisarMudanca(); };
 
-// ── Diário (tudo que a sub dona fez) ─────────────────────────
 const diario = () => db.get('subdona.diario', []);
 function registrar({ acao, executor, alvo = null, motivo = '', texto = '', desfazer = null, origem = 'ordem', guildId = null }) {
   const lista = diario();
@@ -117,7 +98,6 @@ function marcarDesfeito(id) {
   db.set('subdona.diario', diario().map((d) => (d.id === id ? { ...d, desfeito: true } : d)));
 }
 
-// ── Recados para o pai ───────────────────────────────────────
 const recados = () => db.get('subdona.recados', []);
 function anotarRecado({ de, canalId, guildId, msgId, texto }) {
   const l = recados();
@@ -126,8 +106,6 @@ function anotarRecado({ de, canalId, guildId, msgId, texto }) {
 }
 const limparRecados = () => db.set('subdona.recados', []);
 
-// ── Pedidos pendentes de confirmação (somem em 3 minutos) ────
-// ── Caixa de sonhos (pagamentos pela Loritta) e cobranças ────
 const caixa = () => db.get('subdona.caixa', []);
 function lancar(p) {
   const l = caixa();
@@ -160,7 +138,7 @@ function pegarPendente(token) {
 const soltarPendente = (token) => pendentes.delete(token);
 
 module.exports = {
-  cfg, setCfg, PODERES, MODOS, modo, setModo, paiId, ehPai, delegados, ehDelegado, podeMandar, delegar, tirarDelegado,
+  cfg, setCfg, PODERES, MODOS, modo, setModo, responsavelId, ehResponsavel, delegados, ehDelegado, podeMandar, delegar, tirarDelegado,
   ativo, setAtivo, modoEfetivo, alertasCanal, ticketModo, lorittaId, caixa, lancar, cobrancas, salvarCobrancas, amostrasSonhos, guardarAmostra,
   canaisLivres, setCanaisLivres, canalLivre, perguntas, setPerguntas,
   ausencia, ausentar, voltar, aoMudarAusencia, diario, registrar, obter, marcarDesfeito, recados, anotarRecado, limparRecados,

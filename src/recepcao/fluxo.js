@@ -19,7 +19,6 @@ const EPH = MessageFlags.Ephemeral;
 const chave = (id) => `recepcao.sessoes.${id}`;
 const emAndamento = new Set();
 
-// ---------- Assumir atendimento (staff) ----------
 function botaoAssumir(userId, assumido) {
   return new ButtonBuilder()
     .setCustomId(`recepcao:assumir:${userId}`)
@@ -28,7 +27,6 @@ function botaoAssumir(userId, assumido) {
     .setStyle(assumido ? ButtonStyle.Secondary : ButtonStyle.Danger);
 }
 
-// Botões da primeira mensagem: [Sou apenas representante] [Assumir/Devolver] [Solicitar ajuda] [Staff]
 function linhaAssumir(userId, assumido) {
   const linha = new ActionRowBuilder();
   if (T.repDisponivel()) {
@@ -52,7 +50,6 @@ function linhaAssumir(userId, assumido) {
   return linha;
 }
 
-// Staff = quem tem Gerenciar Servidor ou o cargo de staff da recepção
 function ehStaffRecepcao(interaction) {
   const p = interaction.memberPermissions;
   if (p && p.has(PermissionFlagsBits.ManageGuild)) return true;
@@ -60,16 +57,13 @@ function ehStaffRecepcao(interaction) {
   return !!(cargo && interaction.member && interaction.member.roles.cache.has(cargo));
 }
 
-// true quando a staff assumiu o atendimento desse membro (o bot fica em silêncio)
 function estaAssumido(userId) {
   const s = db.get(chave(userId));
   return !!(s && s.assumido);
 }
 
-// Texto mostrado ao membro enquanto a staff está com o atendimento (editável no site)
 const msgAssumido = () => T.preencher(T.mensagem('assumido').texto, {});
 
-// Botão "Assumir atendimento" / "Devolver ao Atlas"
 async function alternarAtendimento(interaction, userId) {
   const sessao = db.get(chave(userId));
   if (!sessao) {
@@ -106,7 +100,6 @@ function variaveis(member, sessao) {
   };
 }
 
-// Cria o canal privado da recepção
 async function criarCanal(member) {
   const guild = member.guild;
   const eu = guild.members.me ?? (await guild.members.fetchMe());
@@ -134,11 +127,9 @@ async function criarCanal(member) {
   return guild.channels.create(opcoes);
 }
 
-// Começa a recepção de um membro (usado ao entrar e no /recepcao testar)
 async function iniciarRecepcao(member, { teste = false, darCargo = false } = {}) {
   const guild = member.guild;
 
-  // O cargo "sem vaga" vem do onboarding; o Atlas só o entrega se pedirem (darCargo)
   const semVaga = U.cfg('cargos.semVaga');
   if (darCargo && !teste && semVaga && guild.roles.cache.has(semVaga)) {
     await member.roles
@@ -155,8 +146,6 @@ async function iniciarRecepcao(member, { teste = false, darCargo = false } = {})
   const canal = await criarCanal(member);
   db.set(chave(member.id), { canalId: canal.id, etapa: 'personagem', teste });
 
-  // Primeira mensagem: texto simples (sem embed e sem banner), com os botões da recepção.
-  // O membro é marcado no começo, a não ser que o texto já tenha {usuario}.
   const modelo = T.mensagem('inicio').texto;
   const texto = T.preencher(modelo, variaveis(member, null));
   const enviada = await canal.send({
@@ -198,7 +187,6 @@ async function enviarEmojis(canal, userId) {
   });
 }
 
-// Parece um nome de personagem? Conversa comum (pergunta, link, frase longa) não conta.
 function pareceNome(bruto) {
   const t = String(bruto || '').trim();
   if (!t || t.length > 40) return false;
@@ -208,7 +196,6 @@ function pareceNome(bruto) {
   return true;
 }
 
-// Confere a vaga do personagem e, estando livre, segue para a escolha do molde
 async function conferirPersonagem(canal, userId, nome) {
   if (emAndamento.has(userId)) return;
   emAndamento.add(userId);
@@ -229,7 +216,6 @@ async function conferirPersonagem(canal, userId, nome) {
     if (!sessao || sessao.etapa !== 'personagem' || sessao.assumido) return;
     const { proposta, obra, obraPendente, obraConfere, avisouObra, ...resto } = sessao;
     if (U.cfg('perguntarObra', true) !== false) {
-      // Antes do molde, pergunta a obra (deixa o registro de vagas organizado)
       db.set(chave(userId), { ...resto, personagem: nome, etapa: 'obra' });
       await canal.send(`✅ **${nome}** está livre!\nAgora me diga **de qual obra** ele é (anime, mangá, jogo, série...). Se não souber, escreva **pular**.`);
       return;
@@ -241,7 +227,6 @@ async function conferirPersonagem(canal, userId, nome) {
   }
 }
 
-// Pergunta "é esse mesmo?" antes de aceitar o nome
 async function propor(message, nome) {
   const userId = message.author.id;
   const antes = db.get(chave(userId));
@@ -263,7 +248,6 @@ async function propor(message, nome) {
   if (atual) db.set(chave(userId), { ...atual, proposta: { nome, msgId: enviada.id } });
 }
 
-// Quando o membro escreve no chat durante a etapa do personagem
 async function receberPersonagem(message) {
   const userId = message.author.id;
   const sessao = db.get(chave(userId));
@@ -271,7 +255,6 @@ async function receberPersonagem(message) {
 
   const bruto = message.content.trim();
   if (!pareceNome(bruto)) {
-    // Conversa comum: o Atlas fica quieto (só orienta uma vez)
     if (bruto && !sessao.avisouNome) {
       db.set(chave(userId), { ...sessao, avisouNome: true });
       await message
@@ -289,7 +272,6 @@ async function receberPersonagem(message) {
   return propor(message, nome);
 }
 
-// Quando o membro escreve a obra do personagem: confere se ela existe (anime, filme, série, jogo...)
 async function receberObra(message) {
   const O = require('../vagas/obras');
   const userId = message.author.id;
@@ -335,7 +317,7 @@ async function receberObra(message) {
     await message.channel.sendTyping().catch(() => {});
     const r = await O.verificar(bruto);
     if (r.status === 'ok') return await seguir(r.titulo, true, `📚 Obra: **${r.titulo}** (${r.tipo})`);
-    if (r.status === 'erro') return await seguir(bruto, false); // serviços fora do ar: aceita e a staff confere depois
+    if (r.status === 'erro') return await seguir(bruto, false);
 
     db.set(chave(userId), { ...resto, obraPendente: r.status === 'sugestao' ? { digitada: bruto, sugestao: r.titulo, tipo: r.tipo } : { digitada: bruto } });
     await responder(r.status === 'sugestao'
@@ -346,7 +328,6 @@ async function receberObra(message) {
   }
 }
 
-// Botão "Sim, é esse"
 async function confirmarPersonagem(interaction) {
   const userId = interaction.user.id;
   const sessao = db.get(chave(userId));
@@ -362,7 +343,6 @@ async function confirmarPersonagem(interaction) {
   }
 }
 
-// Botão "Não, foi só uma mensagem"
 async function cancelarPersonagem(interaction) {
   const userId = interaction.user.id;
   const sessao = db.get(chave(userId));
@@ -374,11 +354,9 @@ async function cancelarPersonagem(interaction) {
   await interaction.message.delete().catch(() => {});
 }
 
-// Quando o membro escreve um emoji no chat
 async function receberEmoji(message) {
   const texto = message.content.trim();
   if (!texto || /[\p{L}\p{N}]/u.test(texto) || Array.from(texto).length > 8) {
-    // Conversa comum: o Atlas fica quieto (só orienta uma vez)
     const sessao = db.get(chave(message.author.id));
     if (texto && sessao && !sessao.avisouEmoji) {
       db.set(chave(message.author.id), { ...sessao, avisouEmoji: true });
@@ -391,7 +369,6 @@ async function receberEmoji(message) {
   await aplicarNome(message.channel, member, texto);
 }
 
-// Troca o apelido e manda a mensagem com os passos
 async function aplicarNome(canal, member, emoji) {
   const sessao = db.get(chave(member.id));
   if (!sessao || sessao.etapa !== 'emoji') return;
@@ -410,7 +387,6 @@ async function aplicarNome(canal, member, emoji) {
   const nova = { ...sessao, emoji, nick, etapa: 'passos' };
   db.set(chave(member.id), nova);
 
-  // A mensagem de passos fica em recepcao/passos.js (a mesma do botão "Passos" da staff)
   const embed = P.embedPassos(member.guild.name, member.id, nova);
   const botoes = P.botoesPassos(member.id);
 
@@ -451,19 +427,16 @@ async function escolherEmoji(interaction) {
   await aplicarNome(interaction.channel, interaction.member, emoji);
 }
 
-// Botão "Trocar personagem"
 async function trocar(interaction) {
   const sessao = db.get(chave(interaction.user.id));
   if (!sessao) return interaction.reply({ content: 'Não achei sua recepção.', flags: EPH });
 
-  // Zera só os dados do personagem; mantém canal, teste, mensagem inicial e "assumido"
   const { personagem, molde, emoji, nick, pedido, proposta, ...mantem } = sessao;
   db.set(chave(interaction.user.id), { ...mantem, etapa: 'personagem' });
   await interaction.update({ components: [] });
   await interaction.channel.send('🔄 Tudo bem! Me envie o nome do **novo personagem**.');
 }
 
-// Botão "Verificar"
 async function verificar(interaction) {
   await interaction.deferReply({ flags: EPH });
 

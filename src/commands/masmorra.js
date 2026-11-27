@@ -59,7 +59,6 @@ module.exports = {
       return interaction.reply({ embeds: [M.embedFinal('saiu', st, j, res)] });
     }
 
-    // entrar
     if (M.estado(id)) return interaction.reply({ content: 'Você já está numa masmorra! Use `/masmorra continuar`.', flags: EPH });
     if (C.obterAtivo(id)) return interaction.reply({ content: 'Termine o combate de `/rpg explorar` antes de entrar numa masmorra.', flags: EPH });
     const dif = interaction.options.getString('dificuldade');
@@ -72,4 +71,4 @@ module.exports = {
     p.content = `${d.emoji} **${j.personagem || interaction.user.username}** entra em **${d.nome}**!\n*${d.desc}*`;
     return interaction.editReply(p);
   },
-};                         
+};

@@ -1,4 +1,3 @@
-// Ajudantes para mexer nas stars do RPG (precisa ter personagem de RPG).
 const R = require('../rpg/nucleo');
 
 const SEM_RPG = 'Você precisa de um personagem de RPG para isso. Use `/rpg criar` primeiro! 💜';
@@ -8,7 +7,6 @@ const saldo = (uid) => {
   return j ? j.moedas : null;
 };
 
-// { erro } ou { ok, j }
 function gastar(uid, valor) {
   const j = R.obter(uid);
   if (!j) return { erro: SEM_RPG };

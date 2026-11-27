@@ -1,5 +1,3 @@
-// Motor de combate das masmorras (turnos). Parecido com o combate normal, mas com:
-// poção inteligente (usa também os elixires) e golpe poderoso do Boss avisado um turno antes.
 const { CLASSES, ITENS } = require('./dados');
 const N = require('./nucleo');
 
@@ -15,7 +13,6 @@ function golpe(atk, critChance, defesa, { mult = 1, critGarantido = false, ignor
   return { dano, crit };
 }
 
-// Escolhe a melhor poção: a menor que cobre a vida que falta; se nenhuma cobre, a maior que a pessoa tiver
 function melhorPocao(j) {
   const falta = j.hpMax - j.hp;
   const tem = CONSUMOS.filter((i) => (j.inv[i] || 0) > 0 && ITENS[i]).sort((a, b) => ITENS[a].cura - ITENS[b].cura);
@@ -41,7 +38,6 @@ function usarPocao(j) {
   return { id, cura };
 }
 
-// Uma rodada: ação do jogador + resposta do monstro. Devolve { fim?: 'vitoria'|'derrota'|'fuga', invalido? }
 function agir(e, j, tipo) {
   const cl = CLASSES[j.classe];
   const m = e.monstro;
@@ -100,7 +96,6 @@ function agir(e, j, tipo) {
     return { fim: 'vitoria' };
   }
 
-  // Turno do monstro
   e.turno++;
   const forte = m.boss && e.carga;
   if (forte) e.carga = false;
@@ -113,11 +108,10 @@ function agir(e, j, tipo) {
     linhas.push(`${m.emoji} ${m.nome} ${forte ? 'desferiu um **GOLPE DEVASTADOR**' : 'causou'} **${r.dano}** de dano${r.crit ? ' (**CRÍTICO!**)' : ''}.`);
     reg({ por: 'b', tipo: 'atq', visual: 'corte', dano: r.dano, crit: r.crit, forte });
   }
-  // O Boss avisa um turno antes do golpe forte (a cada 4 turnos)
   if (m.boss && e.turno % 4 === 3 && m.hp > 0 && j.hp > 0) {
     e.carga = true;
     const ultimo = e.eventos[e.eventos.length - 1];
-    if (ultimo) ultimo.aviso = true; // a cena mostra o Boss se preparando
+    if (ultimo) ultimo.aviso = true;
     linhas.push(`⚠️ **${m.nome} ruge e prepara um golpe devastador!**`);
   }
   if (e.cdHab > 0) e.cdHab--;

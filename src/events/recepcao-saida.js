@@ -1,10 +1,9 @@
 const db = require('../db');
 const U = require('../recepcao/util');
 
-const LIMITE_MENSAGENS = 3000; // quantas mensagens do canal o Atlas olha
-const apagando = new Set(); // quem já está sendo limpo (evita rodar duas vezes)
+const LIMITE_MENSAGENS = 3000;
+const apagando = new Set();
 
-// Busca mensagens antigas de um canal, de 100 em 100
 async function buscarMensagens(canal, limite) {
   const todas = [];
   let antes;
@@ -18,7 +17,6 @@ async function buscarMensagens(canal, limite) {
   return todas;
 }
 
-// Lê o texto que estiver dentro dos componentes (mensagens de outros bots)
 function textoComponentes(lista) {
   let t = '';
   for (const c of lista || []) {
@@ -28,7 +26,6 @@ function textoComponentes(lista) {
   return t;
 }
 
-// Junta o texto da mensagem com o texto dos embeds e dos componentes
 function textoDaMensagem(msg) {
   let texto = msg.content || '';
   for (const e of msg.embeds) {
@@ -39,8 +36,6 @@ function textoDaMensagem(msg) {
   return texto + textoComponentes(msg.components);
 }
 
-// Apaga as mensagens do membro no canal "fechar vaga":
-// as que ele mesmo escreveu e as postadas por bots (formulários) marcando ele
 async function limparCanalDeVaga(member) {
   const canalId = U.cfg('canais.fechar_vaga');
   if (!canalId || apagando.has(member.id)) return;
@@ -74,7 +69,6 @@ async function limparCanalDeVaga(member) {
 module.exports = {
   name: 'guildMemberRemove',
   async execute(client, member) {
-    // Apaga o canal da recepção, se a pessoa estava no meio dela
     const sessao = db.get(`recepcao.sessoes.${member.id}`);
     if (sessao) {
       const canal = await member.guild.channels.fetch(sessao.canalId).catch(() => null);
@@ -82,7 +76,6 @@ module.exports = {
       db.remover(`recepcao.sessoes.${member.id}`);
     }
 
-    // Apaga as mensagens dela no canal de fechar vaga
     if (member.user && member.user.bot) return;
     await limparCanalDeVaga(member);
   },

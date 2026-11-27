@@ -1,4 +1,3 @@
-// Sub dona: vigia flood, spam de menção e golpes nas mensagens.
 const Vigia = require('../subdona/vigia');
 
 module.exports = {

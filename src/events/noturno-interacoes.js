@@ -17,7 +17,6 @@ module.exports = {
       if (!TIPOS.includes(tipo)) return;
 
       const texto = interaction.fields.getTextInputValue('texto');
-      // Mantém o que já existe (ex.: o banner) e troca só o que foi editado
       const atual = db.get(`config.noturno.mensagens.${tipo}`) || {};
       const novo = { ...atual, texto };
       if (!N.ehSoTexto(tipo)) novo.titulo = interaction.fields.getTextInputValue('titulo');

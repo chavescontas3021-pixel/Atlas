@@ -1,7 +1,7 @@
 const { ChannelType, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const db = require('../db');
 
-const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar'); // não passa pelo editor de mensagens
+const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar');
 
 const PADROES = {
   fechar: '00:00',
@@ -9,7 +9,6 @@ const PADROES = {
   aviso: 10,
   fuso: 'America/Sao_Paulo',
   mensagens: {
-    // soTexto: todas vão como mensagem de texto, com banner opcional anexado como imagem na mesma mensagem (config.noturno.mensagens.<tipo>.banner)
     avisoFechar: {
       soTexto: true,
       texto: '🌙 **Hora de dormir!** Faltam **{minutos} minutos** para os chats fecharem (**{fechar}**). Terminem suas cenas! 💤',
@@ -29,7 +28,6 @@ const PADROES = {
   },
 };
 
-// Permissões que o bloqueio tira (e depois devolve como estavam)
 const PERMS = ['SendMessages', 'SendMessagesInThreads', 'CreatePublicThreads', 'CreatePrivateThreads', 'AddReactions'];
 const TIPOS_CANAL = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 const TIPOS_VOZ = [ChannelType.GuildVoice, ChannelType.GuildStageVoice];
@@ -55,7 +53,6 @@ function mensagem(tipo) {
 
 const ehSoTexto = (tipo) => !!PADROES.mensagens[tipo].soTexto;
 
-// Banner (imagem grande) opcional: link direto de uma imagem
 function bannerValido(url) {
   if (typeof url !== 'string') return null;
   const t = url.trim();
@@ -64,15 +61,12 @@ function bannerValido(url) {
 
 const banner = (tipo) => bannerValido(cfg(`mensagens.${tipo}.banner`));
 
-// O banner vai como imagem ANEXADA na mesma mensagem do texto (sem embed).
-// O Discord mostra anexos de imagem grandes, logo abaixo do texto.
 function anexoBanner(url) {
   let ext = 'png';
   try {
     const m = new URL(url).pathname.match(/\.(png|jpe?g|gif|webp)$/i);
     if (m) ext = m[1].toLowerCase();
   } catch {
-    // mantém png
   }
   return new AttachmentBuilder(url, { name: `banner.${ext}` });
 }
@@ -81,7 +75,6 @@ function preencher(texto, vars) {
   return String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
 }
 
-// "6", "6h", "06:30", "6h30" -> "06:30". Retorna null se for inválido.
 function normalizarHora(txt) {
   const m = String(txt).trim().match(/^(\d{1,2})(?:[:hH](\d{2})?)?$/);
   if (!m) return null;
@@ -101,7 +94,6 @@ function deMin(min) {
   return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
 }
 
-// Data e hora atuais no fuso configurado
 function agora() {
   const partes = new Intl.DateTimeFormat('en-CA', {
     timeZone: fuso(),
@@ -116,14 +108,12 @@ function agora() {
   return { data: `${pega('year')}-${pega('month')}-${pega('day')}`, hora: `${pega('hour')}:${pega('minute')}` };
 }
 
-// Está na janela em que os chats devem ficar fechados?
 function deveFechar(agoraMin, fecharMin, abrirMin) {
   if (fecharMin === abrirMin) return false;
   if (fecharMin < abrirMin) return agoraMin >= fecharMin && agoraMin < abrirMin;
   return agoraMin >= fecharMin || agoraMin < abrirMin;
 }
 
-// Todos os chats que o bloqueio atinge (chats soltos + chats dentro das categorias)
 function canaisAlvo(guild) {
   const soltos = cfgLista('canais');
   const cats = cfgLista('categorias');
@@ -139,7 +129,6 @@ function canaisAlvo(guild) {
   return [...resultado.values()];
 }
 
-// Calls (voz/palco) atingidas pelo fechamento: soltas na lista ou dentro das categorias
 function ehCanalVoz(canal) {
   if (!canal || !TIPOS_VOZ.includes(canal.type)) return false;
   return cfgLista('canais').includes(canal.id) || (!!canal.parentId && cfgLista('categorias').includes(canal.parentId));
@@ -149,7 +138,6 @@ function canaisVoz(guild) {
   return [...guild.channels.cache.values()].filter(ehCanalVoz);
 }
 
-// Desconecta quem está nas calls bloqueadas (bots ficam)
 async function expulsarDaVoz(guild, motivo = 'Fechamento noturno') {
   let expulsos = 0;
   let falhas = 0;
@@ -168,7 +156,6 @@ async function expulsarDaVoz(guild, motivo = 'Fechamento noturno') {
   return { expulsos, falhas };
 }
 
-// Bloqueia o envio de mensagens, guardando como estava antes
 async function fechar(guild, motivo = 'Fechamento noturno') {
   const alvos = canaisAlvo(guild);
   const cargos = [guild.id, ...cfgLista('cargos')];
@@ -180,7 +167,7 @@ async function fechar(guild, motivo = 'Fechamento noturno') {
       if (cargoId !== guild.id && !guild.roles.cache.has(cargoId)) continue;
 
       const chave = `noturno.estado.${canal.id}.${cargoId}`;
-      if (db.get(chave)) continue; // já está fechado por nós
+      if (db.get(chave)) continue;
 
       const ow = canal.permissionOverwrites.cache.get(cargoId);
       const original = {};
@@ -207,7 +194,6 @@ async function fechar(guild, motivo = 'Fechamento noturno') {
   return { ok, falhas, canais: alvos.length, voz: canaisVoz(guild).length, expulsos: voz.expulsos, falhasVoz: voz.falhas };
 }
 
-// Devolve as permissões como estavam antes do bloqueio
 async function abrir(guild, motivo = 'Abertura da manhã') {
   const estado = db.get('noturno.estado', {}) || {};
   let ok = 0;
@@ -236,7 +222,6 @@ async function abrir(guild, motivo = 'Abertura da manhã') {
   return { ok, falhas, canais: Object.keys(estado).length };
 }
 
-// Manda a mensagem no canal de avisos (os avisos de 10 minutos marcam o cargo)
 async function anunciar(guild, tipo) {
   const canalId = cfg('avisoCanal');
   if (!canalId) return;
@@ -254,7 +239,6 @@ async function anunciar(guild, tipo) {
   const cargoId = cfg('cargoDorminhoca');
   const ping = marcar && cargoId ? `<@&${cargoId}>` : null;
 
-  // Mensagens só de texto, com banner opcional anexado (imagem junto da mensagem, sem embed)
   if (ehSoTexto(tipo)) {
     const corpo = preencher(msg.texto, vars);
     const opcoes = {
@@ -268,7 +252,6 @@ async function anunciar(guild, tipo) {
       await canal.send(opcoes);
     } catch (erro) {
       if (!img) throw erro;
-      // Se a imagem não puder ser enviada, manda ao menos o texto
       console.error('[Noturno] banner falhou, enviando só o texto:', erro.message);
       delete opcoes.files;
       await canal.send(opcoes);
@@ -301,7 +284,6 @@ async function executar(guild, tipo) {
   return anunciar(guild, tipo);
 }
 
-// Roda a cada 20 segundos e dispara o que estiver na hora
 async function ciclo(client) {
   const guild = client.guilds.cache.get(process.env.GUILD_ID);
   if (!guild || !cfg('ativo', false)) return;
@@ -321,7 +303,7 @@ async function ciclo(client) {
 
   for (const [tipo, hora] of eventos) {
     if (hora !== t.hora) continue;
-    if (db.get(`noturno.ultimo.${tipo}`) === chave) continue; // já disparou neste minuto
+    if (db.get(`noturno.ultimo.${tipo}`) === chave) continue;
     db.set(`noturno.ultimo.${tipo}`, chave);
     try {
       await executar(guild, tipo);
@@ -331,7 +313,6 @@ async function ciclo(client) {
   }
 }
 
-// Ao ligar o bot, corrige o estado se ele ficou fora do ar na hora de abrir/fechar
 async function reconciliar(guild) {
   if (!cfg('ativo', false)) return;
   const t = agora();

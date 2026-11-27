@@ -8,9 +8,7 @@ const {
   GatewayIntentBits,
   Partials,
 } = require('discord.js');
-const Standby = require('./standby/nucleo');
 
-// Lê todos os .js de uma pasta, incluindo subpastas
 function listarArquivos(dir) {
   let resultado = [];
   if (!fs.existsSync(dir)) return resultado;
@@ -25,8 +23,6 @@ function listarArquivos(dir) {
   return resultado;
 }
 
-// Cria o bot, carrega comandos e eventos e entra no Discord.
-// (Fica numa função para só rodar depois que o banco estiver pronto: veja o final do arquivo.)
 function iniciarBot() {
   const client = new Client({
     intents: [
@@ -35,7 +31,6 @@ function iniciarBot() {
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.GuildMessageReactions,
-      // Usados pelos logs do servidor
       GatewayIntentBits.GuildModeration,
       GatewayIntentBits.GuildVoiceStates,
       GatewayIntentBits.GuildInvites,
@@ -46,10 +41,8 @@ function iniciarBot() {
 
   client.commands = new Collection();
 
-  // O Atlas tem muitos módulos ouvindo os mesmos eventos (é normal). Isso tira o aviso de "MaxListeners".
   client.setMaxListeners(0);
 
-  // Carrega comandos
   for (const arquivo of listarArquivos(path.join(__dirname, 'commands'))) {
     const comando = require(arquivo);
     if (comando.data && comando.execute) {
@@ -59,7 +52,6 @@ function iniciarBot() {
     }
   }
 
-  // Carrega eventos (várias partes podem usar o mesmo evento)
   for (const arquivo of listarArquivos(path.join(__dirname, 'events'))) {
     const evento = require(arquivo);
     if (!evento.name || !evento.execute) continue;
@@ -78,7 +70,6 @@ process.on('unhandledRejection', (erro) => {
   console.error('[ERRO NÃO TRATADO]', erro);
 });
 
-// Servidor mínimo: alguns hospedadores gratuitos exigem uma porta aberta
 if (process.env.PORT) {
   http
     .createServer((req, res) => {
@@ -88,16 +79,11 @@ if (process.env.PORT) {
     .listen(process.env.PORT);
 }
 
-// Início. Com MODO=principal ou MODO=reserva no .env, espera a sua vez antes de ligar o bot
-// (assim o banco certo já está em data/db.json quando os módulos carregarem).
-// Sem MODO, funciona como sempre.
 (async () => {
   try {
-    if (Standby.ativo()) await Standby.aguardarVez();
-    const client = iniciarBot();
-    if (Standby.ativo()) Standby.manter(client);
+    iniciarBot();
   } catch (erro) {
     console.error('[ERRO AO INICIAR]', erro.message || erro);
-    process.exit(erro && erro.configuracao ? 2 : 1);
+    process.exit(1);
   }
 })();

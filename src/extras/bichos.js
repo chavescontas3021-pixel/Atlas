@@ -1,20 +1,16 @@
-// Bichinhos fofos em pixel art, com animação (pulinho + piscadinha + brilho).
-// O GIF é montado aqui mesmo, sem precisar de nenhuma biblioteca extra.
 const { AttachmentBuilder } = require('discord.js');
 
-const ESCALA = 10; // cada pixel vira 10x10
-const ATRASO = 45; // 0,45 s por quadro
+const ESCALA = 10;
+const ATRASO = 45;
 const FUNDOS = [
-  [255, 232, 243], // rosa
-  [225, 240, 255], // azul
-  [235, 255, 235], // verde
-  [255, 247, 220], // creme
-  [240, 232, 255], // lilás
+  [255, 232, 243],
+  [225, 240, 255],
+  [235, 255, 235],
+  [255, 247, 220],
+  [240, 232, 255],
 ];
 const BRILHO = [255, 255, 255];
 
-// Sprites 16x16. "." = fundo. Cada bicho tem sua paleta (letra -> cor).
-// o contorno · c corpo · w claro · k olho · b brilho do olho · p bochecha · n nariz/bico
 const BICHOS = {
   gatinho: {
     emoji: '🐱', nome: 'Gatinho',
@@ -150,61 +146,6 @@ const BICHOS = {
   },
 };
 
-// Bichos ESPECIAIS: não aparecem no sorteio do /bichinho (são presentes exclusivos).
-// Têm tamanho próprio (28x20) e um segundo quadro desenhado à mão (asas batendo e piscadinha).
-const ESPECIAIS = {
-  dragonfox: {
-    emoji: '🦊', nome: 'Dragonfox', escala: 8,
-    cores: { o: [74, 38, 22], c: [236, 150, 60], d: [170, 95, 40], w: [255, 226, 180], k: [24, 18, 24], b: [255, 255, 255], p: [250, 150, 150], n: [60, 30, 30], r: [205, 100, 50], t: [96, 48, 28], s: [250, 190, 110] },
-    q: [
-      '............................',
-      '.t.......o........o.......t.',
-      '.tr.....opo......opo.....rt.',
-      '.trr...ocpco....ocpco...rrt.',
-      '.trrr..occccoooocccco..rrrt.',
-      '..trrr.occcccccccccco.rrrt..',
-      '..trrrroccccccccccccorrrrt..',
-      '...trrrocckbccccbkccorrrt...',
-      '...trrrocckkcccckkccorrrt...',
-      '....trroppcccnncccpporrt....',
-      '....trr.owwwwwwwwwwo.rrt....',
-      '.....tr..oowwwwwwoo..rss....',
-      '......t.occwwwwwwcco.t.ds...',
-      '........occwwwwwwcco....ds..',
-      '........occwwwwwwcco....ds..',
-      '........occwwwwwwcco...ds...',
-      '........owwwwwwwwwwo..ds....',
-      '........owwowwwwowwodds.....',
-      '........oooowwwwoooo........',
-      '............................',
-    ],
-    q2: [
-      '............................',
-      '.........o........o.........',
-      '........opo......opo........',
-      '.......ocpco....ocpco.......',
-      '.......occccoooocccco.......',
-      't......occcccccccccco......t',
-      'tr.....occcccccccccco.....rt',
-      '.trr...occooccccoocco...rrt.',
-      '.trrr..occcccccccccco..rrrt.',
-      '..trrrroppcccnncccpporrrrt..',
-      '..trrrr.owwwwwwwwwwo.rrrrt..',
-      '...trrr..oowwwwwwoo..rsst...',
-      '....trr.occwwwwwwcco.rrds...',
-      '....trr.occwwwwwwcco.rrtds..',
-      '........occwwwwwwcco....ds..',
-      '........occwwwwwwcco...ds...',
-      '........owwwwwwwwwwo..ds....',
-      '........owwowwwwowwodds.....',
-      '........oooowwwwoooo........',
-      '............................',
-    ],
-  },
-};
-const TODOS = { ...BICHOS, ...ESPECIAIS };
-
-// Compressão LZW usada pelo formato GIF
 function lzw(indices, minCode) {
   const clear = 1 << minCode;
   const eoi = clear + 1;
@@ -252,11 +193,9 @@ function lzw(indices, minCode) {
 
 const u16 = (n) => [n & 255, (n >> 8) & 255];
 
-// ---------- Quadros ----------
-const BRILHINHO = [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]]; // uma estrelinha de 5 pixels
+const BRILHINHO = [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]];
 const chaves = Object.keys(BICHOS);
 
-// Quadro 1: parado. Quadro 2: pulinho (1 pixel para baixo), olhos fechados e estrelinha.
 function quadro(bicho, indice) {
   const grade = bicho.q.map((l) => l.split(''));
   if (indice === 0) return grade;
@@ -265,7 +204,6 @@ function quadro(bicho, indice) {
   for (let y = 0; y < grade.length; y++) {
     for (let x = 0; x < grade[0].length; x++) if (grade[y][x] !== '.' && y + 1 < grade.length) novo[y + 1][x] = grade[y][x];
   }
-  // piscadinha: o olho vira um tracinho
   for (let y = 0; y < novo.length; y++) {
     const linha = novo[y];
     const temBrilho = linha.includes('b');
@@ -277,14 +215,13 @@ function quadro(bicho, indice) {
       }
     }
   }
-  // k da linha do brilho vira tracinho também
   for (const linha of novo) if (linha.includes('o') && linha.includes('k')) for (let x = 0; x < linha.length; x++) if (linha[x] === 'k' && linha.slice(Math.max(0, x - 1), x + 2).includes('o')) linha[x] = 'o';
   for (const [dx, dy] of BRILHINHO) if (novo[dy][dx] === '.') novo[dy][dx] = '*';
   return novo;
 }
 
 function montarGif(chave, fundoIdx) {
-  const bicho = TODOS[chave];
+  const bicho = BICHOS[chave];
   const escala = bicho.escala || ESCALA;
   const letras = Object.keys(bicho.cores);
   const paleta = [FUNDOS[fundoIdx % FUNDOS.length], ...letras.map((l) => bicho.cores[l]), BRILHO];
@@ -295,9 +232,9 @@ function montarGif(chave, fundoIdx) {
   const alt = bicho.q.length * escala;
   const out = [];
   out.push(...Buffer.from('GIF89a'));
-  out.push(...u16(larg), ...u16(alt), 0xf3, 0, 0); // tabela global de 16 cores
+  out.push(...u16(larg), ...u16(alt), 0xf3, 0, 0);
   for (let i = 0; i < 16; i++) out.push(...(paleta[i] || [0, 0, 0]));
-  out.push(0x21, 0xff, 0x0b, ...Buffer.from('NETSCAPE2.0'), 0x03, 0x01, 0, 0, 0); // repete para sempre
+  out.push(0x21, 0xff, 0x0b, ...Buffer.from('NETSCAPE2.0'), 0x03, 0x01, 0, 0, 0);
   for (let q = 0; q < 2; q++) {
     const grade = quadro(bicho, q);
     const pixels = [];
@@ -327,7 +264,6 @@ function gif(chave, fundoIdx = 0) {
   return cache.get(k);
 }
 
-// Sorteia (ou usa) um bichinho e devolve tudo pronto para mandar numa mensagem
 function sortear(chave) {
   const c = chave && BICHOS[chave] ? chave : chaves[Math.floor(Math.random() * chaves.length)];
   const fundo = Math.floor(Math.random() * FUNDOS.length);
@@ -335,10 +271,9 @@ function sortear(chave) {
   return { chave: c, emoji: BICHOS[c].emoji, nome: BICHOS[c].nome, arquivo: nome, url: `attachment://${nome}`, anexo: () => new AttachmentBuilder(gif(c, fundo), { name: nome }) };
 }
 
-// Anexo pronto para um bicho específico (inclusive os especiais), ex.: anexoDe('dragonfox')
 function anexoDe(chave, fundo = 0) {
   const nome = `${chave}.gif`;
   return { url: `attachment://${nome}`, anexo: () => new AttachmentBuilder(gif(chave, fundo), { name: nome }) };
 }
 
-module.exports = { BICHOS, ESPECIAIS, chaves, gif, sortear, anexoDe };
+module.exports = { BICHOS, chaves, gif, sortear, anexoDe };

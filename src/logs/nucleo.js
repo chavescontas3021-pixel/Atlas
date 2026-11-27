@@ -1,10 +1,9 @@
-// Núcleo dos logs: onde cada tipo de log vai parar e como montar as mensagens.
 const { AuditLogEvent, EmbedBuilder } = require('discord.js');
 const db = require('../db');
 const T = require('../ui/tema');
 const UI = require('../ui/componentes');
 
-const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar'); // não passa pelo editor de mensagens
+const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar');
 
 const CATEGORIAS = {
   membros: 'Entradas, saídas e mudanças de membros',
@@ -17,7 +16,6 @@ const CATEGORIAS = {
   comandos: 'Comandos usados',
 };
 
-// Logs em preto do Atlas. Só o vermelho (saídas, bans, apagados) mantém um toque de cor.
 const CORES = { verde: T.COR.base, vermelho: T.COR.perigo, amarelo: T.COR.base, azul: T.COR.base, rosa: T.COR.base, cinza: T.COR.base };
 
 const cfg = (k, p) => db.get(`config.logs.${k}`, p);
@@ -25,7 +23,6 @@ const ativa = (cat) => !(cfg('desligados', []) || []).includes(cat);
 const canalId = (cat) => cfg(`canais.${cat}`) || cfg('padrao') || null;
 const ignorados = () => cfg('ignorados', []) || [];
 
-// IDs de todos os canais usados como log (para não registrar o próprio log)
 function canaisDeLog() {
   const s = new Set();
   if (cfg('padrao')) s.add(cfg('padrao'));
@@ -63,7 +60,6 @@ async function enviar(guild, cat, emb) {
   }
 }
 
-// Descobre QUEM fez a ação olhando o registro de auditoria (precisa da permissão "Ver registro de auditoria")
 async function quem(guild, tipo, alvoId, { espera = 900, filtro } = {}) {
   try {
     await new Promise((r) => setTimeout(r, espera));
@@ -75,7 +71,7 @@ async function quem(guild, tipo, alvoId, { espera = 900, filtro } = {}) {
       if (filtro && !filtro(e)) continue;
       return { executor: e.executor || null, motivo: e.reason || null, entrada: e };
     }
-  } catch { /* sem permissão ou sem registro */ }
+  } catch {}
   return null;
 }
 

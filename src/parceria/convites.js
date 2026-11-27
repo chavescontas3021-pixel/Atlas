@@ -1,16 +1,13 @@
-// Vigia de convites das parcerias: guarda cada convite postado e confere de tempos em tempos
-// se ele ainda funciona. Quando expira (ou é apagado), avisa a staff uma única vez.
 const { EmbedBuilder } = require('discord.js');
 const db = require('../db');
 
 const COR_ERRO = 0xe74c3c;
-const PAUSA = 1500; // espera entre uma checagem e outra (evita limite de requisições do Discord)
+const PAUSA = 1500;
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const REGEX_CONVITE =
   /(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com\/invite|dsc\.gg)\/([A-Za-z0-9-]{2,32})/gi;
 
-// ---------- Configuração ----------
 const cfg = (chave, padrao) => db.get(`config.parceriaconvites.${chave}`, padrao);
 const setCfg = (chave, valor) => db.set(`config.parceriaconvites.${chave}`, valor);
 
@@ -24,7 +21,6 @@ function conf() {
   };
 }
 
-// ---------- Lista de convites guardados ----------
 function todos() {
   const t = db.get('parceria.convites', {});
   return t && typeof t === 'object' ? t : {};
@@ -44,7 +40,6 @@ function acharTodos(texto) {
   return [...new Set(achados)];
 }
 
-// Guarda (ou atualiza) um convite. Devolve o registro.
 function registrar({ codigo, servidor, promotorId, canalId, msgId }) {
   if (!codigo) return null;
   const atual = obter(codigo) || {};
@@ -70,20 +65,16 @@ const remover = (codigo) => {
   return true;
 };
 
-// ---------- Checagem ----------
-// Devolve { estado: 'ok' | 'quebrado' | 'erro', servidor }
 async function checarUm(client, codigo) {
   try {
     const inv = await client.fetchInvite(codigo);
     return { estado: 'ok', servidor: (inv && inv.guild && inv.guild.name) || null };
   } catch (e) {
-    // 10006 = "Unknown Invite": o convite não existe mais. Qualquer outro erro (rede, limite) NÃO conta.
     if (e && e.code === 10006) return { estado: 'quebrado', servidor: null };
     return { estado: 'erro', servidor: null };
   }
 }
 
-// Confirma antes de dar como quebrado (uma segunda tentativa, para evitar falso alarme)
 async function checarConfirmando(client, codigo) {
   let r = await checarUm(client, codigo);
   if (r.estado === 'quebrado') {
@@ -125,7 +116,6 @@ async function enviarAviso(client, c) {
   return true;
 }
 
-// Checa um convite, atualiza o registro e avisa se acabou de quebrar
 async function processar(client, codigo) {
   const c = obter(codigo);
   if (!c) return null;
@@ -136,7 +126,7 @@ async function processar(client, codigo) {
   if (r.servidor) novo.servidor = r.servidor;
   if (r.estado === 'ok') {
     novo.quebrado = false;
-    novo.avisadoEm = null; // se quebrar de novo no futuro, avisa de novo
+    novo.avisadoEm = null;
   } else {
     novo.quebrado = true;
     if (!novo.avisadoEm) {
@@ -151,7 +141,6 @@ async function processar(client, codigo) {
   return { ...novo, estado: r.estado };
 }
 
-// Rotina automática: só checa quem já passou do intervalo
 let rodando = false;
 async function tick(client) {
   const c = conf();
@@ -169,7 +158,6 @@ async function tick(client) {
   }
 }
 
-// Checa tudo agora (comando /parceriaconvites verificar)
 async function verificarTodos(client) {
   const resumo = { ok: 0, quebrados: [], erros: 0, total: 0 };
   for (const item of Object.values(todos())) {
@@ -184,7 +172,6 @@ async function verificarTodos(client) {
   return resumo;
 }
 
-// Lê mensagens antigas de um canal e guarda os convites que achar
 async function importar(client, canal, limite = 300) {
   let antes;
   let lidas = 0;

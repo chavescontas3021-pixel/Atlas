@@ -1,15 +1,12 @@
-// Núcleo de sorteios e eventos.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../db');
 const RPG = require('../rpg/nucleo');
 
 const COR = 0xf5a3c7;
 const CINZA = 0x808080;
-const BRT = 3 * 3600 * 1000; // Brasília = UTC-3 (sem horário de verão)
+const BRT = 3 * 3600 * 1000;
 const ts = (ms) => Math.floor(ms / 1000);
 
-// ---------- Tempo ----------
-// "30m", "2h", "1d12h" -> milissegundos
 function duracaoParaMs(txt) {
   const t = String(txt || '').trim().toLowerCase().replace(/\s+/g, '');
   if (!/^(\d{1,6}[smhd])+$/.test(t)) return null;
@@ -19,7 +16,6 @@ function duracaoParaMs(txt) {
   return total;
 }
 
-// "20:00", "25/10 20:00" ou "25/10/2026 20:00" (horário de Brasília) -> timestamp
 function dataParaTs(txt) {
   const t = String(txt || '').trim();
   const agora = Date.now();
@@ -63,7 +59,6 @@ function proximoId(chave) {
 
 const mencoes = (ids, max = 40) => ids.slice(0, max).map((i) => `<@${i}>`).join(' ');
 
-// ---------- Sorteios ----------
 const getSorteio = (id) => db.get(`sorteios.lista.${id}`, null);
 const salvarSorteio = (s) => db.set(`sorteios.lista.${s.id}`, s);
 const todosSorteios = () => Object.values(db.get('sorteios.lista', {}) || {});
@@ -136,7 +131,6 @@ function embaralhar(lista) {
   return a;
 }
 
-// Sorteia entre quem ainda é elegível (continua no servidor, tem o cargo, tem personagem)
 async function sortear(client, s, quantidade, excluir = []) {
   const guild = client.guilds.cache.get(s.guildId);
   const escolhidos = [];
@@ -220,7 +214,6 @@ async function rerolarSorteio(client, id, quantidade) {
   return { ok: true, ganhadores: novos };
 }
 
-// ---------- Eventos ----------
 const getEvento = (id) => db.get(`eventos.lista.${id}`, null);
 const salvarEvento = (e) => db.set(`eventos.lista.${e.id}`, e);
 const todosEventos = () => Object.values(db.get('eventos.lista', {}) || {});
@@ -306,7 +299,6 @@ function premiarEvento(id, stars) {
   return { ok, sem };
 }
 
-// ---------- Agendador (roda a cada 15s) ----------
 async function tick(client) {
   const agora = Date.now();
 

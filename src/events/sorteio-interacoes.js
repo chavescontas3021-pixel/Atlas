@@ -79,7 +79,7 @@ module.exports = {
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: 'Deu erro. Tente de novo.', flags: EPH });
         }
-      } catch { /* ignora */ }
+      } catch {}
     }
   },
 };

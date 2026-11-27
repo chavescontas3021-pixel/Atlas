@@ -1,11 +1,3 @@
-// Lista ampliada do automod (ódio, extremismo, ameaças, golpes, autolesão e mais).
-// Funciona junto com palavras.js: tudo aqui entra como GRAVE (apaga a mensagem + advertência).
-// Escreva do jeito normal; o Atlas já pega n4z1st4, p u t a, letras repetidas, acentos e símbolos.
-//
-// DE PROPÓSITO FORA DA LISTA: palavrões comuns (caralho, porra, foda-se, vai tomar no cu,
-// filho da puta e parecidos). Se quiser bloquear algum, use /automod adicionar.
-// Evitamos palavras que também são comuns no dia a dia (ex.: "kkk" é risada, números como
-// 1488 aparecem em preços do RPG), para não apagar conversa normal.
 module.exports = {
   graves: {
     'racismo': [
@@ -175,6 +167,5 @@ module.exports = {
     ],
   },
 
-  // Símbolos de ódio: um sozinho já conta (apaga + advertência)
   simbolos: ['卐'],
 };

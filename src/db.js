@@ -18,7 +18,6 @@ if (fs.existsSync(arquivo)) {
 
 let salvando = null;
 function salvar() {
-  // Agrupa várias gravações seguidas em uma só
   if (salvando) return;
   salvando = setTimeout(() => {
     salvando = null;
@@ -28,7 +27,6 @@ function salvar() {
   }, 300);
 }
 
-// get('config.recepcao.canal', padrao)
 function get(chave, padrao = undefined) {
   const partes = chave.split('.');
   let atual = dados;

@@ -26,7 +26,6 @@ function botao(id, rotulo, emoji, estilo) {
   return b;
 }
 
-// Texto da prévia: o que vai mudar e o que deu problema
 function previa(titulo, res, { iguaisTxt } = {}) {
   const linhas = [
     `✏️ **${res.mudancas.length}** vão mudar${res.iguais !== undefined ? ` · ➖ **${res.iguais}** já estão iguais` : ''} · ⚠️ **${res.problemas.length}** com problema`,
@@ -56,7 +55,6 @@ function resumoFinal(ok, falhas, rodape) {
   return corta(t.join('\n'), 1900);
 }
 
-// Mostra a prévia, espera o botão e aplica. "atual" é a interação que vai editar a mensagem.
 async function perguntarEAplicar(atual, interaction, { embed, mudancas, rotulo, motivo, preparar, concluir, rodape }) {
   if (!mudancas.length) {
     await atual.editReply({ content: 'Nada para mudar.', embeds: [embed], components: [] });
@@ -109,7 +107,6 @@ async function perguntarEAplicar(atual, interaction, { embed, mudancas, rotulo, 
   return null;
 }
 
-// Espera o staff colar a lista editada no chat (em quantas mensagens quiser)
 async function coletar(interaction) {
   const linha = new ActionRowBuilder().addComponents(
     botao('decorar:pronto', 'Pronto', '✅', ButtonStyle.Success),
@@ -152,7 +149,7 @@ async function coletar(interaction) {
     return null;
   }
   await clique.deferUpdate();
-  for (const m of msgs) m.delete().catch(() => {}); // melhor esforço (precisa de Gerenciar Mensagens)
+  for (const m of msgs) m.delete().catch(() => {});
   if (!textos.length) {
     await clique.editReply({ content: '❌ Você não colou nada. Use `/decorar aplicar` de novo.', components: [] });
     return null;
@@ -161,7 +158,6 @@ async function coletar(interaction) {
 }
 
 module.exports = {
-  global: true, // funciona em qualquer servidor onde a Atlas estiver (veja deploy-commands.js)
   data: new SlashCommandBuilder()
     .setName('decorar')
     .setDescription('Muda o nome de vários canais e categorias de uma vez (staff)')
@@ -189,7 +185,6 @@ module.exports = {
 
     const sub = interaction.options.getSubcommand();
 
-    // ---------- Lista ----------
     if (sub === 'lista') {
       await interaction.deferReply({ flags: EPH });
       await interaction.guild.channels.fetch().catch(() => {});
@@ -214,7 +209,6 @@ module.exports = {
       return null;
     }
 
-    // ---------- Aplicar ----------
     if (sub === 'aplicar') {
       if (N.estaOcupado()) return responder('⏳ Já tem uma decoração em andamento. Aguarde terminar.');
       if (!interaction.channel) return responder('❌ Não consegui ver este canal.');
@@ -258,7 +252,6 @@ module.exports = {
       });
     }
 
-    // ---------- Desfazer ----------
     if (sub === 'desfazer') {
       if (N.estaOcupado()) return responder('⏳ Já tem uma decoração em andamento. Aguarde terminar.');
       await interaction.deferReply({ flags: EPH });

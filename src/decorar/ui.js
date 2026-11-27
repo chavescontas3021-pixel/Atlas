@@ -1,4 +1,3 @@
-// Peças de tela compartilhadas pelo /criar e pelo /cargo (mesmo jeito do /decorar: lista, prévia, confirmar, aplicar)
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const N = require('./nucleo');
 
@@ -14,7 +13,6 @@ const botao = (id, rotulo, emoji, estilo) => {
 };
 const embed = (titulo, linhas) => new EmbedBuilder().setColor(COR).setTitle(titulo).setDescription(corta(linhas.join('\n'), 3900));
 
-// Pega a lista: do arquivo anexado ou colada no chat (em quantas mensagens quiser). Devolve { texto, atual } ou null.
 async function lerLista(interaction, comando) {
   const anexo = interaction.options.getAttachment('arquivo');
   if (anexo) {
@@ -41,7 +39,6 @@ async function lerLista(interaction, comando) {
   return { texto: textos.join('\n'), atual: clique };
 }
 
-// Mostra a prévia, espera o botão e roda executar(progresso) → texto final
 async function confirmar(atual, interaction, { prévia, rotulo, executar }) {
   const linha = new ActionRowBuilder().addComponents(botao('ui:ok', rotulo, '✅', ButtonStyle.Success), botao('ui:cancelar', 'Cancelar', null, ButtonStyle.Secondary));
   const msg = await atual.editReply({ content: '', embeds: [prévia], components: [linha] });
@@ -60,7 +57,6 @@ async function confirmar(atual, interaction, { prévia, rotulo, executar }) {
   } finally { N.liberar(); }
 }
 
-// Falhas em lista curta
 const falhasTxt = (falhas, nomeDe) => falhas.length ? [`⚠️ **${falhas.length}** falharam:`, ...falhas.slice(0, 10).map((f) => `• ${corta(nomeDe(f), 35)} — ${f.erro}`), ...(falhas.length > 10 ? [`… e mais ${falhas.length - 10}`] : [])] : [];
 
 module.exports = { COR, corta, botao, embed, lerLista, confirmar, falhasTxt };

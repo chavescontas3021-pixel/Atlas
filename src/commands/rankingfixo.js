@@ -49,4 +49,3 @@ module.exports = {
     }
   },
 };
-// fim do arquivo

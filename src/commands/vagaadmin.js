@@ -180,7 +180,6 @@ module.exports = {
       return responder(interaction, `✅ Cada pessoa pode ocupar até **${n}** vaga(s).`);
     }
 
-    // remover / ocupar / liberar usam uma vaga
     const vaga = N.acharVaga(interaction.options.getString('vaga'));
     if (!vaga) return responder(interaction, '❌ Não achei essa vaga.');
     await interaction.deferReply({ flags: EPH });
@@ -208,4 +207,3 @@ module.exports = {
     }
   },
 };
-// fim do arquivo

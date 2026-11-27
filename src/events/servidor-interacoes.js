@@ -48,7 +48,6 @@ module.exports = {
       }
       await interaction.editReply({ content: msg.slice(0, 1900) });
 
-      // Aviso no canal da staff
       const canal = await guild.channels.fetch(pedido.canalMantido).catch(() => null);
       if (canal && canal.send) {
         await canal.send(`🔴 Servidor desligado por <@${userId}>. Para reabrir, use \`/servidor ligar\` aqui.`).catch(() => {});

@@ -1,8 +1,5 @@
-// Equipamento e aura no personagem: a arma e a armadura que a pessoa usa no RPG aparecem no desenho,
-// e o nível (e a classe) dão uma aura. Tudo por código, sem imagens.
 const db = require('../db');
 
-// Letras novas usadas só aqui: a A v n N (arma) · m M r x z (armadura)
 const R = (g, x, y, w, h, c) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (j >= 0 && j < g.length && i >= 0 && i < g[0].length) g[j][i] = c; };
 const P = (g, x, y, c) => R(g, x, y, 1, 1, c);
 const lin = (g, x0, y0, x1, y1, c) => {
@@ -11,8 +8,6 @@ const lin = (g, x0, y0, x1, y1, c) => {
 };
 const fase = (f) => f.fase || 0;
 
-// ---------- Armas ----------
-// Lâmina padrão: coluna da luz (x=20) e da sombra (x=21), guarda e cabo na altura da mão
 function espada(g, dy, c) {
   R(g, 20, 4, 1, 15, c.l); R(g, 21, 5, 1, 14, c.s); P(g, 20, 3, c.l);
   R(g, 18, 19 + dy, 5, 1, c.g); P(g, 18, 19 + dy, c.G); P(g, 22, 19 + dy, c.g);
@@ -50,7 +45,7 @@ const ARMAS = {
       espada(g, dy, { l: 'a', s: 'A', g: 'A', G: 'A' });
       for (let y = 5; y < 18; y += 2) P(g, 19, y + (fase(f) % 2), 'N');
       P(g, 20, 19 + dy, 'n'); P(g, 20, 4, 'n');
-      for (let k = 0; k < 3; k++) P(g, 19 + k, 2 - ((fase(f) + k) % 3), k % 2 ? 'n' : 'N'); // fumaça
+      for (let k = 0; k < 3; k++) P(g, 19 + k, 2 - ((fase(f) + k) % 3), k % 2 ? 'n' : 'N');
     },
   },
   foice_ceifador: {
@@ -60,7 +55,7 @@ const ARMAS = {
       R(g, 16, 4, 6, 1, 'a'); R(g, 13, 5, 9, 1, 'a'); R(g, 12, 6, 5, 1, 'A'); R(g, 12, 7, 2, 1, 'A'); P(g, 12, 8, 'v');
       R(g, 17, 3, 4, 1, 'n'); P(g, 14, 4, 'n'); P(g, 12, 5, 'n');
       const k = fase(f) % 4;
-      P(g, 14, 9 - k, 'n'); P(g, 18, 1 + ((k + 2) % 4), 'N'); // almas
+      P(g, 14, 9 - k, 'n'); P(g, 18, 1 + ((k + 2) % 4), 'N');
     },
   },
   espada_vazio: {
@@ -84,8 +79,6 @@ const ARMAS = {
   },
 };
 
-// ---------- Armaduras ----------
-// estilo: o formato do corpo (tunica | armadura | casaco). cores: o que troca de cor. detalhe: o que é desenhado por cima.
 const ARMADURAS = {
   couro: {
     nome: 'Couro Curtido', estilo: 'tunica',
@@ -173,7 +166,6 @@ const ARMADURAS = {
   },
 };
 
-// O que está valendo agora (respeita o botão "ocultar equipamento")
 function ativo(app) {
   if (!app || app.mostrarEquip === false || !app.equip) return {};
   return { arma: ARMAS[app.equip.arma] ? app.equip.arma : null, armadura: ARMADURAS[app.equip.armadura] ? app.equip.armadura : null };
@@ -183,7 +175,6 @@ function coresEquip(app) {
   return { ...(e.arma ? ARMAS[e.arma].cores : {}), ...(e.armadura ? ARMADURAS[e.armadura].cores : {}) };
 }
 
-// ---------- Aura ----------
 const AURAS = {
   guerreiro: ['#ffb347', '#d98a1c'], mago: ['#c47cff', '#8a46d0'], arqueiro: ['#5cff9a', '#2faa6a'],
   curandeiro: ['#fff4b8', '#d4b84a'], ladino: ['#d8c8ff', '#8a6ae0'],
@@ -193,7 +184,6 @@ const nivelAura = (app) => {
   return n >= 40 ? 4 : n >= 30 ? 3 : n >= 20 ? 2 : n >= 10 ? 1 : 0;
 };
 
-// Desenha a aura atrás do personagem. Só usa 2 cores fixas (tramado), então não pesa no GIF.
 function aura(g, cx, cy, app, f, { rx = 13, ry = 19 } = {}) {
   if (!app || app.mostrarEquip === false) return;
   const t = nivelAura(app);
@@ -202,27 +192,23 @@ function aura(g, cx, cy, app, f, { rx = 13, ry = 19 } = {}) {
   const H = g.length; const W = g[0].length;
   const px = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (y >= 0 && y < H && x >= 0 && x < W) g[y][x] = c; };
   const p = f % 8;
-  // halo: borda em tramado
   for (let y = Math.floor(cy - ry - 2); y <= Math.ceil(cy + ry + 2); y++) for (let x = Math.floor(cx - rx - 2); x <= Math.ceil(cx + rx + 2); x++) {
     const d = Math.hypot((x - cx) / rx, (y - cy) / ry);
     const pulso = 0.9 + 0.05 * Math.sin((p / 8) * Math.PI * 2);
     if (d <= pulso && d > pulso - 0.16 && (x + y) % 2 === 0) px(x, y, c2);
     if (t >= 4 && d <= pulso - 0.2 && d > pulso - 0.34 && (x + y) % 2 === 1) px(x, y, c2);
   }
-  // faíscas girando em volta
   if (t >= 2) for (let k = 0; k < (t >= 4 ? 5 : 3); k++) {
     const a = (p / 8) * Math.PI * 2 + (k / (t >= 4 ? 5 : 3)) * Math.PI * 2;
     const x = cx + Math.cos(a) * (rx + 1); const y = cy + Math.sin(a) * (ry * 0.75);
     px(x, y, c1); px(x + 1, y, c2); px(x, y - 1, c2);
   }
-  // chamas subindo dos lados
   if (t >= 3) for (let k = 0; k < 6; k++) {
     const lado = k % 2 ? 1 : -1;
     const x = cx + lado * (rx * 0.62 + (k % 3));
     const y = cy + ry * 0.7 - ((p * 2 + k * 5) % Math.round(ry * 1.6));
     px(x, y, c1); px(x, y - 1, c2); if (k % 2) px(x + lado, y, c2);
   }
-  // anel no chão e runas
   if (t >= 4) {
     for (let a = 0; a < 40; a++) { const ang = (a / 40) * Math.PI * 2; px(cx + Math.cos(ang) * (rx + 2), cy + ry + 1 + Math.sin(ang) * 2.2, a % 2 ? c1 : c2); }
     for (let k = 0; k < 3; k++) {
@@ -232,8 +218,6 @@ function aura(g, cx, cy, app, f, { rx = 13, ry = 19 } = {}) {
   }
 }
 
-// ---------- Integração ----------
-// Junta o equipamento e o nível salvos no RPG à aparência (só para desenhar; nada disso é salvo no personagem)
 function enriquecer(uid, app) {
   const j = db.get(`rpg.jogadores.${uid}`, null);
   const a = { ...app };
@@ -247,4 +231,3 @@ function enriquecer(uid, app) {
 const limpar = (app) => { const { equip, nivel, classe, ...resto } = app || {}; return resto; };
 
 module.exports = { ARMAS, ARMADURAS, AURAS, ativo, coresEquip, nivelAura, aura, enriquecer, limpar };
-// fim do arquivo

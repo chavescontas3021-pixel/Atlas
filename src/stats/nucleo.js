@@ -1,14 +1,12 @@
-// Estatísticas do servidor: mensagens por dia/canal/membro, entradas e saídas.
 const db = require('../db');
 
-const BRT = 3 * 3600 * 1000; // Brasília = UTC-3
+const BRT = 3 * 3600 * 1000;
 const DIA = 24 * 3600 * 1000;
 const GUARDAR_DIAS = 90;
 
 const diaChave = (ts) => new Date(ts - BRT).toISOString().slice(0, 10).replace(/-/g, '');
 const ignorados = () => db.get('config.stats.ignorados', []) || [];
 
-// Os contadores ficam na memória e são gravados a cada 30 segundos
 const pendentes = new Map();
 function somar(chave, n = 1) {
   pendentes.set(chave, (pendentes.get(chave) || 0) + n);
@@ -30,7 +28,6 @@ function registrarMensagem(canalId, uid, ts = Date.now()) {
 const registrarEntrada = (ts = Date.now()) => somar(`stats.dias.${diaChave(ts)}.entradas`);
 const registrarSaida = (ts = Date.now()) => somar(`stats.dias.${diaChave(ts)}.saidas`);
 
-// Soma os últimos `dias` dias (contando hoje)
 function agregado(dias, agora = Date.now()) {
   flush();
   const r = { total: 0, entradas: 0, saidas: 0, canais: new Map(), membros: new Map(), porDia: [] };
@@ -73,7 +70,6 @@ function limpar() {
   for (const k of Object.keys(dias)) if (k < limite) db.remover(`stats.dias.${k}`);
 }
 
-// Renomeia o canal-contador (ex: "👥 Membros: 120")
 async function contadorTick(client) {
   const canalId = db.get('config.stats.contador.canal', null);
   if (!canalId) return;

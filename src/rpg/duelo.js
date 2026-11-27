@@ -1,14 +1,12 @@
-// Duelo por turnos: os dois escolhem seus ataques, igual ao combate do explorar.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { CLASSES } = require('./dados');
 const N = require('./nucleo');
 const B = require('../personagem/batalha');
 const Pers = require('../personagem/nucleo');
 
-// Visual do golpe de cada classe no GIF
 const VISUAL = { guerreiro: 'cruz', mago: 'explosao', arqueiro: 'flechas', curandeiro: 'luz', ladino: 'furtivo' };
 
-const duelos = new Map(); // id -> estado
+const duelos = new Map();
 const TEMPO_TURNO = 3 * 60 * 1000;
 const MAX_TURNOS = 60;
 let contador = 0;
@@ -33,7 +31,6 @@ function iniciar(idA, jA, idB, jB, aposta, aoExpirar) {
   const mk = (uid, j) => ({ id: uid, j, hp: j.hpMax, cd: 0, def: false });
   const A = mk(idA, jA);
   const Bx = mk(idB, jB);
-  // Quem tem mais agilidade começa
   const turno = jA.attr.agilidade >= jB.attr.agilidade ? 'a' : 'b';
   const d = {
     id, a: A, b: Bx, turno, aposta, turnos: 0, eventos: [], hpIni: { a: A.hp, b: Bx.hp }, log: ['⚔️ O duelo começou!'], msg: null, timer: null, aoExpirar,
@@ -54,7 +51,6 @@ function armarTimer(d) {
 const vez = (d) => (d.turno === 'a' ? d.a : d.b);
 const alvoDa = (d) => (d.turno === 'a' ? d.b : d.a);
 
-// tipo: atq | hab | def | des
 function agir(d, tipo) {
   const x = vez(d);
   const y = alvoDa(d);
@@ -130,7 +126,6 @@ function agir(d, tipo) {
   return {};
 }
 
-// Paga o prêmio e encerra
 function finalizar(d, vencedor) {
   clearTimeout(d.timer);
   duelos.delete(d.id);
@@ -167,7 +162,6 @@ function embedDuelo(d) {
     .setFooter({ text: x.cd > 0 ? `${cl.hab.nome}: recarga ${x.cd} turno(s)` : `${cl.hab.nome}: pronta! · ${cl.hab.desc}` });
 }
 
-// GIF da cena do turno. perdedorId: quando o duelo acabou, quem cai (some da cena).
 function arquivos(d, perdedorId) {
   return [B.anexo({
     esq: { tipo: 'heroi', app: Pers.visual(d.a.id) },
@@ -203,4 +197,3 @@ function botoes(d) {
 }
 
 module.exports = { iniciar, obter, lado, vez, emDuelo, agir, finalizar, embedDuelo, embedFim, arquivos, botoes };
-// fim do arquivo

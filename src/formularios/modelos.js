@@ -1,12 +1,3 @@
-// Modelos dos formulários de staff. Para mudar perguntas, é só editar este arquivo.
-//
-// Regras do Discord para as janelas de resposta:
-//   - no máximo 5 perguntas por janela (por isso cada formulário é dividido em "partes")
-//   - "curto" (rótulo da pergunta na janela) tem no máximo 38 caracteres (o número entra na frente)
-//   - "dica" (texto cinza dentro do campo) tem no máximo 100 caracteres
-// O texto completo de cada pergunta ("pergunta") aparece na mensagem do formulário.
-// Nada aqui usa emoji, de propósito.
-
 const AREAS = {
   promotor: {
     nome: 'Promotor',
@@ -147,7 +138,6 @@ const AREAS = {
   },
 };
 
-// Mensagens fixas (sem emojis)
 const TEXTOS = {
   aprovado: (area) => `Olá. O seu formulário para a área de ${area} foi aprovado. Aguarde as orientações da equipe.`,
   reprovado: (area) =>

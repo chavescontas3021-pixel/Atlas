@@ -1,4 +1,3 @@
-// Escuta tudo o que acontece no servidor e manda para os canais de log.
 const db = require('../db');
 const L = require('./nucleo');
 
@@ -32,7 +31,6 @@ function registrar(client) {
   const on = (evento, fn) => client.on(evento, seguro(evento, fn));
   const foiEuMesmo = (info) => !!(info && info.executor && info.executor.id === eu());
 
-  // ---------- Membros ----------
   on('guildMemberAdd', async (m) => {
     const nova = Date.now() - m.user.createdTimestamp < 7 * 86400000;
     await enviar(m.guild, 'membros', embed('verde', '📥 Membro entrou', `${pessoa(m.user)} entrou no servidor.`, [
@@ -91,7 +89,6 @@ function registrar(client) {
     }
   });
 
-  // ---------- Moderação ----------
   on('guildBanAdd', async (ban) => {
     const b = ban.partial ? await ban.fetch().catch(() => ban) : ban;
     const info = await quem(b.guild, A.MemberBanAdd, b.user.id);
@@ -103,7 +100,6 @@ function registrar(client) {
     await enviar(ban.guild, 'moderacao', embed('verde', '♻️ Ban removido', pessoa(ban.user), [porQuem(info)]));
   });
 
-  // ---------- Mensagens ----------
   on('messageDelete', async (msg) => {
     if (!msg.guild || (msg.author && msg.author.bot) || canalIgnorado(msg.channel)) return;
     const info = msg.author ? await quem(msg.guild, A.MessageDelete, msg.author.id, { filtro: (e) => !e.extra || !e.extra.channel || e.extra.channel.id === msg.channelId }) : null;
@@ -140,7 +136,6 @@ function registrar(client) {
     ]));
   });
 
-  // ---------- Voz ----------
   on('voiceStateUpdate', async (antes, depois) => {
     const m = depois.member || antes.member;
     if (!m || m.user.bot) return;
@@ -167,11 +162,10 @@ function registrar(client) {
     }
   });
 
-  // ---------- Canais ----------
   on('channelCreate', async (c) => {
     if (!c.guild) return;
     const info = await quem(c.guild, A.ChannelCreate, c.id);
-    if (foiEuMesmo(info)) return; // canais que o próprio Atlas cria (recepção, tickets...)
+    if (foiEuMesmo(info)) return;
     await enviar(c.guild, 'canais', embed('verde', '📁 Canal criado', nomeCanal(c), [['Tipo', tipoCanal(c), true], porQuem(info)]));
   });
 
@@ -203,7 +197,7 @@ function registrar(client) {
         if (info) break;
       }
     }
-    if (foiEuMesmo(info)) return; // ex.: fechamento noturno
+    if (foiEuMesmo(info)) return;
     await enviar(depois.guild, 'canais', embed('amarelo', '🛠️ Canal alterado', nomeCanal(depois), [...dif, porQuem(info)]));
   });
 
@@ -219,7 +213,6 @@ function registrar(client) {
     await enviar(t.guild, 'canais', embed('vermelho', '🧵 Tópico apagado', `**${t.name}**`));
   });
 
-  // ---------- Cargos ----------
   on('roleCreate', async (r) => {
     const info = await quem(r.guild, A.RoleCreate, r.id);
     await enviar(r.guild, 'cargos', embed('verde', '🏷️ Cargo criado', `<@&${r.id}> (${r.name})`, [porQuem(info)]));
@@ -247,7 +240,6 @@ function registrar(client) {
     await enviar(depois.guild, 'cargos', embed('amarelo', '🛠️ Cargo alterado', `<@&${depois.id}> (${depois.name})`, [...dif, porQuem(info)]));
   });
 
-  // ---------- Servidor ----------
   on('guildUpdate', async (antes, depois) => {
     const dif = [];
     if (antes.name !== depois.name) dif.push(['Nome', `${antes.name} → ${depois.name}`]);
@@ -289,7 +281,6 @@ function registrar(client) {
     await enviar(i.guild, 'servidor', embed('vermelho', '🔗 Convite apagado', `\`${i.code}\``, [['Canal', i.channel ? nomeCanal(i.channel) : '—']]));
   });
 
-  // ---------- Comandos ----------
   on('interactionCreate', async (i) => {
     if (!i.isChatInputCommand || !i.isChatInputCommand() || !i.guild || canalIgnorado(i.channel)) return;
     const texto = `/${i.commandName} ${opcoesTexto(i.options && i.options.data)}`.trim();

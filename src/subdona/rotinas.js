@@ -1,6 +1,3 @@
-// ATLAS · sub dona · rotinas automáticas
-// Tipos: anuncio, sorteio, evento (agendados) · inativos, cargo_tempo (varredura diária) · cargo_entrada (ao entrar)
-// Ficam em subdona.rotinas. Respeitam o interruptor mestre e os poderes (anunciar / cargo): se o poder estiver "off", não rodam.
 const db = require('../db');
 const N = require('./nucleo');
 
@@ -17,7 +14,6 @@ const lista = () => db.get('subdona.rotinas', []) || [];
 const salvar = (l) => db.set('subdona.rotinas', l);
 const obter = (id) => lista().find((r) => r.id === id) || null;
 
-// Próxima execução (relógio de Brasília). repete: 'diario' | 'semanal'
 function proxima(r, de = Date.now()) {
   const b = new Date(de - BRT);
   const alvo = new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate(), r.hora || 0, 0));
@@ -67,7 +63,6 @@ function descrever(r) {
 
 const poderOk = (p) => N.ativo() && N.modo(p) !== 'off';
 
-// ── Execução de cada tipo ────────────────────────────────────
 async function rodarAnuncio(client, r) {
   if (!poderOk('anunciar')) return 'poder Anunciar desligado';
   const canal = client.channels.cache.get(r.canalId);
@@ -145,7 +140,6 @@ async function rodarInativos(client, r) {
 const rodarTempo = (client, r) => { const limite = Date.now() - r.dias * DIA; return varrer(client, r, (m) => (m.joinedTimestamp <= limite ? true : null)); };
 const EXEC = { anuncio: rodarAnuncio, sorteio: rodarSorteio, evento: rodarEvento, inativos: rodarInativos, cargo_tempo: rodarTempo };
 
-// Roda o que venceu (a ronda chama a cada 5 min)
 async function tick(client) {
   if (!N.ativo()) return;
   const l = lista();
@@ -162,7 +156,6 @@ async function tick(client) {
   if (mudou) salvar(l);
 }
 
-// guildMemberAdd: cargos de entrada
 async function aoEntrar(client, membro) {
   if (!poderOk('cargo') || membro.user.bot) return;
   for (const r of lista().filter((x) => x.ativa && x.tipo === 'cargo_entrada' && x.guildId === membro.guild.id)) {

@@ -1,7 +1,6 @@
 const N = require('../vagas/nucleo');
 const db = require('../db');
 
-// Quando alguém sai do servidor, libera as vagas dela e apaga os pedidos
 module.exports = {
   name: 'guildMemberRemove',
   once: false,

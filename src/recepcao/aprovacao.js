@@ -1,5 +1,3 @@
-// Recepção com autorização: o pedido de verificação vai para um canal da staff,
-// e só quando alguém da staff aprova o membro é verificado e a casa dá boas-vindas.
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags, PermissionFlagsBits,
 } = require('discord.js');
@@ -16,7 +14,6 @@ const MSG_PADRAO = '{cargo} Deem boas-vindas para {membro}';
 
 const ativo = () => cfg('ativo', false) === true && !!cfg('canal');
 
-// Só vale para recepções de verdade (as de teste continuam verificando sozinhas)
 function usa(userId) {
   const s = db.get(chave(userId));
   return ativo() && !!s && !s.teste;
@@ -29,7 +26,6 @@ function ehStaff(interaction) {
   return !!(cargo && interaction.member && interaction.member.roles.cache.has(cargo));
 }
 
-// Botão "Verificar" do membro
 async function pedir(interaction) {
   await interaction.deferReply({ flags: EPH });
   const member = interaction.member;
@@ -104,7 +100,6 @@ async function boasVindas(guild, member, sessao, staffId) {
   }).catch((e) => console.error('[Recepção] boas-vindas:', e.message));
 }
 
-// Botões da staff
 async function decidir(interaction) {
   const [, acao, userId] = interaction.customId.split(':');
   if (!ehStaff(interaction)) {
@@ -138,7 +133,6 @@ async function decidir(interaction) {
     return encerrar(`❌ Recusado por <@${interaction.user.id}>`);
   }
 
-  // Autorizar
   const semVaga = U.cfg('cargos.semVaga');
   const verificado = U.cfg('cargos.verificado');
   const problemas = [];
@@ -179,4 +173,3 @@ async function decidir(interaction) {
 }
 
 module.exports = { ativo, usa, pedir, decidir, MSG_PADRAO, cfg };
-// fim do arquivo

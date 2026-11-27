@@ -1,7 +1,6 @@
 const L = require('../ajuda/lista');
 const UI = require('../ui/componentes');
 
-// Trata o menu de categorias (cmds:menu) e a paginação (cmds:<tipo>:<pagina>) da central de ajuda.
 module.exports = {
   name: 'interactionCreate',
   async execute(client, interaction) {

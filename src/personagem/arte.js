@@ -1,16 +1,13 @@
-// Arte do personagem em pixel art (dark fantasy): peças em camadas, cores à escolha e cena animada.
-// Tudo é desenhado por código, sem imagens: cada peça pinta uma grade de letras que depois vira GIF.
 const { montar } = require('../extras/pixelgif');
 const Eq = require('./equipamento');
 
-const CW = 24; // largura do personagem
-const CH = 36; // altura do personagem
-const SW = 40; // largura da cena
-const SH = 36; // altura da cena
-const OX = 8; // onde o personagem fica na cena
+const CW = 24;
+const CH = 36;
+const SW = 40;
+const SH = 36;
+const OX = 8;
 const ESCALA = 6;
 
-// ---------- Catálogo de opções ----------
 const PELES = [
   { nome: 'Porcelana', hex: '#f2dccb' }, { nome: 'Clara', hex: '#e9bf9a' }, { nome: 'Morena', hex: '#c58d62' },
   { nome: 'Bronzeada', hex: '#a06a45' }, { nome: 'Escura', hex: '#6f432b' }, { nome: 'Cinzenta (morto-vivo)', hex: '#9aa3a8' },
@@ -45,7 +42,6 @@ const CATALOGO = {
 };
 const PARTES = Object.keys(CATALOGO);
 
-// Aparência padrão: um viajante de preto
 const PADRAO = {
   pele: 1, olhos: 0,
   cabelo: { estilo: 'curto', cor: 0 }, roupa: { estilo: 'tunica', cor: 0 }, calca: { estilo: 'comum', cor: 1 },
@@ -55,7 +51,6 @@ const PADRAO = {
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const dentro = (n, lista) => (Number.isInteger(n) && n >= 0 && n < lista.length ? n : 0);
 
-// Garante que qualquer coisa salva vire uma aparência válida
 function normalizar(app) {
   const a = clone(PADRAO);
   if (!app || typeof app !== 'object') return a;
@@ -68,8 +63,6 @@ function normalizar(app) {
     if (c.cores) a[p].cor = dentro(app[p] && app[p].cor, c.cores);
   }
   a.botas.cor = dentro(app.botas && app.botas.cor, TECIDOS);
-  if (app.especial && typeof app.especial === 'string') a.especial = app.especial;
-  // Equipamento e nível do RPG (só para desenhar; vêm de fora, não fazem parte do que a pessoa escolhe no editor)
   a.mostrarEquip = app.mostrarEquip !== false;
   if (app.equip && typeof app.equip === 'object') {
     a.equip = { arma: Eq.ARMAS[app.equip.arma] ? app.equip.arma : null, armadura: Eq.ARMADURAS[app.equip.armadura] ? app.equip.armadura : null };
@@ -93,18 +86,15 @@ function aleatoria() {
   return a;
 }
 
-// ---------- Cores ----------
-// Sombras puxam para o violeta e luzes para o quente (em vez de só escurecer/clarear): é o que dá "vida" ao pixel art.
 const toRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const toHex = (c) => `#${c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`;
 const tom = (hex, f) => toHex(toRgb(hex).map((v) => (f < 1 ? v * f : v + (255 - v) * (f - 1))));
 const mistura = (a, b, f) => { const x = toRgb(a); const y = toRgb(b); return toHex(x.map((v, i) => v + (y[i] - v) * f)); };
 const escuro = (hex) => mistura(tom(hex, 0.72), '#2a1560', 0.17);
 const claro = (hex) => mistura(tom(hex, 1.24), '#fff0c4', 0.15);
-const contorno = (hex) => mistura(tom(hex, 0.34), '#0c0614', 0.4); // traço escuro com um toque da cor da peça
-const brilho = (hex) => mistura(tom(hex, 1.14), '#8f84d8', 0.2); // luz fria da lua na borda direita
+const contorno = (hex) => mistura(tom(hex, 0.34), '#0c0614', 0.4);
+const brilho = (hex) => mistura(tom(hex, 1.14), '#8f84d8', 0.2);
 
-// Letra de cada "encaixe" de cor -> cor real
 function coresDe(app) {
   const pele = PELES[app.pele].hex;
   const olho = OLHOS[app.olhos].hex;
@@ -115,7 +105,7 @@ function coresDe(app) {
   const cap = TECIDOS[app.capa.cor].hex;
   const cbc = TECIDOS[app.cabeca.cor].hex;
   const m = {
-    k: '#120d1a', // contorno
+    k: '#120d1a',
     s: pele, S: escuro(pele),
     h: cab, H: escuro(cab), j: claro(cab),
     t: rou, T: escuro(rou), y: claro(rou),
@@ -124,18 +114,17 @@ function coresDe(app) {
     c: cap, C: escuro(cap), d: claro(cap),
     u: cbc, U: escuro(cbc),
     e: olho,
-    g: '#e3b93c', G: '#a8791c', i: '#fff0a6', // ouro
-    l: '#c9d0dc', L: '#7d8699', // aço
-    w: '#6b4426', W: '#432818', // madeira
-    o: '#e8e0d0', O: '#b3a78f', // osso
-    f: '#ffd24a', F: '#ff7a1c', // chama
+    g: '#e3b93c', G: '#a8791c', i: '#fff0a6',
+    l: '#c9d0dc', L: '#7d8699',
+    w: '#6b4426', W: '#432818',
+    o: '#e8e0d0', O: '#b3a78f',
+    f: '#ffd24a', F: '#ff7a1c',
     '*': '#ffffff',
-    ...Eq.coresEquip(app), // cores da arma e da armadura que a pessoa usa
+    ...Eq.coresEquip(app),
     ...(app.__cores || {}),
   };
-  // Variantes automáticas: "@x" = contorno colorido ao lado da peça x; "^x" = borda iluminada pela lua
   const SEM_BORDA = new Set(['k', '*', 'i', 'f', 'F', 'e', 'n', 'N', 'z', 'v']);
-  const SEM_LUZ = new Set(['s', 'S']); // a pele não leva borda de luz (fica estranha)
+  const SEM_LUZ = new Set(['s', 'S']);
   for (const L of Object.keys(m)) {
     if (SEM_BORDA.has(L)) continue;
     m[`@${L}`] = contorno(m[L]);
@@ -144,7 +133,6 @@ function coresDe(app) {
   return m;
 }
 
-// ---------- Desenho ----------
 const novo = (w, h) => Array.from({ length: h }, () => Array(w).fill('.'));
 function ret(g, x, y, w, h, c) {
   for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (j >= 0 && j < g.length && i >= 0 && i < g[0].length) g[j][i] = c;
@@ -154,61 +142,59 @@ function carimbo(g, x, y, linhas) {
   linhas.forEach((l, j) => [...l].forEach((c, i) => { if (c !== ' ' && c !== '.') pt(g, x + i, y + j, c); }));
 }
 
-// A luz vem da lua (direita): lado esquerdo na sombra, lado direito iluminado.
 function capa(g, estilo, dy, bal) {
   if (estilo === 'nenhuma') return;
   const topo = 13 + dy;
   const fundo = estilo === 'curta' ? 23 : 31;
   for (let y = topo; y <= fundo; y++) {
     const t = (y - topo) / (fundo - topo);
-    const desl = t > 0.45 ? Math.round(bal * Math.min(1, (t - 0.45) * 2.2)) : 0; // a barra balança mais que o ombro
+    const desl = t > 0.45 ? Math.round(bal * Math.min(1, (t - 0.45) * 2.2)) : 0;
     const e = Math.round(6 - 3.4 * t) + desl;
     const d = Math.round(17 + 3.4 * t) + desl;
     ret(g, e, y, d - e + 1, 1, 'c');
     pt(g, e, y, 'C'); pt(g, e + 1, y, 'C'); pt(g, d, y, 'd');
     if ((y - topo) % 4 === 2) { pt(g, e + 3, y, 'C'); pt(g, d - 4, y, 'C'); pt(g, d - 3, y, 'd'); }
   }
-  ret(g, 6 + Math.round(bal), fundo, 15, 1, 'C'); // barra
+  ret(g, 6 + Math.round(bal), fundo, 15, 1, 'C');
 }
 
 function pernas(g, estilo) {
   for (const x0 of [8, 13]) {
     ret(g, x0, 22, 3, 7, 'p');
-    ret(g, x0, 22, 1, 7, 'P'); // lado da sombra
-    ret(g, x0 + 2, 22, 1, 7, 'q'); // lado da luz
+    ret(g, x0, 22, 1, 7, 'P');
+    ret(g, x0 + 2, 22, 1, 7, 'q');
   }
-  ret(g, 11, 22, 2, 3, 'P'); // entreperna (embaixo fica vazio: o contorno separa as pernas)
+  ret(g, 11, 22, 2, 3, 'P');
   if (estilo === 'cargo') {
     for (const x of [8, 13]) {
-      ret(g, x, 24, 2, 3, 'P'); ret(g, x, 24, 2, 1, 'q'); // bolsos
+      ret(g, x, 24, 2, 3, 'P'); ret(g, x, 24, 2, 1, 'q');
       pt(g, x, 26, 'p');
-      ret(g, x, 28, 3, 1, 'P'); // elástico do tornozelo
+      ret(g, x, 28, 3, 1, 'P');
     }
-    ret(g, 8, 22, 8, 1, 'P'); // cós
+    ret(g, 8, 22, 8, 1, 'P');
   }
 }
 
 function botas(g) {
   for (const x0 of [8, 13]) {
-    ret(g, x0, 29, 3, 2, 'b'); // cano
+    ret(g, x0, 29, 3, 2, 'b');
     ret(g, x0, 29, 3, 1, 'B');
   }
-  ret(g, 6, 31, 5, 2, 'b'); ret(g, 13, 31, 5, 2, 'b'); // pés com a ponta para fora
-  ret(g, 6, 33, 5, 1, 'B'); ret(g, 13, 33, 5, 1, 'B'); // sola
-  pt(g, 6, 32, 'B'); pt(g, 17, 32, 'B'); // biqueira
-  pt(g, 9, 31, 'B'); pt(g, 14, 31, 'B'); // cadarço
+  ret(g, 6, 31, 5, 2, 'b'); ret(g, 13, 31, 5, 2, 'b');
+  ret(g, 6, 33, 5, 1, 'B'); ret(g, 13, 33, 5, 1, 'B');
+  pt(g, 6, 32, 'B'); pt(g, 17, 32, 'B');
+  pt(g, 9, 31, 'B'); pt(g, 14, 31, 'B');
   pt(g, 10, 32, 'B'); pt(g, 13, 32, 'B');
 }
 
-// Forma do corpo: ombros largos, cintura mais fina e saia que abre de novo
 function corpo(g, y0, compr, flare) {
   for (let r = 0; r < compr; r++) {
     let xl = 7; let xr = 16;
     if (r >= 4 && r <= 6) { xl = 8; xr = 15; }
     if (r >= 7) { xl = flare && r >= compr - 2 ? 7 : 8; xr = flare && r >= compr - 2 ? 16 : 15; }
     ret(g, xl, y0 + r, xr - xl + 1, 1, 't');
-    pt(g, xl, y0 + r, 'T'); // sombra à esquerda
-    pt(g, xr, y0 + r, 'y'); // luz à direita
+    pt(g, xl, y0 + r, 'T');
+    pt(g, xr, y0 + r, 'y');
   }
 }
 
@@ -217,52 +203,50 @@ function tronco(g, estilo, dy, pal = { pl: 'l', Pl: 'L' }) {
   const compr = estilo === 'casaco' ? 13 : estilo === 'tunica' ? 11 : 9;
   corpo(g, y0, compr, estilo !== 'armadura');
 
-  // braços
   ret(g, 5, y0, 2, 8, 't'); ret(g, 17, y0, 2, 8, 't');
   ret(g, 5, y0, 1, 8, 'T'); ret(g, 18, y0, 1, 8, 'y');
-  ret(g, 5, y0 + 7, 2, 1, 'T'); ret(g, 17, y0 + 7, 2, 1, 'T'); // punhos
+  ret(g, 5, y0 + 7, 2, 1, 'T'); ret(g, 17, y0 + 7, 2, 1, 'T');
   pt(g, 18, y0 + 7, 'y');
 
   if (estilo === 'casaco') {
-    ret(g, 11, y0, 2, 13, 'T'); // abertura
-    ret(g, 11, y0 + 1, 2, 5, 'p'); // camisa por baixo
-    ret(g, 8, y0 - 1, 3, 2, 'T'); ret(g, 13, y0 - 1, 3, 2, 'T'); pt(g, 15, y0 - 1, 'y'); // gola alta
+    ret(g, 11, y0, 2, 13, 'T');
+    ret(g, 11, y0 + 1, 2, 5, 'p');
+    ret(g, 8, y0 - 1, 3, 2, 'T'); ret(g, 13, y0 - 1, 3, 2, 'T'); pt(g, 15, y0 - 1, 'y');
     ret(g, 7, y0 + 12, 10, 1, 'T');
-    ret(g, 8, y0 + 7, 8, 1, 'w'); pt(g, 11, y0 + 7, 'g'); pt(g, 12, y0 + 7, 'i'); // cinto
-    ret(g, 8, y0 + 9, 2, 1, 'T'); ret(g, 14, y0 + 9, 2, 1, 'T'); // bolsos
+    ret(g, 8, y0 + 7, 8, 1, 'w'); pt(g, 11, y0 + 7, 'g'); pt(g, 12, y0 + 7, 'i');
+    ret(g, 8, y0 + 9, 2, 1, 'T'); ret(g, 14, y0 + 9, 2, 1, 'T');
   } else {
     ret(g, 7, y0 + compr - 1, 10, 1, 'T');
-    ret(g, 8, y0 + 6, 8, 1, 'w'); pt(g, 11, y0 + 6, 'g'); pt(g, 12, y0 + 6, 'i'); // cinto
+    ret(g, 8, y0 + 6, 8, 1, 'w'); pt(g, 11, y0 + 6, 'g'); pt(g, 12, y0 + 6, 'i');
     if (estilo === 'armadura') {
       ret(g, 8, y0 + 1, 8, 5, pal.pl); ret(g, 8, y0 + 1, 8, 1, pal.Pl); ret(g, 11, y0 + 1, 2, 5, pal.Pl);
       pt(g, 14, y0 + 2, '*'); pt(g, 14, y0 + 3, '*'); pt(g, 9, y0 + 5, pal.Pl);
-      ret(g, 4, y0 - 1, 4, 3, pal.pl); ret(g, 16, y0 - 1, 4, 3, pal.pl); // ombreiras
+      ret(g, 4, y0 - 1, 4, 3, pal.pl); ret(g, 16, y0 - 1, 4, 3, pal.pl);
       ret(g, 4, y0 + 1, 4, 1, pal.Pl); ret(g, 16, y0 + 1, 4, 1, pal.Pl); pt(g, 18, y0 - 1, '*'); pt(g, 19, y0, '*');
-      ret(g, 5, y0 + 4, 2, 2, pal.Pl); ret(g, 17, y0 + 4, 2, 2, pal.Pl); pt(g, 18, y0 + 4, pal.pl); // braçadeiras
-      pt(g, 8, y0 + 6, 'g'); pt(g, 15, y0 + 6, 'g'); // rebites do cinto
-      ret(g, 8, y0 + 7, 3, 2, pal.Pl); ret(g, 13, y0 + 7, 3, 2, pal.pl); // couraça da saia
+      ret(g, 5, y0 + 4, 2, 2, pal.Pl); ret(g, 17, y0 + 4, 2, 2, pal.Pl); pt(g, 18, y0 + 4, pal.pl);
+      pt(g, 8, y0 + 6, 'g'); pt(g, 15, y0 + 6, 'g');
+      ret(g, 8, y0 + 7, 3, 2, pal.Pl); ret(g, 13, y0 + 7, 3, 2, pal.pl);
     } else {
-      ret(g, 10, y0, 4, 1, 'T'); // gola em V
+      ret(g, 10, y0, 4, 1, 'T');
       pt(g, 11, y0, 'S'); pt(g, 12, y0, 'S');
-      ret(g, 11, y0 + 1, 2, 4, 'y'); pt(g, 11, y0 + 1, 'T'); pt(g, 12, y0 + 1, 'T'); // fecho
+      ret(g, 11, y0 + 1, 2, 4, 'y'); pt(g, 11, y0 + 1, 'T'); pt(g, 12, y0 + 1, 'T');
     }
   }
-  // mãos (punho fechado, com dedos)
   const yh = y0 + 8;
   ret(g, 5, yh, 2, 3, 's'); ret(g, 17, yh, 2, 3, 's');
   ret(g, 5, yh + 2, 1, 1, 'S'); pt(g, 6, yh + 1, 'S'); pt(g, 17, yh + 1, 'S'); pt(g, 18, yh + 2, 'S');
 }
 
 function cabecaBase(g, dy, olhos, piscar) {
-  ret(g, 11, 12 + dy, 2, 1, 'S'); // pescoço
+  ret(g, 11, 12 + dy, 2, 1, 'S');
   ret(g, 8, 5 + dy, 8, 6, 's'); ret(g, 9, 4 + dy, 6, 1, 's'); ret(g, 9, 11 + dy, 6, 1, 's');
-  pt(g, 7, 8 + dy, 'S'); pt(g, 16, 8 + dy, 's'); pt(g, 16, 9 + dy, 's'); // orelhas (a esquerda na sombra)
-  pt(g, 8, 9 + dy, 'S'); pt(g, 8, 10 + dy, 'S'); pt(g, 9, 11 + dy, 'S'); pt(g, 10, 11 + dy, 'S'); pt(g, 14, 11 + dy, 'S'); // sombra do queixo
-  ret(g, 11, 10 + dy, 2, 1, 'S'); // boca
-  pt(g, 12, 9 + dy, 'S'); // nariz
+  pt(g, 7, 8 + dy, 'S'); pt(g, 16, 8 + dy, 's'); pt(g, 16, 9 + dy, 's');
+  pt(g, 8, 9 + dy, 'S'); pt(g, 8, 10 + dy, 'S'); pt(g, 9, 11 + dy, 'S'); pt(g, 10, 11 + dy, 'S'); pt(g, 14, 11 + dy, 'S');
+  ret(g, 11, 10 + dy, 2, 1, 'S');
+  pt(g, 12, 9 + dy, 'S');
   pt(g, 14, 6 + dy, 's'); pt(g, 15, 7 + dy, 's');
   for (const x of [10, 13]) {
-    pt(g, x, 6 + dy, 'H'); // sobrancelha
+    pt(g, x, 6 + dy, 'H');
     if (piscar) pt(g, x, 8 + dy, 'k');
     else { pt(g, x, 7 + dy, 'k'); pt(g, x, 8 + dy, 'e'); }
   }
@@ -284,13 +268,13 @@ function cabelo(g, estilo, dy, bal) {
     return;
   }
   ret(g, 8, 3 + dy, 8, 2, 'h'); ret(g, 7, 4 + dy, 10, 1, 'h'); ret(g, 8, 5 + dy, 2, 1, 'h'); ret(g, 14, 5 + dy, 2, 1, 'h');
-  ret(g, 11, 5 + dy, 2, 1, 'h'); // franja
+  ret(g, 11, 5 + dy, 2, 1, 'h');
   ret(g, 7, 5 + dy, 1, 3, 'h'); ret(g, 16, 5 + dy, 1, 3, 'h');
   pt(g, 7, 4 + dy, 'H'); pt(g, 7, 6 + dy, 'H'); pt(g, 9, 5 + dy, 'H'); pt(g, 11, 5 + dy, 'H');
   pt(g, 13, 3 + dy, 'j'); pt(g, 14, 3 + dy, 'j'); pt(g, 15, 4 + dy, 'j'); pt(g, 12, 3 + dy, 'j');
   if (estilo === 'longo') {
     ret(g, 6, 5 + dy, 2, 6, 'h'); ret(g, 16, 5 + dy, 2, 6, 'h');
-    ret(g, 6 + vento, 11 + dy, 2, 5, 'h'); ret(g, 16 + vento, 11 + dy, 2, 5, 'h'); // pontas ao vento
+    ret(g, 6 + vento, 11 + dy, 2, 5, 'h'); ret(g, 16 + vento, 11 + dy, 2, 5, 'h');
     ret(g, 6, 7 + dy, 1, 4, 'H'); ret(g, 6 + vento, 11 + dy, 1, 5, 'H'); ret(g, 17 + vento, 11 + dy, 1, 5, 'H');
     pt(g, 17, 7 + dy, 'j'); pt(g, 16 + vento, 12 + dy, 'j'); pt(g, 17 + vento, 14 + dy, 'j');
   }
@@ -348,15 +332,12 @@ function armaCosmetica(g, estilo, dy, fl) {
 const BRILHANTES = new Set(['.', 'k', '*', 'i', 'f', 'F', 'e', 'n', 'N', 'z', 'v']);
 const SEM_LUZ = new Set(['s', 'S']);
 
-// Monta o personagem inteiro numa grade de letras.
-// Contorno colorido (cada peça ganha um traço escuro da própria cor) e borda iluminada pela lua à direita.
 function desenharPersonagem(app, f = {}) {
   const dy = f.dy || 0;
   const g = novo(CW, CH);
   capa(g, app.capa.estilo, dy, f.bal || 0);
   pernas(g, app.calca.estilo);
   botas(g);
-  // Equipamento do RPG: a armadura troca o corpo e a arma troca o que está na mão
   const eq = Eq.ativo(app);
   const arm = eq.armadura ? Eq.ARMADURAS[eq.armadura] : null;
   tronco(g, arm ? arm.estilo : app.roupa.estilo, dy, arm ? { pl: 'm', Pl: 'M' } : undefined);
@@ -372,14 +353,12 @@ function desenharPersonagem(app, f = {}) {
   for (let y = 0; y < CH; y++) {
     for (let x = 0; x < CW; x++) {
       if (base[y][x] === '.') {
-        // contorno: usa a cor da peça vizinha (de baixo, esquerda, direita, cima)
         let viz = null;
         for (const [a, b] of [[0, 1], [-1, 0], [1, 0], [0, -1]]) {
           if (cheio(x + a, y + b)) { viz = base[y + b][x + a]; break; }
         }
         if (viz) g[y][x] = BRILHANTES.has(viz) ? 'k' : `@${viz}`;
       } else if (!BRILHANTES.has(base[y][x]) && !SEM_LUZ.has(base[y][x]) && f.luz !== false) {
-        // borda iluminada: o lado direito vira a versão "lua" da cor
         if (!cheio(x + 1, y)) g[y][x] = `^${base[y][x]}`;
       }
     }
@@ -387,8 +366,7 @@ function desenharPersonagem(app, f = {}) {
   return g;
 }
 
-// ---------- Cena ----------
-const B2 = [[0.125, 0.625], [0.875, 0.375]]; // tramado para misturar duas cores sem criar cores novas
+const B2 = [[0.125, 0.625], [0.875, 0.375]];
 const CEU = ['#07051a', '#0c0824', '#120b30', '#1a0f40', '#24164f', '#33205f', '#47306e'];
 const BRILHO_LUA = ['#241a58', '#2f2370', '#3b2e86'];
 const ESTRELAS = [[3, 2], [9, 5], [14, 1], [20, 4], [25, 2], [37, 12], [5, 10], [17, 8], [34, 3], [12, 12], [27, 9], [1, 6], [22, 11], [38, 6]];
@@ -396,20 +374,17 @@ const VAGALUMES = [[6, 26, 0], [16, 29, 2], [35, 27, 4], [28, 21, 1], [3, 22, 3]
 
 function fundo(frame) {
   const g = Array.from({ length: SH }, () => Array(SW).fill('#000000'));
-  // céu em degradê, misturado por tramado
   for (let y = 0; y < SH; y++) {
     const pos = Math.min(1, y / 26) * (CEU.length - 1);
     const i = Math.min(CEU.length - 2, Math.floor(pos));
     const fr = pos - i;
     for (let x = 0; x < SW; x++) g[y][x] = fr > B2[y & 1][x & 1] ? CEU[i + 1] : CEU[i];
   }
-  // estrelas que piscam (o ciclo fecha em 8 quadros)
   ESTRELAS.forEach(([x, y], k) => {
     const fase = (k * 3 + frame) % 8;
     g[y][x] = fase < 2 ? '#6e66a6' : fase < 6 ? '#cfc9ee' : '#ffffff';
     if (fase >= 6 && x > 0 && x < SW - 1 && y > 0) { g[y][x - 1] = '#8f86c4'; g[y][x + 1] = '#8f86c4'; g[y - 1][x] = '#8f86c4'; g[y + 1][x] = '#8f86c4'; }
   });
-  // lua com brilho suave
   const lx = 31;
   const ly = 8;
   for (let y = -10; y <= 10; y++) {
@@ -429,7 +404,6 @@ function fundo(frame) {
     }
   }
   for (const [x, y] of [[-1, -1], [1, 1], [-2, 1], [2, -2]]) g[ly + y][lx + x] = '#c6bedb';
-  // três camadas de montanhas, cada uma com uma borda de luz no topo
   const camadas = [
     { base: 20, a: 2.6, b: 1.6, f1: 0.45, f2: 1.1, p: 0, cor: '#241a4a', topo: '#3b2f6e' },
     { base: 24, a: 1.8, b: 1.2, f1: 0.7, f2: 1.7, p: 2, cor: '#1a1236', topo: '#2c2358' },
@@ -440,27 +414,22 @@ function fundo(frame) {
       for (let y = h; y < 31; y++) g[y][x] = y === h ? c.topo : c.cor;
     }
   }
-  // castelo distante, com janelas que tremeluzem
   const cor = '#0a0614';
   for (const [x, y, w, h] of [[2, 17, 3, 9], [6, 19, 2, 7], [9, 15, 3, 11], [4, 22, 5, 5]]) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) g[j][i] = cor;
   for (const [x, y] of [[2, 16], [4, 16], [6, 18], [7, 18], [9, 14], [11, 14]]) g[y][x] = cor;
   g[16][10] = frame % 4 < 2 ? '#f2c15a' : '#a8812e';
   g[20][3] = frame % 8 < 5 ? '#f2c15a' : '#a8812e';
-  // chão de pedra
   for (let y = 31; y < SH; y++) for (let x = 0; x < SW; x++) g[y][x] = y === 31 ? '#463a66' : y === 32 ? '#2f2648' : '#1c1628';
   for (let x = 0; x < SW; x++) {
     if ((x * 7 + 3) % 11 === 0) g[33][x] = '#2e2644';
     if ((x * 5 + 1) % 9 === 0) g[34][x] = '#241d36';
     if ((x * 3 + 2) % 13 === 0) g[32][x] = '#3a2f58';
   }
-  // neblina que se arrasta (o padrão se repete a cada 8 quadros)
   for (let y = 28; y <= 31; y++) for (let x = 0; x < SW; x++) if ((x + y * 2 + frame) % 8 < 2) g[y][x] = y < 30 ? '#352b60' : '#40366a';
-  // luz da lua no chão, para os pés não sumirem
   for (let x = OX + 2; x <= OX + 22; x++) {
     const d = Math.abs(x - (OX + 12)) / 10;
     if (d < 1) { g[33][x] = d < 0.6 ? '#34295a' : '#2a2148'; if (d < 0.4) g[32][x] = '#3d3168'; }
   }
-  // brilho fraco atrás do personagem, para destacar a silhueta
   for (let y = 0; y < 31; y++) {
     for (let x = 0; x < SW; x++) {
       const d = Math.hypot((x - (OX + 12)) / 12, (y - 18) / 17);
@@ -468,10 +437,8 @@ function fundo(frame) {
       else if (d < 0.8 && (x + y) % 2 === 0) g[y][x] = '#2b2150';
     }
   }
-  // sombra do personagem
   for (let x = OX + 7; x <= OX + 17; x++) g[35][x] = '#0c0813';
   for (let x = OX + 9; x <= OX + 15; x++) g[34][x] = '#0c0813';
-  // vaga-lumes
   VAGALUMES.forEach(([x, y, k]) => {
     const a = (frame / 8) * Math.PI * 2 + k;
     const px = x + Math.round(Math.sin(a) * 1.6);
@@ -481,14 +448,12 @@ function fundo(frame) {
   return g;
 }
 
-// Quadros da animação curta (usados também pelas batalhas)
 const QUADROS = [
   { dy: 0, bal: 0, piscar: false, chama: 0, fase: 0 },
   { dy: 1, bal: 1, piscar: false, chama: 1, fase: 1 },
   { dy: 0, bal: 0, piscar: true, chama: 0, fase: 2 },
   { dy: 1, bal: 1, piscar: false, chama: 1, fase: 3 },
 ];
-// Animação da cena: 8 quadros (respiração lenta, capa e cabelo ao vento, piscada)
 const QUADROS_CENA = [
   { dy: 0, bal: 0, piscar: false, chama: 0, fase: 0 },
   { dy: 0, bal: 1, piscar: false, chama: 1, fase: 1 },
@@ -504,7 +469,7 @@ function gradeCena(app, i, extra) {
   const cores = coresDe(app);
   const q = QUADROS_CENA[i % QUADROS_CENA.length];
   const g = fundo(i);
-  Eq.aura(g, OX + 12, 18, app, i, { rx: 13, ry: 19 }); // aura do nível, atrás do personagem
+  Eq.aura(g, OX + 12, 18, app, i, { rx: 13, ry: 19 });
   const p = (extra && extra.personagem) ? extra.personagem(app, q) : desenharPersonagem(app, q);
   for (let y = 0; y < p.length; y++) {
     for (let x = 0; x < p[0].length; x++) {
@@ -520,8 +485,6 @@ function gifDe(app, extra) {
   return montar(QUADROS_CENA.map((_, i) => gradeCena(a, i, extra)), { escala: ESCALA, atraso: 38 });
 }
 
-// Aura para outras cenas (a batalha desenha atrás do herói)
 const desenharAura = (g, cx, cy, app, f, o) => Eq.aura(g, cx, cy, normalizar(app), f, o);
 
 module.exports = { desenharAura, CW, CH, SW, SH, OX, CATALOGO, PARTES, PADRAO, PELES, OLHOS, CABELOS, TECIDOS, normalizar, aleatoria, coresDe, desenharPersonagem, gradeCena, gifDe, fundo, QUADROS, QUADROS_CENA, novo, ret, pt, carimbo, escuro, claro, tom };
-// fim do arquivo

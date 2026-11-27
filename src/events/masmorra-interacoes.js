@@ -5,7 +5,7 @@ const Mot = require('../rpg/masmorra-motor');
 const M = require('../rpg/masmorra');
 
 const EPH = MessageFlags.Ephemeral;
-const trancados = new Set(); // evita cliques duplos ao mesmo tempo
+const trancados = new Set();
 
 async function tratar(interaction) {
   const [, acao, uid] = interaction.customId.split(':');
@@ -15,7 +15,6 @@ async function tratar(interaction) {
   const j = N.obter(uid);
   if (!st || !j) return interaction.update({ content: '⌛ Essa masmorra já terminou.', embeds: [], components: [], files: [], attachments: [] });
 
-  // ---------- Telas do acampamento ----------
   if (acao === 'sair') {
     return interaction.update({ components: M.botoesConfirmarSaida(uid) });
   }
@@ -43,21 +42,19 @@ async function tratar(interaction) {
     return interaction.update({ content: '', embeds: [M.embedAcampamento(st, j, false)], components: M.botoesAcampamento(uid, st, j), files: [], attachments: [] });
   }
 
-  // ---------- Começar a luta ----------
   if (acao === 'avancar') {
     if (st.fase !== 'combate') M.proximo(uid, j, st);
     await interaction.deferUpdate();
     return interaction.editReply({ content: '', ...M.painel(uid, st, j) });
   }
 
-  // ---------- Ações de combate ----------
   if (!['atq', 'hab', 'poc', 'fug'].includes(acao)) return;
   if (st.fase !== 'combate' || !st.e) return interaction.update(M.painel(uid, st, j));
 
   const e = st.e;
   const r = Mot.agir(e, j, acao);
   if (r.invalido) return interaction.reply({ content: r.invalido, flags: EPH });
-  await interaction.deferUpdate(); // desenhar o GIF leva um instante
+  await interaction.deferUpdate();
 
   if (r.fim === 'derrota') {
     const files = C.arquivos(e, j, 'derrota');
@@ -84,7 +81,6 @@ async function tratar(interaction) {
     return interaction.editReply({ content: '', embeds: [M.embedAcampamento(st, j, false)], components: M.botoesAcampamento(uid, st, j), files: [], attachments: [] });
   }
 
-  // luta continua
   M.salvarEstado(uid, st);
   N.salvar(uid, j);
   return interaction.editReply({ content: '', embeds: [M.embedCombate(st, e, j)], components: M.botoesCombate(uid, e), files: C.arquivos(e, j), attachments: [] });

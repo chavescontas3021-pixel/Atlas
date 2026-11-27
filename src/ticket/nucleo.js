@@ -46,9 +46,6 @@ function tipos() {
   return Array.isArray(t) && t.length ? t : PADROES.tipos;
 }
 
-// ---------- Painéis separados ----------
-// O painel "padrão" usa config.ticket.* (como sempre foi). Painéis extras ficam em config.ticket.paineis.<id>
-// e podem ter categorias, staff, categoria de canais, logs e mensagens próprios.
 function paineis() {
   const p = cfg('paineis');
   return p && typeof p === 'object' ? p : {};
@@ -63,7 +60,6 @@ function proximoIdPainel() {
   return `p${n}`;
 }
 
-// Painel dono de uma categoria (null = painel padrão)
 function painelDoTipo(tipoId) {
   if (tipos().some((t) => t.id === tipoId)) return null;
   return listaPaineis().find((p) => (p.tipos || []).some((t) => t.id === tipoId)) || null;
@@ -81,7 +77,6 @@ function acharTipo(id) {
 
 const painelDoTicket = (t) => (t && t.painelId ? acharPainel(t.painelId) : null);
 
-// Configurações com herança: se o painel não definiu, vale a global
 function cfgPainel(painel, chave, padrao) {
   if (painel && painel[chave] !== undefined && painel[chave] !== null) return painel[chave];
   return cfg(chave, padrao);
@@ -121,12 +116,10 @@ function ticketsDoUsuario(userId) {
   return Object.values(db.get('ticket.abertos', {}) || {}).filter((t) => t.userId === userId);
 }
 
-// Cargos da staff que ainda existem no servidor
 function staffRoles(guild, painel) {
   return staffIds(painel).filter((id) => guild.roles.cache.has(id));
 }
 
-// ticket (opcional): usa a staff do painel em que ele foi aberto
 function ehStaff(member, ticket) {
   if (
     member.permissions.has(PermissionFlagsBits.Administrator) ||
@@ -137,7 +130,6 @@ function ehStaff(member, ticket) {
   return staffIds(painelDoTicket(ticket)).some((id) => member.roles.cache.has(id));
 }
 
-// Aceita emoji normal (sem letras) ou emoji personalizado <:nome:id>
 function emojiValido(txt) {
   const t = String(txt || '').trim();
   if (!t) return false;
@@ -177,7 +169,6 @@ function botoesTicket(assumido) {
   ]);
 }
 
-// Componentes do painel público: até 3 categorias viram botões; mais que isso vira menu de seleção.
 function componentesPainel(tipos, max = 25) {
   const lista = tipos.slice(0, max);
   if (lista.length <= 3) {
@@ -190,14 +181,11 @@ function componentesPainel(tipos, max = 25) {
   })];
 }
 
-// Texto da lista de categorias que aparece no painel público
 function listaCategorias(tipos) {
   return tipos
     .map((t) => `${T.S.seta}  **${t.nome}**${t.desc ? `\n${T.S.filho} ${t.desc}` : ''}`)
     .join('\n');
 }
-
-// ---------- Transcrição ----------
 
 async function buscarMensagens(canal, limiteMsgs) {
   const todas = [];
@@ -224,7 +212,6 @@ function dataBR(ms) {
   return new Date(ms).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 }
 
-// Troca menções (<@id>, <@&id>, <#id>) por nomes legíveis
 function textoLegivel(msg) {
   let t = msg.content || '';
   t = t.replace(/<@!?(\d+)>/g, (m, id) => {

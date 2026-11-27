@@ -5,10 +5,10 @@ const UI = require('../ui/componentes');
 const T = require('../ui/tema');
 
 const MIN = 60 * 1000;
-const ESPERA = 30 * MIN; // cada pessoa só dá um mimo a cada 30 minutos
-const LIMITE_DIA = 8; // mimos que contam pontos por dia, por casal
-const PTS_DIA = 10; // pontos por dia juntos
-const PTS_MIMO = 2; // pontos por mimo contado
+const ESPERA = 30 * MIN;
+const LIMITE_DIA = 8;
+const PTS_DIA = 10;
+const PTS_MIMO = 2;
 
 const MIMOS = {
   beijo: { emoji: '', nome: 'beijo', frases: ['deu um beijo carinhoso em', 'roubou um beijo de', 'encheu de beijinhos'] },
@@ -18,7 +18,7 @@ const MIMOS = {
 
 const caminhoMimos = (id) => `casamento.mimos.${id}`;
 const mimosDe = (id) => db.get(caminhoMimos(id), null) || { total: 0, hoje: { dia: '', n: 0 }, por: {}, cd: {} };
-const diaBR = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10); // dia de Brasília (UTC-3)
+const diaBR = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
 const diasJuntos = (casal) => Math.max(0, Math.floor((Date.now() - casal.desde) / 86400000));
 const pontos = (casal) => diasJuntos(casal) * PTS_DIA + mimosDe(casal.id).total * PTS_MIMO;
 const fmtMin = (ms) => `${Math.ceil(ms / MIN)} min`;
@@ -106,7 +106,6 @@ module.exports = {
       });
     }
 
-    // ---------- Mimo ----------
     const casal = N.casalDe(eu);
     if (!casal) return interaction.reply(UI.erro('Só quem é casado(a) pode dar mimos de casal.'));
     const par = casal.a === eu ? casal.b : casal.a;

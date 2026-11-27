@@ -1,4 +1,3 @@
-// Monta a lista de comandos lendo os comandos que o bot realmente tem.
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
 const COR = 0xf5a3c7;
@@ -16,7 +15,6 @@ const corta = (t, n) => {
 };
 const ehSubStaff = (desc) => /staff/i.test(desc || '');
 
-// Achata um comando em { nome, desc, subs:[{caminho, desc, staff}] }
 function descrever(json) {
   const subs = [];
   for (const o of json.options || []) {

@@ -1,21 +1,17 @@
-// Pixel art de todos os pets: cada espécie é desenhada por código (formas com sombreado automático,
-// contorno colorido e sombras que puxam para o violeta), com animação de 6 quadros.
-// O pet também ganha brilhos e uma aura conforme o nível. Sem imagens nem bibliotecas.
 const { AttachmentBuilder } = require('discord.js');
 const { montar } = require('./pixelgif');
 const Bichos = require('./bichos');
 
-const W = 24; // tamanho do desenho do pet
+const W = 24;
 const H = 24;
-const SW = 32; // tamanho da cena
+const SW = 32;
 const SH = 28;
 const OX = 4;
 const OY = 2;
 const ESCALA = 9;
-const ATRASO = 11; // centésimos de segundo por quadro
+const ATRASO = 11;
 const QUADROS = 6;
 
-// ---------- Cores ----------
 const toRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const toHex = (c) => `#${c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`;
 const tom = (hex, f) => toHex(toRgb(hex).map((v) => (f < 1 ? v * f : v + (255 - v) * (f - 1))));
@@ -24,7 +20,6 @@ const escuro = (hex) => mistura(tom(hex, 0.74), '#2a1560', 0.16);
 const claro = (hex) => mistura(tom(hex, 1.25), '#fff0c4', 0.14);
 const contorno = (hex) => mistura(tom(hex, 0.32), '#12081f', 0.4);
 
-// Cada grupo de cor (m, s, a, g, r...) vira: 0 sombra, 1 base, 2 luz, e @x = contorno
 function paleta(c) {
   const p = { W: '#ffffff', K: '#1a1022', N: c.n || '#e8708a', E: c.e || '#ffd24a', B: '#ffb4c4' };
   for (const [g, hex] of Object.entries(c)) {
@@ -37,12 +32,10 @@ function paleta(c) {
   return p;
 }
 
-// ---------- Desenho ----------
 const nova = () => Array.from({ length: H }, () => Array(W).fill('.'));
 const px = (g, x, y, c) => { const i = Math.round(x); const j = Math.round(y); if (j >= 0 && j < H && i >= 0 && i < W) g[j][i] = c; };
 const ret = (g, x, y, w, h, c) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) px(g, x + i, y + j, c); };
 
-// Sombreado: luz vinda de cima à direita
 function tonalidade(nx, ny, g) {
   const l = nx * 0.6 - ny * 0.78;
   if (l > 0.5) return `${g}2`;
@@ -80,7 +73,6 @@ function poli(g, pts, grupo, sombrear = true) {
   }
 }
 
-// Linha grossa (caudas, pescoços)
 function traco(g, pts, esp, grupo) {
   for (let i = 0; i < pts.length - 1; i++) {
     const [x0, y0] = pts[i];
@@ -95,7 +87,6 @@ function traco(g, pts, esp, grupo) {
   }
 }
 
-// Contorno colorido: cada pixel vazio ao lado de uma peça ganha um traço escuro da cor dela
 function contornar(g) {
   const base = g.map((l) => l.slice());
   const cheio = (x, y) => y >= 0 && y < H && x >= 0 && x < W && base[y][x] !== '.' && !base[y][x].startsWith('@');
@@ -113,7 +104,6 @@ function contornar(g) {
   }
 }
 
-// Olhos grandes e brilhantes (2x3), com brilho no canto de cima
 function olho(g, x, y, f, cor = 'K') {
   if (f.piscar) { ret(g, x, y + 1, 2, 1, 'K'); return; }
   ret(g, x, y, 2, 3, cor);
@@ -124,20 +114,16 @@ function olho(g, x, y, f, cor = 'K') {
 const ESPECIES = {};
 const def = (id, o) => { ESPECIES[id] = o; };
 
-// ---------- Cena ----------
 function fundoCena(esp, i, nivel) {
   const [a, b] = esp.fundo;
   const g = Array.from({ length: SH }, (_, y) => Array(SW).fill(mistura(a, b, y / (SH - 1))));
-  // tramado suave no degradê
   for (let y = 1; y < SH - 1; y++) for (let x = 0; x < SW; x++) if ((x + y) % 2 === 0 && y % 7 === 0) g[y][x] = mistura(a, b, (y + 1) / (SH - 1));
   if (esp.noite) {
     const estrelas = [[3, 3], [9, 2], [27, 4], [22, 8], [5, 11], [29, 13], [14, 4], [2, 17]];
     estrelas.forEach(([x, y], k) => { const fase = (k * 2 + i) % QUADROS; g[y][x] = fase < 2 ? '#6e66a6' : fase < 4 ? '#cfc9ee' : '#ffffff'; });
   }
-  // chão
   const chao = esp.chao || mistura(b, '#000000', 0.12);
   for (let y = SH - 4; y < SH; y++) for (let x = 0; x < SW; x++) g[y][x] = y === SH - 4 ? mistura(chao, '#ffffff', 0.18) : chao;
-  // aura dourada para pets de nível alto (três faixas suaves, sem tramado)
   if (nivel >= 20) {
     for (let y = 0; y < SH; y++) {
       for (let x = 0; x < SW; x++) {
@@ -149,7 +135,6 @@ function fundoCena(esp, i, nivel) {
   return g;
 }
 
-// Brilhinhos que aparecem conforme o nível
 function brilhos(g, i, nivel) {
   if (nivel < 8) return;
   const pontos = nivel >= 15 ? [[4, 6], [27, 9], [6, 20], [26, 18]] : [[4, 6], [27, 9]];
@@ -181,7 +166,6 @@ function gradeCena(chave, i, nivel = 1) {
   const esp = ESPECIES[chave];
   const cores = paleta(esp.cores);
   const g = fundoCena(esp, i, nivel);
-  // sombra no chão
   for (let x = OX + 6; x <= OX + 17; x++) g[OY + 22][x] = mistura(g[OY + 22][x], '#000000', 0.2);
   for (let x = OX + 8; x <= OX + 15; x++) g[OY + 23][x] = mistura(g[OY + 23][x], '#000000', 0.18);
   const p = quadroPet(esp, i);
@@ -203,7 +187,6 @@ function gif(chave, nivel = 1) {
 
 const tem = (chave) => !!ESPECIES[chave];
 
-// Vitrine: todos os pets lado a lado, animados (usada em /pet lista)
 const vitrines = new Map();
 function vitrine(ids) {
   const chave = ids.join(',');
@@ -231,7 +214,6 @@ function vitrine(ids) {
   return new AttachmentBuilder(vitrines.get(chave), { name: 'pets.gif' });
 }
 
-// Mesma interface do bichos.js: { url, anexo() }. Espécies sem arte nova caem no bichos.js (ex.: Dragonfox).
 function anexoDe(chave, nivel = 1) {
   if (!tem(chave)) return Bichos.anexoDe(chave);
   const nome = `${chave}.gif`;
@@ -240,4 +222,3 @@ function anexoDe(chave, nivel = 1) {
 
 module.exports = { ESPECIES, def, tem, anexoDe, vitrine, gif, gradeCena, ell, poli, traco, px, ret, olho, paleta, W, H, SW, SH, QUADROS };
 require('./petarte-especies');
-// fim do arquivo

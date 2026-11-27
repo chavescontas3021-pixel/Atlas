@@ -1,6 +1,5 @@
 const db = require('../db');
 
-// Passos mostrados ao membro (o "id" é usado no comando /recepcao canal)
 const PASSOS = [
   { id: 'moldes', nome: 'Moldes', desc: 'Veja os moldes para fechar a vaga do seu personagem.' },
   { id: 'pings', nome: 'Pings', desc: 'Escolha os cargos de ping que você quer receber.' },
@@ -12,7 +11,6 @@ const PASSOS = [
   { id: 'avaliar', nome: 'Avaliar house e staff', desc: 'Conte o que achou da house e da staff.' },
 ];
 
-// Valores padrão (tudo isso pode ser mudado por comandos)
 const PADROES = {
   moldes: [
     '{emoji} {personagem}',
@@ -41,7 +39,6 @@ const PADROES = {
   },
 };
 
-// Quantas mensagens do canal "fechar vaga" o Atlas lê
 const LIMITE_MENSAGENS = 3000;
 
 function cfg(chave, padrao) {
@@ -62,13 +59,10 @@ function mensagem(tipo) {
   return { ...PADROES.mensagens[tipo], ...(cfg(`mensagens.${tipo}`) || {}) };
 }
 
-// Troca {usuario}, {nick} etc. pelos valores
 function preencher(texto, vars) {
   return String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
 }
 
-// Minúsculas, sem acentos, sem fonte estilizada (𝐀𝐊𝐀𝐙𝐀, ＡＫＡＺＡ),
-// sem caracteres invisíveis, sem formatação do Discord (_ * ~ ` |) e sem espaços repetidos
 function normalizar(texto) {
   return String(texto || '')
     .normalize('NFKD')
@@ -85,7 +79,6 @@ function escapar(texto) {
   return texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Monta o apelido respeitando o limite de 32 caracteres do Discord
 function montarNick(molde, personagem, emoji) {
   const semNome = molde.replace(/\{personagem\}/g, '').replace(/\{emoji\}/g, () => emoji);
   const espaco = Math.max(1, 32 - Array.from(semNome).length);
@@ -96,7 +89,6 @@ function montarNick(molde, personagem, emoji) {
   return Array.from(nick).slice(0, 32).join('');
 }
 
-// Busca mensagens antigas de um canal, de 100 em 100
 async function buscarMensagens(canal, limite) {
   const todas = [];
   let antes;
@@ -110,7 +102,6 @@ async function buscarMensagens(canal, limite) {
   return todas;
 }
 
-// Lê o texto que estiver dentro dos componentes (mensagens de outros bots)
 function textoComponentes(lista) {
   let t = '';
   for (const c of lista || []) {
@@ -120,7 +111,6 @@ function textoComponentes(lista) {
   return t;
 }
 
-// Junta o texto da mensagem com o texto dos embeds e dos componentes
 function textoDaMensagem(msg) {
   let texto = msg.content || '';
   for (const e of msg.embeds) {
@@ -131,8 +121,6 @@ function textoDaMensagem(msg) {
   return texto + textoComponentes(msg.components);
 }
 
-// Pega só o que vem depois de "Nome do personagem ;" no formulário de vaga.
-// Retorna null se a mensagem não tiver essa linha.
 function campoPersonagem(texto) {
   for (const linha of String(texto).split(/\r?\n/)) {
     const m = normalizar(linha).match(/nome d[oae]s? personagem\s*[;:|>=–—-]*\s*(.*)$/);
@@ -141,9 +129,6 @@ function campoPersonagem(texto) {
   return null;
 }
 
-// Procura o personagem no canal "fechar vaga".
-// ocupada = qualquer vaga com esse nome (de quem for);
-// fechada = a vaga com esse nome que foi fechada pelo próprio membro (autor ou mencionado).
 async function procurarVaga(guild, personagem, userId) {
   const id = cfg('canais.fechar_vaga');
   if (!id) return { erro: 'O canal de fechar vaga ainda não foi configurado.' };
@@ -164,7 +149,6 @@ async function procurarVaga(guild, personagem, userId) {
 
   const textos = mensagens.map(textoDaMensagem);
   const campos = textos.map(campoPersonagem);
-  // Se o canal usa o formulário "Nome do personagem ; ...", olhamos só esse campo
   const usaFormulario = campos.some((c) => c !== null);
 
   let ocupada = null;

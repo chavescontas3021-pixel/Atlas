@@ -1,4 +1,3 @@
-// Missões diárias/semanais e conquistas (ligadas ao RPG da house).
 const { EmbedBuilder } = require('discord.js');
 const UI = require('../ui/componentes');
 const T = require('../ui/tema');
@@ -6,7 +5,7 @@ const db = require('../db');
 const R = require('../rpg/nucleo');
 
 const COR = T.COR.base;
-const BRT = 3 * 3600 * 1000; // Brasília = UTC-3
+const BRT = 3 * 3600 * 1000;
 const DIA = 24 * 3600 * 1000;
 
 const PADROES = {
@@ -67,7 +66,6 @@ const CONQUISTAS = [
   { id: 'rica', emoji: '💰', nome: 'Tesouro', desc: 'Tenha 5000 stars ao mesmo tempo.', stars: 500, prog: (c) => [c.j.moedas || 0, 5000] },
 ];
 
-// ---------- Datas (Brasília) ----------
 const diaChave = (ts) => new Date(ts - BRT).toISOString().slice(0, 10).replace(/-/g, '');
 function diasDesdeSegunda(ts) {
   return (new Date(ts - BRT).getUTCDay() + 6) % 7;
@@ -82,7 +80,6 @@ function hash(txt) {
   return h;
 }
 
-// Escolhe 3 missões do dia/semana (as mesmas para todo mundo), sem repetir o tipo
 function escolher(pool, chave) {
   const ordem = [...pool].sort((a, b) => hash(chave + a.id) - hash(chave + b.id));
   const usadas = new Set();
@@ -97,7 +94,6 @@ function escolher(pool, chave) {
 }
 const ativas = (periodo, chave) => escolher(periodo === 'dia' ? DIARIAS : SEMANAIS, `${periodo}${chave}`);
 
-// ---------- Estado ----------
 function estado(uid, periodo, agora = Date.now()) {
   const chave = periodo === 'dia' ? diaChave(agora) : semanaChave(agora);
   const e = db.get(`missoes.${periodo}.${uid}`, null);
@@ -121,7 +117,6 @@ async function addProgresso(client, uid, metrica, n = 1) {
   await verificarConquistas(client, uid);
 }
 
-// ---------- Conquistas ----------
 async function verificarConquistas(client, uid) {
   const j = R.obter(uid);
   if (!j) return [];
@@ -163,8 +158,6 @@ async function anunciar(client, uid, c) {
   if (user) await user.send({ embeds: [emb] }).catch(() => {});
 }
 
-// ---------- Resgatar ----------
-// Retorna { erro } ou { feitos, stars, xp, subiu, novas }
 async function resgatar(client, uid) {
   const j = R.obter(uid);
   if (!j) return { erro: 'Você precisa de um personagem de RPG para resgatar. Use `/rpg criar`.' };
@@ -203,7 +196,6 @@ function prontas(uid) {
   return n;
 }
 
-// ---------- Visual ----------
 function linhaMissao(m, e) {
   const p = Math.min(e.prog[m.metrica] || 0, m.alvo);
   const feita = e.resg.includes(m.id);
@@ -251,7 +243,6 @@ function embedConquistas(uid, nomeUsuario) {
   });
 }
 
-// ---------- Observador do RPG ----------
 const snapDe = (j) => ({ v: j.vitorias || 0, t: (j.cd && j.cd.treinar) || 0, e: (j.cd && j.cd.explorar) || 0, d: (j.cd && j.cd.diario) || 0 });
 
 function guardarSnapshot(uid) {
@@ -259,7 +250,6 @@ function guardarSnapshot(uid) {
   if (j && !db.get(`missoes.snap.${uid}`, null)) db.set(`missoes.snap.${uid}`, snapDe(j));
 }
 
-// Compara o estado do RPG com o que vimos da última vez e conta o que mudou
 async function aplicarDelta(client, uid) {
   if (!ativo()) return;
   const j = db.get(`rpg.jogadores.${uid}`, null);
@@ -268,7 +258,7 @@ async function aplicarDelta(client, uid) {
   let ant = db.get(`missoes.snap.${uid}`, null);
   db.set(`missoes.snap.${uid}`, atual);
   if (!ant) {
-    if (Date.now() - (j.criadoEm || 0) > 60000) return; // jogador antigo: só marca o ponto de partida
+    if (Date.now() - (j.criadoEm || 0) > 60000) return;
     ant = { v: 0, t: 0, e: 0, d: 0 };
   }
   if (atual.v > ant.v) await addProgresso(client, uid, 'vitorias', atual.v - ant.v);

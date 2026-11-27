@@ -1,9 +1,8 @@
-// Aniversários: cadastro, cargo de aniversariante e mensagem de festa.
 const { EmbedBuilder } = require('discord.js');
 const db = require('../db');
 
 const COR = 0xf5a3c7;
-const BRT = 3 * 3600 * 1000; // Brasília = UTC-3
+const BRT = 3 * 3600 * 1000;
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -42,7 +41,6 @@ function normalizarHora(txt) {
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
-// ---------- Datas (sempre no horário de Brasília) ----------
 const bissexto = (a) => (a % 4 === 0 && a % 100 !== 0) || a % 400 === 0;
 const DIAS_NO_MES = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -60,7 +58,6 @@ function hojeBRT(agora = Date.now()) {
   return { dia, mes, ano, hm, chave };
 }
 
-// Quem nasceu em 29/02 comemora em 28/02 nos anos que não são bissextos
 function diaEfetivo(d, ano) {
   return d.dia === 29 && d.mes === 2 && !bissexto(ano) ? 28 : d.dia;
 }
@@ -72,7 +69,6 @@ function diasAte(d, hoje) {
   return Math.round((alvo - base) / 86400000);
 }
 
-// ---------- Cadastro ----------
 const datas = () => db.get('aniversario.datas', {}) || {};
 const obterData = (id) => db.get(`aniversario.datas.${id}`, null);
 const definirData = (id, dia, mes) => db.set(`aniversario.datas.${id}`, { dia, mes });
@@ -98,7 +94,6 @@ function listaTexto(ids) {
   return `${m.slice(0, -1).join(', ')} e ${m[m.length - 1]}`;
 }
 
-// ---------- Celebração ----------
 function pegarCanal(guild) {
   const id = cfg('canal');
   return id ? guild.channels.cache.get(id) : null;
@@ -140,7 +135,6 @@ async function celebrar(guild, ids, { teste = false, agora = Date.now() } = {}) 
     .setTitle(preencher(msg.titulo, vars))
     .setDescription(preencher(msg.texto, vars));
 
-  // O ping vai FORA do embed (menção dentro de embed não notifica).
   const usaCargo = cargoId && !teste;
   const content = (teste ? '🧪 **Teste** — ' : '') + (usaCargo ? `<@&${cargoId}>` : listaTexto(membros.map((m) => m.id)));
   try {
@@ -177,7 +171,7 @@ async function tick(client, agora = Date.now()) {
   const hoje = hojeBRT(agora);
   if (db.get('aniversario.ultimoDia', null) === hoje.chave) return;
   if (hoje.hm < hora()) return;
-  if (!pegarCanal(guild)) return; // sem canal: tenta de novo quando for configurado
+  if (!pegarCanal(guild)) return;
 
   db.set('aniversario.ultimoDia', hoje.chave);
   const ids = aniversariantesDeHoje(hoje);

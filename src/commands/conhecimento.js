@@ -25,14 +25,14 @@ module.exports = {
       .addStringOption((o) => o.setName('acao').setDescription('O que fazer').setRequired(true).addChoices({ name: 'Adicionar canal', value: 'add' }, { name: 'Tirar canal', value: 'tirar' }, { name: 'Ver a lista', value: 'ver' }))
       .addChannelOption((o) => o.setName('canal').setDescription('Canal').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)))
     .addSubcommand((s) => s.setName('modo').setDescription('Quando eu respondo perguntas')
-      .addStringOption((o) => o.setName('quando').setDescription('Quando').setRequired(true).addChoices({ name: 'Sempre', value: 'sempre' }, { name: 'Só com o pai ausente', value: 'ausente' }, { name: 'Nunca', value: 'off' }))),
+      .addStringOption((o) => o.setName('quando').setDescription('Quando').setRequired(true).addChoices({ name: 'Sempre', value: 'sempre' }, { name: 'Só com o responsável ausente', value: 'ausente' }, { name: 'Nunca', value: 'off' }))),
 
   async execute(interaction, client) {
-    require('../subdona/publico').aplicar(interaction); // respostas ficam no canal, não somem
+    require('../subdona/publico').aplicar(interaction);
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
     const staff = interaction.memberPermissions && interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild);
-    if (!staff && !(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('Só a staff, o pai e os delegados mexem nisso.'));
+    if (!staff && !(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('Só a staff, o responsável e os delegados mexem nisso.'));
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'adicionar') {
@@ -67,7 +67,7 @@ module.exports = {
     }
     if (sub === 'modo') {
       const m = interaction.options.getString('quando'); N.setPerguntas({ modo: m });
-      return interaction.reply(UI.ok({ sempre: 'Vou responder perguntas sempre.', ausente: 'Vou responder perguntas só quando o pai estiver ausente.', off: 'Não respondo mais perguntas (os tickets continuam com o atendimento normal).' }[m]));
+      return interaction.reply(UI.ok({ sempre: 'Vou responder perguntas sempre.', ausente: 'Vou responder perguntas só quando o responsável estiver ausente.', off: 'Não respondo mais perguntas (os tickets continuam com o atendimento normal).' }[m]));
     }
   },
 };

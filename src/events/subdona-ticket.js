@@ -1,4 +1,3 @@
-// Sub dona: atende o membro dentro do ticket.
 const Atendente = require('../subdona/atendente');
 
 module.exports = {

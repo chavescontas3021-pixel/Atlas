@@ -1,5 +1,3 @@
-// ATLAS · respostas que NÃO somem: tira o "só você vê" (efêmero) das respostas de uma interação.
-// Uso: no começo do comando ou do botão, `require('../subdona/publico').aplicar(interaction)`.
 const { MessageFlags } = require('discord.js');
 
 const EPH = Number(MessageFlags.Ephemeral);

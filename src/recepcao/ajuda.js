@@ -1,6 +1,3 @@
-// Botão "Solicitar ajuda" da recepção: o membro aperta e o Atlas marca a staff no canal.
-// Se a staff já assumiu o atendimento, marca só quem assumiu. Tem um tempo de espera
-// entre pedidos para ninguém ficar marcando a staff sem parar.
 const { ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const db = require('../db');
 const U = require('./util');
@@ -19,7 +16,6 @@ const cooldownMin = () => {
 const preencher = (texto, vars) =>
   String(texto).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
 
-// O botão que entra na primeira mensagem da recepção
 const botao = (userId) =>
   new ButtonBuilder()
     .setCustomId(`recepcao:ajuda:${userId}`)
@@ -39,7 +35,6 @@ async function pedir(interaction, userId) {
     return interaction.reply({ content: 'Essa recepção já foi encerrada.', flags: EPH });
   }
 
-  // Tempo de espera entre pedidos
   const chave = `recepcao.ajuda.${userId}`;
   const ultimo = Number(db.get(chave, 0)) || 0;
   const espera = cooldownMin() * 60 * 1000;
@@ -52,7 +47,6 @@ async function pedir(interaction, userId) {
     });
   }
 
-  // Quem marcar: quem assumiu o atendimento ou o cargo de staff
   const cargo = U.cfg('cargos.staff');
   const assumiu = sessao.assumido && sessao.assumido.por;
   if (!assumiu && !cargo) {

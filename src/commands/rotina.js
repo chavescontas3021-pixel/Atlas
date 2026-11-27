@@ -7,7 +7,6 @@ const { S } = require('../ui/tema');
 const DIA = 24 * 3600 * 1000;
 const DUR = (o) => o.setName('duracao_horas').setDescription('Duração em horas').setRequired(true).setMinValue(1).setMaxValue(720);
 
-// Opções de agenda, sempre depois das obrigatórias
 function agenda(s) {
   return s
     .addStringOption((o) => o.setName('repete').setDescription('Com que frequência (padrão: todo dia)')
@@ -23,7 +22,7 @@ const ping = (o) => o.setName('mencionar').setDescription('Cargo para mencionar'
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('rotina')
-    .setDescription('Sub dona: tarefas automáticas (pai e delegados)')
+    .setDescription('Sub dona: tarefas automáticas (responsável e delegados)')
     .addSubcommand((s) => agenda(s.setName('anuncio').setDescription('Posta um aviso sozinha')
       .addChannelOption(canal).addStringOption((o) => o.setName('texto').setDescription('O aviso').setRequired(true).setMaxLength(1500)).addRoleOption(ping)))
     .addSubcommand((s) => agenda(s.setName('sorteio').setDescription('Cria sorteios sozinha')
@@ -50,10 +49,10 @@ module.exports = {
       .addIntegerOption((o) => o.setName('id').setDescription('Número da rotina').setRequired(true).setMinValue(1))),
 
   async execute(interaction, client) {
-    require('../subdona/publico').aplicar(interaction); // respostas ficam no canal, não somem
+    require('../subdona/publico').aplicar(interaction);
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
-    if (!(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('Isso é só do pai e dos delegados.'));
+    if (!(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('Isso é só do responsável e dos delegados.'));
     const sub = interaction.options.getSubcommand();
     const g = (n) => interaction.options.getString(n);
     const i = (n) => interaction.options.getInteger(n);

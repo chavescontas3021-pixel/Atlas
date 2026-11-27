@@ -5,7 +5,7 @@ const F = require('../recepcao/fluxo');
 const L = require('../logs/nucleo');
 
 const EPH = MessageFlags.Ephemeral;
-const reabrindo = new Set(); // evita reabrir duas vezes ao mesmo tempo (clique duplo)
+const reabrindo = new Set();
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -34,12 +34,10 @@ module.exports = {
     await interaction.deferReply({ flags: EPH });
     reabrindo.add(user.id);
     try {
-      // Limpa as marcas que impediam a recepção de abrir (apenas representante / encerrada pela staff)
       db.remover(`recepcao.reps.${user.id}`);
       db.remover(`recepcao.dispensados.${user.id}`);
       const haviaAberta = !!db.get(`recepcao.sessoes.${user.id}`);
 
-      // Cria o canal novo (se ainda existir um antigo, ele é apagado e substituído)
       const canal = await F.iniciarRecepcao(membro);
 
       await L.enviar(

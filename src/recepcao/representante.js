@@ -1,5 +1,3 @@
-// "Sou apenas representante": o membro confirma, o Atlas mostra os canais de parceria e aliança
-// e apaga o canal da recepção.
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags,
 } = require('discord.js');
@@ -11,7 +9,6 @@ const COR = 0xf5a3c7;
 const EPH = MessageFlags.Ephemeral;
 const chave = (id) => `recepcao.sessoes.${id}`;
 
-// Botão "Sou apenas representante": pede confirmação (só o membro vê)
 async function pedir(interaction, userId) {
   const sessao = db.get(chave(userId));
   if (!sessao) return interaction.reply({ content: 'Essa recepção já foi encerrada.', flags: EPH });
@@ -30,12 +27,10 @@ async function pedir(interaction, userId) {
   return interaction.reply({ embeds: [embed], components: [botoes], flags: EPH });
 }
 
-// Botão "Cancelar"
 async function cancelar(interaction) {
   return interaction.update({ content: '👍 Tudo bem! Continue a recepção normalmente.', embeds: [], components: [] });
 }
 
-// Botão "Sim, sou apenas representante"
 async function confirmar(interaction, userId) {
   const sessao = db.get(chave(userId));
   if (!sessao) {
@@ -46,12 +41,10 @@ async function confirmar(interaction, userId) {
   const canal = interaction.channel;
   const member = interaction.member;
 
-  // Quem é só representante não tem vaga: tira o cargo "sem vaga" que o Atlas deu na entrada
   const semVaga = U.cfg('cargos.semVaga');
   if (!sessao.teste && semVaga && member.roles.cache.has(semVaga)) {
     await member.roles.remove(semVaga, 'Disse que é apenas representante').catch(() => {});
   }
-  // Lembra da escolha, para a recepção não recomeçar sozinha depois
   db.set(`recepcao.reps.${userId}`, Date.now());
 
   const c = T.canais();

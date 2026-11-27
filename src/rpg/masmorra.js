@@ -1,5 +1,3 @@
-// Masmorras: andares com 5 bichos e um Boss no fim. O progresso fica salvo (db), então dá para
-// retomar com /masmorra continuar. O saque (XP, stars e itens) só é pago ao sair, vencer o Boss ou morrer.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../db');
 const { CLASSES, ITENS } = require('./dados');
@@ -10,7 +8,7 @@ const Mot = require('./masmorra-motor');
 const D = require('./masmorra-dados');
 
 const { MASMORRAS, BICHOS_POR_ANDAR: POR_ANDAR, CURA_VITORIA, CURA_DESCANSO } = D;
-const FRACAO_MORTE = 0.3; // morrendo você leva 30% do saque
+const FRACAO_MORTE = 0.3;
 const CD_MORTE = 15 * 60 * 1000;
 const CD_SAIDA = 5 * 60 * 1000;
 
@@ -27,7 +25,6 @@ const registro = (j, dif) => {
   return j.masm[dif];
 };
 
-// ---------- Regras ----------
 function validarEntrada(j, dif) {
   const d = MASMORRAS[dif];
   if (!d) return 'Essa masmorra não existe.';
@@ -49,7 +46,6 @@ function entrar(uid, j, dif) {
   return st;
 }
 
-// Começa a próxima luta: um bicho do andar, ou o Boss quando os 5 bichos do último andar caíram
 function proximo(uid, j, st) {
   const d = MASMORRAS[st.dif];
   let boss = false;
@@ -74,7 +70,6 @@ function proximo(uid, j, st) {
 
 const chefeNoFim = (st) => st.abatidos >= POR_ANDAR && st.andar >= MASMORRAS[st.dif].andares;
 
-// Paga o saque (fator 1 = tudo, 0.3 = só 30%)
 function pagar(j, loot, fator) {
   const xp = Math.floor(loot.xp * fator);
   const moedas = Math.floor(loot.moedas * fator);
@@ -88,7 +83,6 @@ function pagar(j, loot, fator) {
   return { xp, moedas, itens, subiu };
 }
 
-// Vitória num combate: soma o saque. Se era o Boss, a masmorra termina.
 function vitoria(uid, j, st) {
   const e = st.e;
   const m = e.monstro;
@@ -158,7 +152,6 @@ function descansar(uid, j, st) {
   return { cura };
 }
 
-// ---------- Telas ----------
 const itensTxt = (itens) => {
   const l = Object.entries(itens).map(([id, q]) => `${N.nomeItem(id)} ×${q}`);
   return l.length ? l.join(', ') : '—';
@@ -252,7 +245,6 @@ function botoesCombate(uid, e) {
   )];
 }
 
-// Painel atual (acampamento ou combate) pronto para enviar
 function painel(uid, st, j) {
   if (st.fase === 'combate' && st.e) {
     return { embeds: [embedCombate(st, st.e, j)], components: botoesCombate(uid, st.e), files: C.arquivos(st.e, j), attachments: [] };

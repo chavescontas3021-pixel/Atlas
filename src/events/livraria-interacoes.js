@@ -4,7 +4,6 @@ const F = require('../livraria/fluxo');
 
 const EPH = MessageFlags.Ephemeral;
 
-// Ações que só o dono da publicação pode usar (o 3º trecho do customId é o ID dele)
 const DA_SESSAO = ['texto', 'editar', 'trocarcapa', 'trocarpdf', 'cancelar', 'publicar', 'classe', 'modaltexto'];
 const TIPOS_MENSAGEM = ['painelPublicacao', 'painelFeedback'];
 

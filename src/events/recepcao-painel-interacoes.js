@@ -6,7 +6,7 @@ const Rep = require('../recepcao/rep');
 const L = require('../logs/nucleo');
 
 const EPH = MessageFlags.Ephemeral;
-const reabrindo = new Set(); // evita reabrir duas vezes ao mesmo tempo (clique duplo)
+const reabrindo = new Set();
 
 async function reabrir(interaction) {
   const responder = (content) => interaction.reply({ content, flags: EPH });
@@ -28,7 +28,6 @@ async function reabrir(interaction) {
     return responder('❌ Este painel é só para quem está **sem vaga**.');
   }
 
-  // Já tem uma recepção aberta e o canal ainda existe: só mostra onde está
   const sessao = db.get(`recepcao.sessoes.${membro.id}`);
   if (sessao && sessao.canalId) {
     const canal =
@@ -42,7 +41,6 @@ async function reabrir(interaction) {
   await interaction.deferReply({ flags: EPH });
   reabrindo.add(membro.id);
   try {
-    // Limpa as marcas que impediam a recepção de abrir (apenas representante / encerrada pela staff)
     db.remover(`recepcao.reps.${membro.id}`);
     db.remover(`recepcao.dispensados.${membro.id}`);
 

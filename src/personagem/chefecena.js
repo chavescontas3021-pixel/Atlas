@@ -1,5 +1,3 @@
-// Cena do chefe em grupo (GIF): o chefe gigante à direita e, à esquerda, o personagem de cada
-// participante atacando (até 6, os que atacaram por último). Reaproveita golpes e números da batalha.
 const { AttachmentBuilder } = require('discord.js');
 const { montar } = require('../extras/pixelgif');
 const B = require('./batalha');
@@ -9,11 +7,10 @@ const W = 152;
 const H = 96;
 const CHAO = 90;
 const ESCALA = 4;
-const BX = 108; // centro do chefe
+const BX = 108;
 const ARQUIVO = 'chefe.gif';
 const { px, ret, mistura, tintar, dissolver, K } = B;
 
-// posições dos heróis (x do centro, deslocamento vertical): fila da frente e fila de trás
 const VAGAS = [
   { x: 56, dy: 0 }, { x: 38, dy: 0 }, { x: 20, dy: 0 },
   { x: 47, dy: -6 }, { x: 29, dy: -6 }, { x: 11, dy: -6 },
@@ -27,7 +24,6 @@ function ampliar(g, s) {
   return out;
 }
 
-// ---------- cenário ----------
 const CEU = ['#0a0716', '#0f0b24', '#150e30', '#1d1342', '#281a56', '#331f66', '#3d2478'];
 const cacheFundo = [];
 function fundo(t) {
@@ -71,7 +67,6 @@ function poe(g, spr, cx, dx, dy) {
   return { x: x0 + w / 2, y: y0 + h * 0.55, topo: y0, w, h, esq: x0 };
 }
 
-// luz de contorno: realça as bordas de cima/esquerda para o chefe escuro não sumir no fundo
 function luz(g) {
   return g.map((l, y) => l.map((c, x) => {
     if (!c || c === K) return c;
@@ -108,7 +103,6 @@ function quadro(cfg, f, fase) {
   const bob = (f % 2 === 0 ? 0 : 1) * (s === 2 ? 2 : 1);
   sombra(g, bx, boss[0].length);
   const bi = poe(g, boss, bx, acertou ? -1 : 0, fase.dissolve ? 0 : -bob);
-  // heróis: fila de trás primeiro
   const ordem = herois.map((h, k) => k).sort((a, b) => VAGAS[a].dy - VAGAS[b].dy);
   const info = [];
   for (const k of ordem) {
@@ -150,4 +144,3 @@ function gif(cfg) {
 const anexo = (cfg) => new AttachmentBuilder(gif(cfg), { name: ARQUIVO });
 
 module.exports = { ARQUIVO, MAX_HEROIS, gif, anexo };
-// fim do arquivo

@@ -3,7 +3,6 @@ const M = require('../recepcao/manual');
 
 const EPH = MessageFlags.Ephemeral;
 
-// Botões e formulário da verificação manual (prefixo "recmanual:")
 module.exports = {
   name: 'interactionCreate',
   async execute(client, interaction) {

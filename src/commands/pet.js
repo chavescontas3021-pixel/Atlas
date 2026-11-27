@@ -15,11 +15,8 @@ const ESPECIES = {
   coelho: { emoji: '🐰', nome: 'Coelho', preco: 200, desc: 'Ligeiro: pode passear a cada 40 minutos.', pocao: 0.1, stars: 1, xp: 1, cd: 40 },
   raposa: { emoji: '🦊', nome: 'Raposa', preco: 400, desc: 'Esperta: ganha 25% mais XP.', pocao: 0.1, stars: 1, xp: 1.25, cd: 60 },
   coruja: { emoji: '🦉', nome: 'Coruja', preco: 500, desc: 'Sábia: mais XP e um pouco mais de stars.', pocao: 0.15, stars: 1.05, xp: 1.2, cd: 60 },
-  dragonfox: { emoji: '🦊', nome: 'Dragonfox', preco: 0, exclusivo: true, animado: true, desc: 'ULTRA LENDÁRIO: uma raposa com asas de dragão. +60% de stars, +50% de XP, acha poções e passeia a cada 30 min.', pocao: 0.35, stars: 1.6, xp: 1.5, cd: 30 },
   dragao: { emoji: '🐉', nome: 'Dragãozinho', preco: 1500, desc: 'Lendário: +30% de stars e acha poções.', pocao: 0.2, stars: 1.3, xp: 1.1, cd: 60 },
 
-  // Lendários dark fantasy: caros, mas com os melhores benefícios.
-  // jxp = XP que o dono ganha a cada passeio; raro = chance de trazer um material valioso
   corvo: { emoji: '🐦‍⬛', nome: 'Corvo Agourento', preco: 2000, desc: 'Lendário: +25% de stars, +35% de XP, passeia a cada 45 min e traz XP ao dono.', pocao: 0.25, stars: 1.25, xp: 1.35, cd: 45, jxp: 25, raro: { item: 'pena_sombria', chance: 0.1 } },
   lobo: { emoji: '🐺', nome: 'Lobo Espectral', preco: 2800, desc: 'Lendário: +45% de stars, passeia a cada 40 min e traz XP ao dono.', pocao: 0.3, stars: 1.45, xp: 1.25, cd: 40, jxp: 40, raro: { item: 'pena_sombria', chance: 0.15 } },
   fenix: { emoji: '🔥', nome: 'Fênix Carmesim', preco: 3800, desc: 'Lendário: +60% de stars, +40% de XP, passeia a cada 35 min e traz cinzas raras.', pocao: 0.4, stars: 1.6, xp: 1.4, cd: 35, jxp: 60, raro: { item: 'cinza_fenix', chance: 0.18 } },
@@ -27,11 +24,9 @@ const ESPECIES = {
   quimera: { emoji: '👑', nome: 'Quimera Ancestral', preco: 7000, desc: 'Mítico supremo: dobra as stars, +70% de XP, passeia a cada 25 min e traz muito XP e fragmentos do vazio.', pocao: 0.5, stars: 2.0, xp: 1.7, cd: 25, jxp: 140, raro: { item: 'fragmento_vazio', chance: 0.3 } },
 };
 
-// Toda espécie que tem pixel art (em extras/petarte.js ou no bichos.js) mostra a imagem animada
 for (const id of Object.keys(ESPECIES)) if (PetArte.tem(id) || ESPECIES[id].animado) ESPECIES[id].animado = true;
 
-// Espécies exclusivas (presentes da staff) não aparecem na lista nem podem ser compradas
-const COMPRAVEIS = Object.entries(ESPECIES).filter(([, e]) => !e.exclusivo);
+const COMPRAVEIS = Object.entries(ESPECIES);
 
 const caminho = (uid) => `extras.pets.${uid}`;
 const obter = (uid) => db.get(caminho(uid), null);
@@ -61,8 +56,8 @@ function embedPet(p, dono) {
   const saciado = p.alimentadoAte > agora;
   const cd = Math.max(0, (p.cdPasseio || 0) - agora);
   const emb = new EmbedBuilder()
-    .setColor(e.exclusivo ? 0xffb347 : COR)
-    .setTitle(`${e.emoji} ${p.nome}${e.exclusivo ? ' ✨' : ''}`)
+    .setColor(COR)
+    .setTitle(`${e.emoji} ${p.nome}`)
     .setDescription(`${e.nome} de **${dono}**\n_${e.desc}_`)
     .addFields(
       { name: 'Nível', value: `${p.nivel}${p.nivel >= NIVEL_MAX ? ' (máx.)' : ` — ${R.barra(p.xp, xpNecessario(p.nivel), 10)} ${p.xp}/${xpNecessario(p.nivel)}`}` },
@@ -74,7 +69,6 @@ function embedPet(p, dono) {
   return emb;
 }
 
-// Arquivo da imagem animada (só para espécies que têm)
 const arquivosPet = (p) => (ESPECIES[p.especie] && ESPECIES[p.especie].animado ? [PetArte.anexoDe(p.especie, p.nivel).anexo()] : []);
 
 module.exports = {
@@ -123,7 +117,7 @@ module.exports = {
       if (obter(uid)) return responder('❌ Você já tem um pet. Solte-o com `/pet soltar` se quiser outro.');
       const id = interaction.options.getString('especie');
       const e = ESPECIES[id];
-      if (!e || e.exclusivo) return responder('❌ Esse bichinho não está à venda.');
+      if (!e) return responder('❌ Esse bichinho não está à venda.');
       const r = S.gastar(uid, e.preco);
       if (r.erro) return responder(`❌ ${r.erro}`);
       const p = { especie: id, nome: interaction.options.getString('nome').trim(), nivel: 1, xp: 0, alimentadoAte: Date.now() + 6 * HORA, cdPasseio: 0, passeios: 0, adotadoEm: Date.now() };
@@ -143,7 +137,6 @@ module.exports = {
     }
 
     if (sub === 'soltar') {
-      if (e.exclusivo) return responder('💛 Esse pet é um presente especial e não pode ser solto.');
       if (!interaction.options.getBoolean('confirmar')) return responder('Ufa, o pet continua com você. 💜');
       db.remover(caminho(uid));
       return responder(`👋 ${e.emoji} **${p.nome}** foi solto na natureza.`);
@@ -191,4 +184,3 @@ module.exports = {
     }
   },
 };
-// fim do arquivo

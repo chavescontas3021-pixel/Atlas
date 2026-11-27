@@ -1,12 +1,9 @@
-// Masmorras: 4 dificuldades, cada uma com seus andares, 5 monstros por andar e um Boss no fim.
 const { MONSTROS } = require('./dados');
 
 const BICHOS_POR_ANDAR = 5;
-const CURA_VITORIA = 0.08; // vida recuperada a cada bicho derrotado
-const CURA_DESCANSO = 0.35; // vida recuperada ao descansar (uma vez por andar)
+const CURA_VITORIA = 0.08;
+const CURA_DESCANSO = 0.35;
 
-// Cada bicho da masmorra tem nome, emoji e desenho próprios, mas usa os números (vida, ataque...) de um monstro comum
-// de mesmo nível. Assim o equilíbrio testado continua valendo.
 const e = (nome, emoji, base) => ({ nome, emoji, base });
 
 const MASMORRAS = {
@@ -48,7 +45,6 @@ const ORDEM = ['iniciante', 'intermediario', 'avancado', 'mestre'];
 const rolar = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const base = (nome) => MONSTROS.find((m) => m.nome === nome);
 
-// Cada andar fica um pouco mais forte que o anterior, além de trocar os monstros por outros mais perigosos
 const escalaAndar = (andar) => 1 + (andar - 1) * 0.035;
 
 function aplicar(m, mult, nome, emoji) {
@@ -63,7 +59,6 @@ function aplicar(m, mult, nome, emoji) {
   };
 }
 
-// Um dos 5 bichos de um andar
 function gerarBicho(dif, andar) {
   const d = MASMORRAS[dif];
   const p = d.andares > 1 ? (andar - 1) / (d.andares - 1) : 0;
@@ -75,7 +70,6 @@ function gerarBicho(dif, andar) {
   return aplicar(m, { hp: d.hp * esc, atk: d.atk * esc, def: d.def * esc }, slot.nome, slot.emoji);
 }
 
-// O Boss do fim da masmorra: o monstro mais forte do grupo, muito mais resistente
 function gerarBoss(dif) {
   const d = MASMORRAS[dif];
   const topo = base(d.pool[d.pool.length - 1].base);

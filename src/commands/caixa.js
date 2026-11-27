@@ -22,15 +22,15 @@ module.exports = {
       .addIntegerOption((o) => o.setName('numero').setDescription('Número da cobrança').setRequired(true).setMinValue(1)))
     .addSubcommand((s) => s.setName('loritta').setDescription('Muda o ID da Loritta (se você usa outra versão dela)')
       .addStringOption((o) => o.setName('id').setDescription('ID do bot').setRequired(true).setMaxLength(25)))
-    .addSubcommand((s) => s.setName('amostras').setDescription('Mensagens da Loritta que citaram o pai (para ajustar o leitor)'))
+    .addSubcommand((s) => s.setName('amostras').setDescription('Mensagens da Loritta que citaram o responsável (para ajustar o leitor)'))
     .addSubcommand((s) => s.setName('teste').setDescription('Testa se um texto seria lido como pagamento')
       .addStringOption((o) => o.setName('texto').setDescription('Cole a mensagem da Loritta (use a menção, ex.: <@123>)').setRequired(true).setMaxLength(1000))),
 
   async execute(interaction, client) {
-    require('../subdona/publico').aplicar(interaction); // respostas ficam no canal, não somem
+    require('../subdona/publico').aplicar(interaction);
     if (!interaction.inGuild()) return;
     client = client || interaction.client;
-    if (!(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('O caixa é só do pai e dos delegados.'));
+    if (!(await N.podeMandar(client, interaction.user.id))) return interaction.reply(UI.erro('O caixa é só do responsável e dos delegados.'));
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'extrato') {
@@ -70,13 +70,13 @@ module.exports = {
 
     if (sub === 'amostras') {
       const a = N.amostrasSonhos().slice().reverse();
-      return interaction.reply({ embeds: [UI.painel({ trilha: ['Caixa', 'Amostras'], titulo: 'Mensagens da Loritta que citaram o pai', descricao: a.map((x, i) => `**${i + 1}.** ${quando(x.em)}\n\`\`\`${x.txt.replace(/`/g, "'").slice(0, 350)}\`\`\``).join('\n').slice(0, 3800) || `Nada ainda. Só guardo mensagens do bot <@${N.lorittaId()}> que citam o pai.` })], flags: UI.EPH, allowedMentions: SEM_PING });
+      return interaction.reply({ embeds: [UI.painel({ trilha: ['Caixa', 'Amostras'], titulo: 'Mensagens da Loritta que citaram o responsável', descricao: a.map((x, i) => `**${i + 1}.** ${quando(x.em)}\n\`\`\`${x.txt.replace(/`/g, "'").slice(0, 350)}\`\`\``).join('\n').slice(0, 3800) || `Nada ainda. Só guardo mensagens do bot <@${N.lorittaId()}> que citam o responsável.` })], flags: UI.EPH, allowedMentions: SEM_PING });
     }
 
     if (sub === 'teste') {
-      const pai = await N.paiId(client);
-      const r = Sonhos.entenderPagamento(interaction.options.getString('texto'), { paiId: pai, euId: client.user.id });
-      return interaction.reply({ ...(r ? UI.ok(`Entendi como pagamento: **${fmt(r.valor)} sonhos** de <@${r.pagador}> para <@${r.recebedor}>.`) : UI.aviso('Não reconheci como pagamento. O texto precisa ter o valor em "sonhos", um verbo como "enviou/transferiu" e a menção do pai (<@id>) e de quem pagou.')), allowedMentions: SEM_PING });
+      const responsavel = await N.responsavelId(client);
+      const r = Sonhos.entenderPagamento(interaction.options.getString('texto'), { responsavelId: responsavel, euId: client.user.id });
+      return interaction.reply({ ...(r ? UI.ok(`Entendi como pagamento: **${fmt(r.valor)} sonhos** de <@${r.pagador}> para <@${r.recebedor}>.`) : UI.aviso('Não reconheci como pagamento. O texto precisa ter o valor em "sonhos", um verbo como "enviou/transferiu" e a menção do responsável (<@id>) e de quem pagou.')), allowedMentions: SEM_PING });
     }
   },
 };

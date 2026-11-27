@@ -3,7 +3,6 @@ const UI = require('../ui/componentes');
 const db = require('../db');
 const F = require('../ticket/fluxo');
 
-
 module.exports = {
   name: 'interactionCreate',
   async execute(client, interaction) {
@@ -19,7 +18,6 @@ module.exports = {
         return;
       }
 
-      // Menu de categorias do painel público
       if (interaction.isStringSelectMenu() && acao === 'novo') {
         return await F.abrirModal(interaction, interaction.values[0]);
       }

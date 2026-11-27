@@ -1,11 +1,9 @@
-// Decorar cargos: lista com ID, edição e aplicação em lote (igual ao decorar de canais)
 const db = require('../db');
 const N = require('./nucleo');
 const C = require('../construir/nucleo');
 
-const BACKUP = 'decorar.backupCargos'; // { idDoCargo: { original, em } }
+const BACKUP = 'decorar.backupCargos';
 
-// Cargos que dá para editar, do mais alto para o mais baixo
 const decoraveis = (guild) => [...guild.roles.cache.values()].filter((r) => r.id !== guild.id && !r.managed).sort((a, b) => b.position - a.position);
 const montarLista = (guild) => { const r = decoraveis(guild); return { linhas: r.map((x) => `${x.id} | ${x.name}`), total: r.length }; };
 
@@ -34,7 +32,7 @@ async function renomear(guild, mudancas, { motivo, aoProgredir } = {}) {
     if (!r) falhas.push({ ...m, erro: 'o cargo não existe mais' });
     else if (r.name === m.depois) ok.push(m);
     else { try { await C.comLimite(r.setName(m.depois, motivo), 20000); ok.push(m); } catch (e) { falhas.push({ ...m, erro: C.motivoErro(e) }); } }
-    if (aoProgredir) { try { await aoProgredir(i, mudancas.length); } catch { /* só informativo */ } }
+    if (aoProgredir) { try { await aoProgredir(i, mudancas.length); } catch {} }
     await C.dormir(600);
   }
   return { ok, falhas };

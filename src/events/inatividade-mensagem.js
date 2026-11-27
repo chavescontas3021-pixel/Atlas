@@ -1,6 +1,5 @@
 const N = require('../inatividade/nucleo');
 
-// Cada mensagem enviada conta como "apareceu" para quem ocupa uma vaga
 module.exports = {
   name: 'messageCreate',
   once: false,

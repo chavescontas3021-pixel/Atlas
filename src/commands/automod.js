@@ -5,7 +5,6 @@ const A = require('../automod/nucleo');
 const EPH = MessageFlags.Ephemeral;
 const responder = (i, content) => i.reply({ content, flags: EPH, allowedMentions: { parse: [] } });
 
-// Liga/desliga um item numa lista salva (retorna true se ficou na lista)
 function alternar(chave, valor) {
   const lista = db.get(`config.automod.${chave}`, []);
   const atual = Array.isArray(lista) ? [...lista] : [];

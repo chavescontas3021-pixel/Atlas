@@ -1,22 +1,18 @@
-// Boas-vindas e saída: mensagem de TEXTO (sem embed) marcando o membro, com log opcional.
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../db');
 const L = require('../logs/nucleo');
 const T = require('../ui/tema');
 
-const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar'); // não passa pelo editor de mensagens
+const IGNORAR_TRADUCAO = Symbol.for('atlas.mensagens.ignorar');
 
-// Textos padrão (o site pode trocar). Variáveis: {usuario} {nome} {servidor} {contagem} {id}
 const PADROES = {
   entrada: 'Bem-vindo(a) à **{servidor}**, {usuario}. Você é o membro **#{contagem}**. Aproveite a house.',
   saida: '{usuario} (**{nome}**) saiu da **{servidor}**. Agora somos **{contagem}** membros.',
 };
 
-// config.boasvindas.entrada.{ativo,canal,texto,banner} | config.boasvindas.saida.{ativo,canal,texto,banner} | config.boasvindas.canalLog
 const cfg = (chave, padrao) => db.get(`config.boasvindas.${chave}`, padrao);
 const texto = (tipo) => cfg(`${tipo}.texto`) || PADROES[tipo];
 
-// Banner (imagem grande) opcional: link direto de uma imagem
 function bannerValido(url) {
   if (typeof url !== 'string') return null;
   const t = url.trim();
@@ -57,11 +53,9 @@ async function enviarTexto(guild, canalId, conteudo, userId, pingar, bannerUrl) 
   try {
     const msg = {
       content: String(conteudo).slice(0, 2000),
-      // Entrada: marca (e notifica) o membro. Saída: mostra a marcação, mas sem notificar.
       allowedMentions: pingar ? { users: [userId] } : { parse: [] },
       [IGNORAR_TRADUCAO]: true,
     };
-    // Com banner, o texto continua normal e a imagem aparece logo abaixo
     if (bannerUrl) msg.embeds = [new EmbedBuilder().setColor(T.COR.base).setImage(bannerUrl)];
     await canal.send(msg);
     return { ok: true, canalId: canal.id };

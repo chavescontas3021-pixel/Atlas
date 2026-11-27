@@ -1,5 +1,3 @@
-// Dados do RPG: classes, itens e monstros.
-
 const CLASSES = {
   guerreiro: {
     nome: 'Guerreiro', emoji: '⚔️', principal: 'forca', hp: 120,
@@ -48,7 +46,6 @@ const ITENS = {
   placas: { nome: 'Armadura de Placas', emoji: '🛡️', tipo: 'armadura', bonus: 13, preco: 850, nivelMin: 12 },
   manto_estelar: { nome: 'Manto Estelar', emoji: '🛡️', tipo: 'armadura', bonus: 22, preco: 2200, nivelMin: 20 },
 
-  // Dark fantasy: equipamentos de elite (caros e com exigência de nível)
   lamina_sombria: { nome: 'Lâmina Sombria', emoji: '🗡️', tipo: 'arma', bonus: 34, preco: 4500, nivelMin: 24 },
   foice_ceifador: { nome: 'Foice do Ceifador', emoji: '🌙', tipo: 'arma', bonus: 46, preco: 8000, nivelMin: 28 },
   espada_vazio: { nome: 'Espada do Vazio', emoji: '🌑', tipo: 'arma', bonus: 60, preco: 14000, nivelMin: 34 },
@@ -102,4 +99,3 @@ const MONSTROS = [
 ];
 
 module.exports = { CLASSES, ITENS, LOJA, MONSTROS };
-// fim do arquivo

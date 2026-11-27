@@ -82,7 +82,6 @@ module.exports = {
   async execute(interaction) {
     if (!interaction.inGuild()) return;
 
-    // Só ADM (ou o dono) pode mexer na blacklist
     const ehAdm =
       interaction.memberPermissions.has(PermissionFlagsBits.Administrator) ||
       interaction.user.id === interaction.guild.ownerId;

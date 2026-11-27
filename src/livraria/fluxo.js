@@ -31,8 +31,6 @@ function entrada(id, label, estilo, max, valor, min) {
   return new ActionRowBuilder().addComponents(t);
 }
 
-// ---------- Canal privado e limpeza ----------
-
 async function criarCanal(member) {
   const guild = member.guild;
   const eu = guild.members.me ?? (await guild.members.fetchMe());
@@ -59,7 +57,6 @@ async function criarCanal(member) {
   return guild.channels.create(opcoes);
 }
 
-// Se o membro abandonar a publicação, o canal é apagado depois de 3 horas
 function agendarLimpeza(canal, userId) {
   setTimeout(async () => {
     const s = db.get(chave(userId));
@@ -69,8 +66,6 @@ function agendarLimpeza(canal, userId) {
     }
   }, 3 * 60 * 60 * 1000);
 }
-
-// ---------- Passo 1: título e sinopse ----------
 
 async function iniciarPublicacao(interaction) {
   if (!N.cfg('canalLivros')) {
@@ -131,7 +126,7 @@ async function receberTexto(interaction, userId) {
   const min = N.minLinhas();
 
   const salvo = { ...sessao, titulo, autor, sinopse };
-  db.set(chave(userId), salvo); // guarda sempre, para o membro poder corrigir
+  db.set(chave(userId), salvo);
 
   if (linhas < min) {
     return interaction.reply({
@@ -155,8 +150,6 @@ async function receberTexto(interaction, userId) {
   }
   return interaction.reply({ content: '✅ Texto atualizado!', flags: EPH });
 }
-
-// ---------- Passo 2 e 3: capa, PDF e classificação ----------
 
 function menuClasse(userId, atual) {
   return new ActionRowBuilder().addComponents(
@@ -228,8 +221,6 @@ async function escolherClasse(interaction, userId) {
   return interaction.channel.send('Agora envie aqui no chat o **arquivo PDF** do livro.');
 }
 
-// ---------- Prévia ----------
-
 async function enviarPreview(canal, member) {
   const s = db.get(chave(member.id));
   if (!s) return;
@@ -297,8 +288,6 @@ async function cancelar(interaction, userId) {
   const canal = interaction.channel;
   setTimeout(() => canal.delete('Publicação cancelada').catch(() => {}), 4000);
 }
-
-// ---------- Publicar ----------
 
 async function publicar(interaction, userId) {
   const s = db.get(chave(userId));
@@ -388,8 +377,6 @@ async function publicar(interaction, userId) {
   setTimeout(() => canal.delete('Livro publicado').catch(() => {}), 60 * 1000);
 }
 
-// ---------- Apagar livro ----------
-
 function podeApagar(interaction, livro) {
   return (
     interaction.user.id === livro.userId ||
@@ -421,8 +408,6 @@ async function confirmarApagar(interaction, bookId) {
   N.removerLivro(bookId);
   return interaction.update({ content: '🗑️ Livro removido da livraria.', components: [] });
 }
-
-// ---------- Feedback ----------
 
 async function abrirFeedback(interaction) {
   const r = db.get(rascunho(interaction.user.id), {}) || {};

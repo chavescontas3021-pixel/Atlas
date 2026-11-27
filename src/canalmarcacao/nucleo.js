@@ -1,7 +1,6 @@
 const db = require('../db');
 const { ehStaff } = require('../utils/acesso');
 
-// Aceita menção de canal (<#123>) ou link de canal/mensagem (discord.com/channels/...)
 const REGEX_CANAL = /<#\d+>|https?:\/\/(?:\w+\.)?discord(?:app)?\.com\/channels\/\d+\/\d+/i;
 
 const canais = () => {
@@ -26,7 +25,6 @@ function remover(canalId) {
   return true;
 }
 
-// Apaga a mensagem se não tiver marcação de canal. A staff é ignorada.
 async function verificar(message) {
   if (!message.guild || !message.author || message.author.bot || message.system) return;
   if (!ehCanalVigiado(message.channel.id)) return;

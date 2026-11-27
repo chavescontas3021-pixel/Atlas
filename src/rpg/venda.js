@@ -1,12 +1,9 @@
-// Venda em massa do inventário do RPG (/rpg vendertudo)
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { ITENS } = require('./dados');
 const N = require('./nucleo');
 
-// Mesmo preço do /rpg vender: 50% do valor do item
 const valorUnidade = (id) => Math.floor((ITENS[id].preco || 0) * 0.5);
 
-// modo: 'tudo' = tudo que tem preço | 'mat' = só materiais (guarda poções e equipamentos)
 function calcular(j, modo) {
   const itens = [];
   let total = 0;
@@ -39,7 +36,6 @@ function botoes(userId, temMat, temOutros) {
   );
 }
 
-// Tela de confirmação (nada é vendido ainda)
 function confirmacao(j, userId) {
   const todos = calcular(j, 'tudo');
   if (!todos.itens.length) return { vazio: true };
@@ -56,7 +52,6 @@ function confirmacao(j, userId) {
   return { embed, linha: botoes(userId, mats.itens.length > 0, mats.itens.length !== todos.itens.length) };
 }
 
-// Faz a venda de verdade, recalculando agora (o inventário pode ter mudado desde a confirmação)
 function vender(j, modo) {
   const r = calcular(j, modo);
   for (const x of r.itens) N.removerItem(j, x.id, x.q);

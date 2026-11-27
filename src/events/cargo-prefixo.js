@@ -46,7 +46,6 @@ module.exports = {
 
       let cargos = idsCargos.map((id) => message.guild.roles.cache.get(id)).filter(Boolean);
 
-      // Se não marcou o cargo, tenta pelo nome escrito
       if (!cargos.length) {
         const nome = simples(partes.slice(2).join(' ').replace(/<@[!&]?\d+>/g, ''));
         if (nome) {

@@ -1,4 +1,3 @@
-// Núcleo do RPG: jogador, XP, atributos, inventário, cooldowns e perfil.
 const { EmbedBuilder } = require('discord.js');
 const db = require('../db');
 const { CLASSES, ITENS } = require('./dados');

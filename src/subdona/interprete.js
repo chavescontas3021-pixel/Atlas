@@ -1,12 +1,6 @@
-// ─────────────────────────────────────────────────────────────
-//  ATLAS · sub dona · entende ordens em português
-//  "atlas, silencia @fulano 10 min spam"  →  { acao:'silenciar', alvo, ms, motivo }
-//  Só regras e palavras-chave: sem IA, sem custo. Função pura (fácil de testar).
-// ─────────────────────────────────────────────────────────────
 const sem = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 const ABERTURA = '^(?:(?:por favor|pf|pode|consegue|poderia|vc pode|voce pode|faz favor de|faz|agora|entao|bora|vai)\\s+)*';
 
-// Cada ordem: id, padrão do verbo e prioridade (a maior ganha). 
 const ORDENS = [
   { acao: 'desbanir', p: 90, re: 'desban[a-z]*|unban|tira (?:o )?ban[a-z]*|perdoa' },
   { acao: 'tirar_silencio', p: 88, re: 'desmuta[a-z]*|tira (?:o )?(?:castigo|silencio|mute|timeout)(?: d[eoa])?|destimeout|solta|libera' },
@@ -24,7 +18,6 @@ const ORDENS = [
   { acao: 'anunciar', p: 95, re: 'anunci[a-z]*|manda (?:um )?(?:aviso|anuncio|recado)|posta|avisa (?:no|em|na)|diz (?:no|em|na)' },
 ].map((o) => ({ ...o, rx: new RegExp(`${ABERTURA}(?:${o.re})(?![a-z])`) }));
 
-// ── Tempo ("10 min", "2h", "1 dia", "meia hora") ─────────────
 const UNIDADE = { s: 1, seg: 1, segundo: 1, segundos: 1, m: 60, min: 60, minuto: 60, minutos: 60, h: 3600, hr: 3600, hrs: 3600, hora: 3600, horas: 3600, d: 86400, dia: 86400, dias: 86400, sem: 604800, semana: 604800, semanas: 604800 };
 function tempo(t) {
   const x = sem(t);
@@ -35,7 +28,6 @@ function tempo(t) {
   return { s: n * UNIDADE[m[2]], trecho: new RegExp(m[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) };
 }
 
-// Tira da frase o verbo, o tempo e palavras de ligação, sobrando o motivo
 function motivoDe(bruto, rxVerbo, { tirarTempo = true, tirarNumero = false } = {}) {
   let t = String(bruto).replace(/<[@#&!]+\d+>/g, ' ').replace(/\b\d{17,20}\b/g, ' ');
   const base = sem(t);
@@ -47,10 +39,8 @@ function motivoDe(bruto, rxVerbo, { tirarTempo = true, tirarNumero = false } = {
   return t.replace(/\s+/g, ' ').trim();
 }
 
-// ── Principal ────────────────────────────────────────────────
-// entrada: { bruto (texto sem o "atlas"), usuarios:[ids], cargos:[ids], canais:[ids] }
 function entender({ bruto, usuarios = [], cargos = [], canais = [] }) {
-  const extra = require('./interprete2').entender({ bruto, usuarios, cargos, canais }); // ordens com substantivo (ticket, sorteio, canal...)
+  const extra = require('./interprete2').entender({ bruto, usuarios, cargos, canais });
   if (extra) return extra;
   const texto = sem(String(bruto).replace(/<[@#&!]+\d+>/g, ' '));
   if (!texto) return null;
@@ -64,7 +54,6 @@ function entender({ bruto, usuarios = [], cargos = [], canais = [] }) {
   const tm = tempo(texto);
   const base = { acao, alvo, canal };
 
-  // "libera @fulano" é tirar castigo; "abre"/"libera" sem alvo é destrancar
   if (acao === 'destrancar' && usuarios.length) acao = 'tirar_silencio';
   if (acao === 'tirar_silencio' && !alvo) acao = 'destrancar';
   base.acao = acao;
@@ -73,7 +62,7 @@ function entender({ bruto, usuarios = [], cargos = [], canais = [] }) {
   switch (acao) {
     case 'limpar': {
       const n = /(\d{1,3})/.exec(texto);
-      if (!n && !/mensage|msg/.test(texto)) return null; // "apaga" sozinho é vago demais
+      if (!n && !/mensage|msg/.test(texto)) return null;
       return { ...base, n: Math.min(100, Math.max(1, n ? parseInt(n[1], 10) : 10)), alvo: usuarios[0] || null };
     }
     case 'silenciar':
@@ -111,7 +100,6 @@ function entender({ bruto, usuarios = [], cargos = [], canais = [] }) {
   }
 }
 
-// A frase parece uma ordem? (a conversa usa isso para não responder "não entendi" a uma ordem)
 const parece = (bruto) => require('./interprete2').parece(bruto) || ORDENS.some((o) => o.rx.test(sem(String(bruto).replace(/<[@#&!]+\d+>/g, ' ').replace(/^\s*atlas[\s,:;!-]*/i, ''))));
 
 module.exports = { entender, parece, tempo, sem };

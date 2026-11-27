@@ -88,7 +88,6 @@ module.exports = {
       const obraDigitada = (interaction.options.getString('obra') || '').trim();
       await interaction.deferReply({ flags: EPH });
 
-      // Descobre o que foi pedido: vaga cadastrada, personagem do AniList ou personagem digitado à mão
       let vaga = null;
       let novo = null;
       let chave;
@@ -112,7 +111,6 @@ module.exports = {
         if (!vaga) novo = { nome: bruto, grupo: obraDigitada, ext: null, foto: null };
       }
 
-      // Confere o personagem inteiro (também as entradas gêmeas), não só a vaga que foi escolhida
       const alvo = vaga || { ext: novo.ext || chave, nome: novo.nome, grupo: novo.grupo };
       const dono = N.acharTodos(alvo).find((v) => v.ocupanteId);
       if (dono) return interaction.editReply(`❌ **${dono.nome}**${dono.grupo ? ` (${dono.grupo})` : ''} já está ocupado por <@${dono.ocupanteId}>.`);
@@ -141,4 +139,3 @@ module.exports = {
     }
   },
 };
-// fim do arquivo

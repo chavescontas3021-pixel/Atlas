@@ -12,7 +12,6 @@ const sobre = (itens, problemas, extra = []) => {
 };
 
 module.exports = {
-  global: true,
   data: new SlashCommandBuilder().setName('criar').setDescription('Cria canais, categorias e cargos a partir de uma lista (staff)')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .addSubcommand((s) => s.setName('canais').setDescription('Cria canais e categorias da lista (cole no chat ou envie o .txt)')

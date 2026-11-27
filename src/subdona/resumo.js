@@ -1,4 +1,3 @@
-// ATLAS · sub dona · resumos (diário, semanal e "ao voltar")
 const UI = require('../ui/componentes');
 const { S, quando, barra } = require('../ui/tema');
 const N = require('./nucleo');
@@ -8,7 +7,6 @@ const DIA = 24 * 3600 * 1000;
 const BRT = 3 * 3600 * 1000;
 const SEM_PING = { parse: [] };
 
-// Configuração: config.subdona.resumo = { diario, semanal, hora }
 const conf = () => ({ diario: false, semanal: false, hora: 9, ...(N.cfg('resumo', {}) || {}) });
 const setConf = (c) => N.setCfg('resumo', c);
 
@@ -30,7 +28,6 @@ function eventos() {
   } catch { return { sorteios: 0, eventos: 0 }; }
 }
 
-// desde/ate em ms. Devolve a tela pronta (embed) com tudo que aconteceu no período.
 function montar({ desde, ate = Date.now(), titulo = 'Resumo', trilha = 'Resumo' }) {
   const dias = Math.ceil((ate - desde) / DIA);
   const st = stats(dias);
@@ -74,20 +71,18 @@ function montar({ desde, ate = Date.now(), titulo = 'Resumo', trilha = 'Resumo' 
   };
 }
 
-// Entrega no canal de alertas (qualquer servidor onde esteja) ou na DM do pai
 async function entregar(client, payload) {
   const id = N.alertasCanal();
   const canal = id && client.channels.cache.get(id);
   try {
     if (canal) return await canal.send(payload);
-    const pai = await N.paiId(client);
-    const u = pai && (await client.users.fetch(pai));
+    const responsavel = await N.responsavelId(client);
+    const u = responsavel && (await client.users.fetch(responsavel));
     if (u) return await u.send(payload);
   } catch (e) { console.error('[Sub dona] resumo:', e.message); }
   return null;
 }
 
-// Chamado pela ronda (a cada 5 min): envia quando chega a hora, uma vez por dia / semana
 async function tick(client) {
   const c = conf();
   if (!c.diario && !c.semanal) return;
